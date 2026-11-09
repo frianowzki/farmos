@@ -32,6 +32,8 @@ export const SORTS = [
   { id: "updated", label: "Last edited" },
   { id: "next", label: "Next date" },
   { id: "priority", label: "Priority" },
+  { id: "rating", label: "Rating (best first)" },
+  { id: "rating-asc", label: "Rating (worst first)" },
   { id: "tier", label: "Tier" },
   { id: "status", label: "Status" },
   { id: "pnl", label: "Net PnL" },
@@ -47,6 +49,10 @@ export function sortProjects(list: Project[], by: string, today: string, pnl: (p
         return (nextDate(a, today)?.day ?? far).localeCompare(nextDate(b, today)?.day ?? far);
       case "priority":
         return (PRI_RANK[a.priority] ?? 9) - (PRI_RANK[b.priority] ?? 9);
+      case "rating":
+        return (b.rating ?? 0) - (a.rating ?? 0) || (b.audit?.score ?? 0) - (a.audit?.score ?? 0);
+      case "rating-asc":
+        return (a.rating || 9) - (b.rating || 9);
       case "tier":
         return (TIER_RANK[a.tier] ?? 9) - (TIER_RANK[b.tier] ?? 9);
       case "status":

@@ -11,6 +11,7 @@ import { today as todayFn } from "@/lib/dates";
 import { pct, relDay, tone, usd } from "@/lib/format";
 import { useProjects, useUpdateProject, type Project } from "@/lib/client/api";
 import { CATEGORY_OPTS, PRIORITY_OPTS, RISK_OPTS, STATUS_OPTS, TIER_OPTS, catTone } from "@/lib/options";
+import { Rating } from "@/components/panelui/rating";
 import { SORTS, nextDate, pnlFor, sortProjects } from "@/lib/project-utils";
 
 const VIEWS = [
@@ -175,6 +176,7 @@ function TableView({ projects, pnl, today, showCat, onNew }: ViewProps & { onNew
             <th className={th}>Chains</th>
             <th className={th}>Priority</th>
             <th className={th}>Tier</th>
+            <th className={th}>Rating</th>
             <th className={th}>Risk</th>
             <th className={th}>Deadline</th>
             <th className={cn(th, "text-right")}>Invested</th>
@@ -190,7 +192,7 @@ function TableView({ projects, pnl, today, showCat, onNew }: ViewProps & { onNew
               <tr key={p.id} className="group transition-colors hover:bg-[color-mix(in_oklab,var(--hover)_55%,transparent)]">
                 <td className={cn(td, "pl-2")}>
                   <Link href={`/projects/${p.id}`} className="flex items-center gap-2 rounded-md px-1.5 py-1 hover:bg-hover">
-                    <Monogram name={p.name} />
+                    <Monogram name={p.name} accent={p.accent} />
                     <span className="truncate font-medium">{p.name}</span>
                     {nd && <span className="ml-auto hidden shrink-0 items-center gap-1 text-[11.5px] text-muted group-hover:flex"><CalendarClock className="h-3 w-3" />{nd.label} {relDay(nd.day, today)}</span>}
                   </Link>
@@ -202,6 +204,7 @@ function TableView({ projects, pnl, today, showCat, onNew }: ViewProps & { onNew
                 </td>
                 <td className={td}><SelectPill value={p.priority} options={PRIORITY_OPTS} onChange={(v) => set(p.id, { priority: v })} dot={false} /></td>
                 <td className={td}><SelectPill value={p.tier} options={TIER_OPTS} onChange={(v) => set(p.id, { tier: v })} dot={false} /></td>
+                <td className={cn(td, "px-2")}><Rating value={p.rating} onChange={(v) => set(p.id, { rating: v })} size={12} /></td>
                 <td className={td}><SelectPill value={p.risk} options={RISK_OPTS} onChange={(v) => set(p.id, { risk: v })} /></td>
                 <td className={cn(td, "w-[130px]")}><InlineText type="date" value={p.deadline} onSave={(v) => set(p.id, { deadline: v || null })} mono className="text-[12.5px]" /></td>
                 <td className={cn(td, "num pr-2 text-right text-[13px] text-ink-2")}>{r.invested ? usd(r.invested, { compact: true }) : <span className="text-faint">—</span>}</td>
@@ -262,9 +265,9 @@ function Board({ projects, pnl, today, showCat }: ViewProps) {
                       className="block rounded-md border border-line bg-panel p-2.5 shadow-[0_1px_0_rgba(0,0,0,0.02)] transition-[border,transform] hover:border-line-strong active:scale-[0.99]"
                     >
                       <div className="flex items-start gap-2">
-                        <Monogram name={p.name} size={18} />
+                        <Monogram name={p.name} accent={p.accent} size={18} />
                         <div className="min-w-0 flex-1 text-[13.5px] font-medium leading-snug">{p.name}</div>
-                        <span className="num text-[11px] text-faint">{p.tier}</span>
+                        {p.rating > 0 ? <Rating value={p.rating} readOnly size={10} /> : <span className="num text-[11px] text-faint">{p.tier}</span>}
                       </div>
                       {p.summary && <p className="mt-1 line-clamp-2 text-[12.5px] text-muted">{p.summary}</p>}
                       <div className="mt-2 flex flex-wrap items-center gap-1">
@@ -300,7 +303,7 @@ function ListView({ projects, pnl, today }: ViewProps) {
         const st = STATUS_OPTS.find((s) => s.id === p.status)!;
         return (
           <Link key={p.id} href={`/projects/${p.id}`} className="flex items-center gap-3 px-3 py-2.5 transition-colors hover:bg-hover">
-            <Monogram name={p.name} size={28} />
+            <Monogram name={p.name} accent={p.accent} size={28} />
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
                 <span className="truncate text-[14px] font-medium">{p.name}</span>

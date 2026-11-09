@@ -8,7 +8,7 @@ export async function DELETE(_: Request, ctx: Ctx) {
   const denied = await requireSession();
   if (denied) return denied;
   const { provider } = await ctx.params;
-  if (!["x", "discord", "github", "telegram"].includes(provider)) return bad("unknown provider", 404);
+  if (!["x", "discord", "github", "telegram", "farcaster"].includes(provider)) return bad("unknown provider", 404);
   await removeConnection(provider);
   return NextResponse.json({ ok: true });
 }

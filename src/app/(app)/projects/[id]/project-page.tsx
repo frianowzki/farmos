@@ -1,7 +1,7 @@
 "use client";
 import { useQueryClient } from "@tanstack/react-query";
 import {
-  AtSign, Banknote, CalendarDays, CalendarPlus, ChevronRight, CircleDot, Coins, ExternalLink, Flag, Gauge, Layers, Link2, Mail, MoreHorizontal,
+  AtSign, Banknote, CalendarRange, Palette, Star, CalendarDays, CalendarPlus, ChevronRight, CircleDot, Coins, ExternalLink, Flag, Gauge, Layers, Link2, Mail, MoreHorizontal,
   Pin, PinOff, Plus, RefreshCw, ShieldAlert, Sparkles, Tag, Telescope, Trash2, Wallet as WalletIcon, Waypoints, ScanSearch,
 } from "lucide-react";
 import Link from "next/link";
@@ -12,7 +12,14 @@ import { Editor } from "@/components/editor";
 import { MailList } from "@/components/mail";
 import { Monogram, Page } from "@/components/shell";
 import { AddTask, TaskRow, useTaskModel } from "@/components/tasks";
-import { Button, Empty, InlineText, Popover, SelectPill, Skeleton, TagInput } from "@/components/ui";
+import { Button, Dialog, Empty, InlineText, Popover, SelectPill, Skeleton, TagInput } from "@/components/ui";
+import { ColorSelector, ColorSelectorItem, ColorSelectorList } from "@/components/motion/color-selector";
+import { WheelPicker } from "@/components/motion/wheel-picker";
+import { Attachments } from "@/components/panelui/attachment";
+import { Questionnaire } from "@/components/panelui/questionnaire";
+import { Rating } from "@/components/panelui/rating";
+import { AUDIT, auditScore, scoreToRating } from "@/lib/audit";
+import { addDays } from "@/lib/dates";
 import { cn } from "@/lib/cn";
 import { CHAIN_SUGGESTIONS, KEY_DATES, LINK_FIELDS } from "@/lib/constants";
 import { today as todayFn } from "@/lib/dates";
@@ -27,11 +34,13 @@ const TABS = [
   { id: "tasks", label: "Tasks" },
   { id: "diary", label: "Diary" },
   { id: "mail", label: "Mail" },
+  { id: "files", label: "Files" },
 ];
 
 export function ProjectPage({ id }: { id: string }) {
   const { data, isLoading, error } = useProject(id);
   const update = useUpdateProject();
+  const qc = useQueryClient();
   const [tab, setTab] = useState("notes");
   const today = todayFn();
   if (isLoading) return <Page><Skeleton className="mb-4 h-10 w-1/2" /><Skeleton className="h-64" /></Page>;
@@ -55,7 +64,7 @@ export function ProjectPage({ id }: { id: string }) {
       </div>
 
       <div className="mb-1 flex items-start gap-3">
-        <Monogram name={p.name} size={44} className="mt-1 rounded-[10px]" />
+        <Monogram name={p.name} accent={p.accent} size={44} className="mt-1 rounded-[10px]" />
         <div className="min-w-0 flex-1">
           <TitleInput value={p.name} onSave={(name) => name.trim() && set({ name: name.trim() })} />
           <input
@@ -78,6 +87,7 @@ export function ProjectPage({ id }: { id: string }) {
             {t.label}
             {t.id === "positions" && data.positions.length > 0 && <span className="num ml-1.5 text-[11.5px] text-faint">{data.positions.length}</span>}
             {t.id === "diary" && data.diary.length > 0 && <span className="num ml-1.5 text-[11.5px] text-faint">{data.diary.length}</span>}
+            {t.id === "files" && data.attachments.length > 0 && <span className="num ml-1.5 text-[11.5px] text-faint">{data.attachments.length}</span>}
             {t.id === "tasks" && data.tasks.length > 0 && <span className="num ml-1.5 text-[11.5px] text-faint">{data.tasks.length}</span>}
           </button>
         ))}
@@ -88,6 +98,17 @@ export function ProjectPage({ id }: { id: string }) {
       {tab === "tasks" && <ProjectTasks projectId={id} />}
       {tab === "diary" && <ProjectDiary projectId={id} entries={data.diary} />}
       {tab === "mail" && <MailList projectId={id} />}
+      {tab === "files" && (
+        <Attachments
+          items={data.attachments}
+          target={{ projectId: id }}
+          onChange={() => qc.invalidateQueries({ queryKey: keys.project(id) })}
+          onRemove={async (aid) => {
+            await api(`/api/attachments/${aid}`, { method: "DELETE" });
+            qc.invalidateQueries({ queryKey: keys.project(id) });
+          }}
+        />
+      )}
     </Page>
   );
 }
@@ -197,6 +218,19 @@ function Properties({ p, set, today }: { p: Project; set: (patch: Partial<Projec
         <Prop icon={<Flag className={ic} />} label="Priority"><SelectPill value={p.priority} options={PRIORITY_OPTS} onChange={(v) => set({ priority: v })} dot={false} /></Prop>
         <Prop icon={<Gauge className={ic} />} label="Tier / potential"><SelectPill value={p.tier} options={TIER_OPTS.map((t) => ({ ...t, label: t.long }))} onChange={(v) => set({ tier: v })} dot={false} /></Prop>
         <Prop icon={<ShieldAlert className={ic} />} label="Risk"><SelectPill value={p.risk} options={RISK_OPTS} onChange={(v) => set({ risk: v })} /></Prop>
+        <Prop icon={<Star className={ic} />} label="Rating">
+          <div className="flex items-center gap-2 py-1">
+            <Rating value={p.rating} onChange={(v) => set({ rating: v })} />
+            <AuditButton p={p} set={set} />
+          </div>
+        </Prop>
+        <Prop icon={<Palette className={ic} />} label="Accent">
+          <ColorSelector value={p.accent ?? ""} onValueChange={(v) => set({ accent: v || null })} className="py-1">
+            <ColorSelectorList className="flex-nowrap gap-1">
+              {ACCENTS.map((a) => <ColorSelectorItem key={a} value={a} color={`var(--t-${a}-fg)`} label={a} className="size-6 [&>span:last-child]:size-3.5" />)}
+            </ColorSelectorList>
+          </ColorSelector>
+        </Prop>
         <Prop icon={<Waypoints className={ic} />} label="Chains"><TagInput value={p.chains} onChange={(v) => set({ chains: v })} suggestions={CHAIN_SUGGESTIONS} placeholder="Empty" /></Prop>
         <Prop icon={<Tag className={ic} />} label="Tags"><TagInput value={p.tags} onChange={(v) => set({ tags: v })} suggestions={["points", "quests", "galxe", "zealy", "bridge", "swap", "lp", "staking", "node", "social", "gtd", "fcfs", "season-1"]} placeholder="Empty" tone="stone" /></Prop>
         <Prop icon={<WalletIcon className={ic} />} label="Wallets used">
@@ -212,6 +246,9 @@ function Properties({ p, set, today }: { p: Project; set: (patch: Partial<Projec
             <DateCell value={kd[k.id as keyof typeof kd] ?? null} today={today} onSave={(v) => set({ keyDates: { ...kd, [k.id]: v } })} />
           </Prop>
         ))}
+        <Prop icon={<CalendarRange className={ic} />} label="Campaign">
+          <CampaignCell start={p.campaignStart} end={p.campaignEnd} today={today} onSave={(a, b) => set({ campaignStart: a, campaignEnd: b })} />
+        </Prop>
         <Prop icon={<Sparkles className={ic} />} label="Source"><InlineText value={p.source} onSave={(v) => set({ source: v || null })} placeholder="Where you found it" /></Prop>
       </div>
       <div className="md:col-span-2">
@@ -501,3 +538,75 @@ function ProjectDiary({ projectId, entries }: { projectId: string; entries: { id
   );
 }
 
+
+const ACCENTS = ["amber", "red", "green", "blue", "violet", "stone"] as const;
+
+function AuditButton({ p, set }: { p: Project; set: (patch: Partial<Project>) => void }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button onClick={() => setOpen(true)} className="rounded px-1.5 py-0.5 text-[12px] text-muted hover:bg-hover hover:text-ink">
+        {p.audit ? <>Audit <span className="num text-ink-2">{p.audit.score}</span>/100</> : "Run audit"}
+      </button>
+      <Dialog open={open} onClose={() => setOpen(false)} title="Project audit" width={560}>
+        <Questionnaire
+          questions={AUDIT.map((q) => ({ id: q.id, title: q.title, help: q.help, options: q.options.map((o) => ({ id: o.id, label: o.label })) }))}
+          initial={p.audit?.answers ?? {}}
+          submitLabel="Save audit"
+          onCancel={() => setOpen(false)}
+          onSubmit={(answers) => {
+            const score = auditScore(answers);
+            set({ audit: { answers, score, updatedAt: new Date().toISOString() }, ...(p.rating ? {} : { rating: scoreToRating(score) }) });
+            setOpen(false);
+            toast.success(`Audit saved · ${score}/100`);
+          }}
+        />
+      </Dialog>
+    </>
+  );
+}
+
+const fmtShort = (d: string) => new Date(`${d}T00:00:00`).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+
+/** Campaign window picked on two wheels (beUI Wheel Picker), ±1 year around today. */
+function CampaignCell({ start, end, today, onSave }: { start: string | null; end: string | null; today: string; onSave: (a: string | null, b: string | null) => void }) {
+  const [open, setOpen] = useState(false);
+  const [a, setA] = useState(start ?? today);
+  const [b, setB] = useState(end ?? addDays(start ?? today, 30));
+  const options = (() => {
+    const out: { label: string; value: string }[] = [];
+    for (let i = -365; i <= 365; i++) {
+      const d = addDays(today, i);
+      out.push({ label: fmtShort(d), value: d });
+    }
+    return out;
+  })();
+  const days = start && end ? Math.round((new Date(end).getTime() - new Date(start).getTime()) / 86_400_000) : null;
+  return (
+    <>
+      <button onClick={() => { setA(start ?? today); setB(end ?? addDays(start ?? today, 30)); setOpen(true); }} className="rounded px-1.5 py-1 text-left text-[13px] hover:bg-hover">
+        {start || end ? (
+          <span className="num text-ink-2">{start ? fmtShort(start) : "…"} → {end ? fmtShort(end) : "…"}{days != null && <span className="ml-2 text-faint">{days}d</span>}</span>
+        ) : (
+          <span className="text-faint">Empty</span>
+        )}
+      </button>
+      <Dialog open={open} onClose={() => setOpen(false)} title="Campaign window" width={520}>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <div className="mb-1 font-label text-[11px] uppercase tracking-[0.14em] text-muted">Starts</div>
+            <WheelPicker options={options} value={a} onValueChange={setA} aria-label="Campaign start" />
+          </div>
+          <div>
+            <div className="mb-1 font-label text-[11px] uppercase tracking-[0.14em] text-muted">Ends</div>
+            <WheelPicker options={options} value={b} onValueChange={setB} aria-label="Campaign end" />
+          </div>
+        </div>
+        <div className="mt-4 flex items-center justify-between">
+          <Button variant="ghost" size="sm" onClick={() => { onSave(null, null); setOpen(false); }}>Clear</Button>
+          <Button variant="primary" size="sm" disabled={b < a} onClick={() => { onSave(a, b); setOpen(false); }}>{b < a ? "End is before start" : "Save"}</Button>
+        </div>
+      </Dialog>
+    </>
+  );
+}

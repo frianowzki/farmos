@@ -1,7 +1,6 @@
 "use client";
 import { Check, ChevronDown, X } from "lucide-react";
 import { forwardRef, useEffect, useLayoutEffect, useRef, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type TextareaHTMLAttributes } from "react";
-import { AnimatePresence, motion } from "motion/react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/cn";
 import { Button as PanelButton } from "@/components/panelui/button";

@@ -64,6 +64,54 @@ Tools are public read-only data: DefiLlama, DexScreener, GeckoTerminal, CoinGeck
 - For WalletConnect (mobile wallets, QR), create a project at https://cloud.reown.com, then set `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` (Production + Preview) and redeploy.
 - frioOS is **read-only**: it reads balances only and never requests signatures or sends transactions.
 
+## 5. Connected accounts (Settings → Connected accounts)
+Every provider is optional. When its keys are missing, Settings shows "Not set up" with the exact env var names and callback URL, and nothing else breaks. Tokens are AES-GCM encrypted with `AUTH_SECRET` in the `connected_accounts` table and never reach the browser. Connecting needs an unlocked session first; these logins do **not** unlock frioOS (only the passcode or `ALLOWED_EMAIL` Google can).
+
+Callback URL pattern: `https://frioos-iota.vercel.app/api/auth/callback/<provider>`. Add the localhost one too if you develop locally.
+
+**X** (Feed → X timeline, read-only)
+1. https://developer.x.com → Projects & Apps → your app → User authentication settings → OAuth 2.0, type **Web App**, permissions **Read**.
+2. Callback URL: `https://frioos-iota.vercel.app/api/auth/callback/x`. Website URL: `https://frioos-iota.vercel.app`.
+3. Copy the OAuth 2.0 Client ID and Secret into `X_CLIENT_ID` and `X_CLIENT_SECRET`.
+4. Scopes requested: `users.read tweet.read follows.read offline.access`. The home timeline needs a paid X API tier (Basic or higher). On Free, the Feed shows X's plan message instead of posts. On 429 it shows the rate-limit message.
+
+**Discord** (identity on your profile)
+1. https://discord.com/developers/applications → New Application → OAuth2.
+2. Redirect: `https://frioos-iota.vercel.app/api/auth/callback/discord`.
+3. `DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET`. Scope: `identify` only.
+
+**GitHub** (identity, public profile)
+1. https://github.com/settings/developers → New OAuth App.
+2. Homepage `https://frioos-iota.vercel.app`, callback `https://frioos-iota.vercel.app/api/auth/callback/github`.
+3. `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`. Scope: `read:user`.
+
+**Telegram** (official Login Widget)
+1. In Telegram, message @BotFather → `/newbot` → copy the token into `TELEGRAM_BOT_TOKEN` (server-only).
+2. Send `/setdomain` to @BotFather, choose the bot, and enter `frioos-iota.vercel.app`.
+3. Set `NEXT_PUBLIC_TELEGRAM_BOT_USERNAME` to the bot username without `@` (public by design).
+4. frioOS checks the widget payload's HMAC with the bot token and rejects payloads older than 24 h.
+
+**Farcaster** (public profile)
+No keys needed. Enter your username; frioOS reads the public profile from the Farcaster (Warpcast) API. It is a display link, not a verified sign-in (that would need a signature, which frioOS never asks for).
+
+**Google**: see section 2.
+
+Redeploy after adding any env var (`vercel --prod`).
+
+## 6. Upcoming mints (OpenSea)
+1. Get an API key at https://docs.opensea.io/reference/api-keys and set `OPENSEA_API_KEY` (Production + Preview, sensitive). It stays server-side.
+2. NFT → Upcoming mints lists OpenSea's upcoming and featured drops with stages, price, supply, and a countdown.
+3. **Check eligibility** tests every saved wallet (Wallets page), read-only:
+   - Public stage: open to everyone.
+   - The stage that is live right now: frioOS asks OpenSea to *build* (not send) a 1-token mint for the wallet with only the API key. OpenSea answers 200 (on the list) or `MINTER_NOT_ELIGIBLE`. The returned calldata is thrown away; nothing is signed or sent.
+   - SeaDrop Merkle allowlists: frioOS reads the root from the SeaDrop contract on-chain, finds the `AllowListUpdated` event's published list, rebuilds the root to confirm the file, and checks each wallet. Set `ETHERSCAN_API_KEY` to search the full log history; without it only roughly the last 49k blocks are searched.
+   - Token-gated stages: checks on-chain whether the wallet holds a gate NFT.
+   - Signed presales that are not live yet: OpenSea only reveals these to a signed-in wallet, so frioOS shows "Unknown", re-checks when the stage opens, and lets you keep a manual status, the project's own checker link, and a note.
+4. **Watch** keeps a drop under Watching. **Track as project** creates an NFT project with the mint date and OpenSea link.
+
+## 7. Attachments (Vercel Blob)
+The private Blob store `frioos-files` is linked to the project, which provides `BLOB_READ_WRITE_TOKEN`. Files on projects (Files tab) and diary entries are stored privately and streamed through `/api/attachments/<id>/file` after the session check. The limit is 4 MB per file, which keeps uploads under Vercel's function body limit.
+
 ## Env var reference
 | Var | Required | Notes |
 | --- | --- | --- |
@@ -75,3 +123,9 @@ Tools are public read-only data: DefiLlama, DexScreener, GeckoTerminal, CoinGeck
 | `AI_BASE_URL`, `AI_API_KEY`, `AI_MODEL` | optional | or configure in Settings |
 | `ETHERSCAN_API_KEY` | optional | richer audits |
 | `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` | optional | WalletConnect; public by design |
+| `OPENSEA_API_KEY` | optional | Upcoming mints + live-stage WL check |
+| `BLOB_READ_WRITE_TOKEN` | optional | attachments (set by the Blob integration) |
+| `X_CLIENT_ID`, `X_CLIENT_SECRET` | optional | X connection + Feed timeline |
+| `DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET` | optional | Discord connection |
+| `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | optional | GitHub connection |
+| `TELEGRAM_BOT_TOKEN`, `NEXT_PUBLIC_TELEGRAM_BOT_USERNAME` | optional | Telegram Login Widget |

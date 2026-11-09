@@ -145,11 +145,13 @@ function SidebarBody() {
     }
     return c;
   }, [data]);
-  const pinned = (data?.projects ?? []).filter((p) => p.pinned).slice(0, 8);
+  // Counts and pins come from the client cache; render them only after mount so SSR and hydration agree.
+  const ready = useMounted();
+  const pinned = ready ? (data?.projects ?? []).filter((p) => p.pinned).slice(0, 8) : [];
   const isActive = (href: string) => (href === "/" ? pathname === "/" : pathname.startsWith(href));
   const cat = pathname === "/projects" ? sp.get("cat") ?? "all" : null;
   const icon = (I: typeof Gift) => <I className="h-[17px] w-[17px]" strokeWidth={1.75} />;
-  const badge = (n?: number) => (n ? <span className="num text-[11px] text-faint">{n}</span> : undefined);
+  const badge = (n?: number) => (n && ready ? <span className="num text-[11px] text-faint">{n}</span> : undefined);
   const btn = "min-h-[32px] rounded-lg px-2.5 text-[13.5px] font-normal text-ink-2 hover:text-ink";
 
   return (

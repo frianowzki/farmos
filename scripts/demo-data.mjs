@@ -22,13 +22,13 @@ if (cmd === "clean") {
   fs.unlinkSync(file);
   process.exit(0);
 }
-const day = (d) => { const x = new Date(); x.setDate(x.getDate() + d); return x.toISOString().slice(0, 10); };
+const day = (d) => { const x = new Date(); x.setDate(x.getDate() + d); return x.toLocaleDateString("en-CA"); };
 const ids = { projects: [], tasks: [], diary: [] };
 const P = [
-  { name: "[demo] Monad", category: "testnet", status: "active", chains: ["Monad"], priority: "high", tier: "S", risk: "low", summary: "Daily swaps + NFT mints on testnet, Discord roles.", keyDates: { snapshot: day(9) }, costSpent: 0, tags: ["quests"] },
-  { name: "[demo] Ink points", category: "airdrop", status: "waiting", chains: ["Ink"], priority: "medium", tier: "A", risk: "low", summary: "Bridged + weekly LP. Waiting on season 2.", deadline: day(3), costSpent: 41.5, capitalDeployed: 300, rewardsReceived: 0 },
-  { name: "[demo] Pudgy Rods WL", category: "nft", status: "claimable", chains: ["Ethereum"], priority: "urgent", tier: "B", risk: "medium", summary: "GTD spot won, mint window opens soon.", keyDates: { mint: day(1) }, costSpent: 6 },
-  { name: "[demo] BRETT rotation", category: "degen", status: "active", chains: ["Base"], priority: "medium", tier: "C", risk: "high", summary: "Momentum play, stop at −30%.", costSpent: 3.2 },
+  { name: "[demo] Monad", category: "testnet", status: "active", chains: ["Monad"], priority: "high", tier: "S", risk: "low", rating: 5, accent: "violet", campaignStart: day(-20), campaignEnd: day(40), summary: "Daily swaps + NFT mints on testnet, Discord roles.", keyDates: { snapshot: day(9) }, costSpent: 0, tags: ["quests"] },
+  { name: "[demo] Ink points", category: "airdrop", status: "waiting", chains: ["Ink"], priority: "medium", tier: "A", risk: "low", rating: 4, accent: "blue", summary: "Bridged + weekly LP. Waiting on season 2.", deadline: day(3), costSpent: 41.5, capitalDeployed: 300, rewardsReceived: 0 },
+  { name: "[demo] Pudgy Rods WL", category: "nft", status: "claimable", chains: ["Ethereum"], priority: "urgent", tier: "B", risk: "medium", rating: 3, summary: "GTD spot won, mint window opens soon.", keyDates: { mint: day(1) }, costSpent: 6 },
+  { name: "[demo] BRETT rotation", category: "degen", status: "active", chains: ["Base"], priority: "medium", tier: "C", risk: "high", rating: 2, accent: "red", summary: "Momentum play, stop at −30%.", costSpent: 3.2 },
   { name: "[demo] Hyperlane", category: "airdrop", status: "done", chains: ["Arbitrum", "Base"], priority: "low", tier: "A", risk: "low", summary: "Claimed and sold.", costSpent: 28, rewardsReceived: 412 },
 ];
 for (const p of P) ids.projects.push((await call("POST", "/api/projects", p)).project.id);
@@ -44,6 +44,7 @@ const T = [
 for (const t of T) ids.tasks.push((await call("POST", "/api/tasks", { cadence: "daily", startDate: day(-40), ...t })).task.id);
 for (let i = 1; i < 40; i++) for (const [k, id] of ids.tasks.entries()) if ((i * 7 + k * 3) % 5 !== 0 || i < 6) await call("POST", `/api/tasks/${id}/toggle`, { day: day(-i), done: true });
 await call("POST", `/api/tasks/${ids.tasks[1]}/toggle`, { day: day(0), done: true });
+ids.diary.push((await call("POST", "/api/diary", { day: day(-3), title: "Ink LP rebalance", content: "<p>Moved range up after the pump. Fees ok.</p>", projectIds: [ids.projects[1]] })).entry.id);
 ids.diary.push((await call("POST", "/api/diary", { day: day(-1), title: "Monad week 3", content: "<p>Faucet slower today. Swapped on 3 dexes, minted 1 NFT.</p>", projectIds: [ids.projects[0]] })).entry.id);
 fs.writeFileSync(file, JSON.stringify(ids));
 console.log("seeded", ids.projects.length, "projects");

@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { decrypt, encrypt } from "@/lib/server/crypto";
 
-export type ProviderId = "google" | "x" | "discord" | "github" | "telegram";
+export type ProviderId = "google" | "x" | "discord" | "github" | "telegram" | "farcaster";
 
 export const PROVIDERS: { id: ProviderId; label: string; env: string[]; purpose: string }[] = [
   { id: "google", label: "Google", env: ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"], purpose: "Gmail (read-only) and Calendar sync" },
@@ -12,11 +12,14 @@ export const PROVIDERS: { id: ProviderId; label: string; env: string[]; purpose:
   { id: "discord", label: "Discord", env: ["DISCORD_CLIENT_ID", "DISCORD_CLIENT_SECRET"], purpose: "Identity (username and avatar) on your project pages" },
   { id: "github", label: "GitHub", env: ["GITHUB_CLIENT_ID", "GITHUB_CLIENT_SECRET"], purpose: "Identity and public profile for dev-heavy testnets" },
   { id: "telegram", label: "Telegram", env: ["TELEGRAM_BOT_TOKEN", "NEXT_PUBLIC_TELEGRAM_BOT_USERNAME"], purpose: "Identity via the official Login Widget" },
+  { id: "farcaster", label: "Farcaster", env: [], purpose: "Public profile by username (read from the Farcaster API, no sign-in)" },
 ];
 
 export const isConfigured = (id: ProviderId) => {
   const p = PROVIDERS.find((x) => x.id === id);
-  return Boolean(p && p.env.every((k) => process.env[k]) && process.env.AUTH_SECRET);
+  if (!p) return false;
+  const needsAuthJs = id === "x" || id === "discord" || id === "github" || id === "google";
+  return p.env.every((k) => process.env[k]) && (!needsAuthJs || Boolean(process.env.AUTH_SECRET));
 };
 
 export async function saveConnection(input: {

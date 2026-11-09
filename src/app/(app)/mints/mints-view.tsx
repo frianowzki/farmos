@@ -43,6 +43,7 @@ function price(s?: DropStage | null) {
   return `${Number(formatEther(BigInt(s.price))).toLocaleString(undefined, { maximumFractionDigits: 5 })} ${native ? "ETH" : "token"}`;
 }
 const autoOf = (w?: MintWatch) => (w?.auto as unknown as Eligibility | null) ?? null;
+const publicOnly = (e: Eligibility | null) => Boolean(e && e.wallets.length && e.wallets.every((w) => w.verdict === "not_eligible" && w.stages.some((x) => /public/i.test(x.type))));
 const bestVerdict = (e: Eligibility | null): Verdict | null => (!e ? null : e.wallets.some((w) => w.verdict === "eligible") ? "eligible" : e.wallets.length && e.wallets.every((w) => w.verdict === "not_eligible") ? "not_eligible" : "unknown");
 
 export function MintsView() {
@@ -114,7 +115,7 @@ export function MintsView() {
                     </div>
                   </div>
                   <div className="hidden shrink-0 items-center gap-3 sm:flex">
-                    {v && <Marker tone={VERDICT[v].tone}>{VERDICT[v].label}</Marker>}
+                    {v && (publicOnly(autoOf(w)) ? <Marker tone="gray">Public only</Marker> : <Marker tone={VERDICT[v].tone}>{VERDICT[v].label}</Marker>)}
                     {manual && <Pill tone="gray">{manual}</Pill>}
                   </div>
                   <div className="w-[118px] shrink-0 text-right text-[12.5px]">
@@ -237,7 +238,7 @@ function DropDialog({ slug, onClose }: { slug: string; onClose: () => void }) {
                   <li key={r.address} className="px-3 py-2.5">
                     <div className="flex items-center justify-between gap-2">
                       <span className="min-w-0 truncate text-[13px] text-ink">{r.label || "Wallet"} <span className="num text-muted">{r.address.slice(0, 6)}…{r.address.slice(-4)}</span></span>
-                      <VerdictTag v={r.verdict} />
+                      <VerdictTag v={r.verdict} publicOnly={r.verdict === "not_eligible" && r.stages.some((x) => /public/i.test(x.type))} />
                     </div>
                     <ul className="mt-1.5 space-y-0.5">
                       {r.stages.map((s, i) => (
@@ -286,11 +287,11 @@ function DropDialog({ slug, onClose }: { slug: string; onClose: () => void }) {
   );
 }
 
-function VerdictTag({ v }: { v: Verdict }) {
+function VerdictTag({ v, publicOnly }: { v: Verdict; publicOnly?: boolean }) {
   const Icon = v === "eligible" ? Check : v === "not_eligible" ? XIcon : CircleDashed;
   return (
-    <span className={cn("inline-flex items-center gap-1 text-[12.5px] font-medium", v === "eligible" ? "text-pos" : v === "not_eligible" ? "text-neg" : "text-muted")}>
-      <Icon className="h-3.5 w-3.5" /> {VERDICT[v].label}
+    <span className={cn("inline-flex items-center gap-1 text-[12.5px] font-medium", v === "eligible" ? "text-pos" : v === "not_eligible" ? (publicOnly ? "text-ink-2" : "text-neg") : "text-muted")}>
+      <Icon className="h-3.5 w-3.5" /> {publicOnly ? "Public stage only" : VERDICT[v].label}
     </span>
   );
 }

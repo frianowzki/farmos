@@ -1,6 +1,6 @@
 "use client";
 import { useMutation, useQuery, useQueryClient, type QueryKey } from "@tanstack/react-query";
-import type { DiaryEntry, Position, Project, Task, Wallet } from "@/db/schema";
+import type { Attachment, DiaryEntry, Position, Project, Task, Wallet } from "@/db/schema";
 
 export type { DiaryEntry, Position, Project, Task, Wallet };
 
@@ -49,6 +49,7 @@ export type ProjectDetail = {
   project: Project;
   positions: Position[];
   tasks: Task[];
+  attachments: Attachment[];
   diary: DiaryEntry[];
   calendar: { kind: string; eventId: string; day: string }[];
 };

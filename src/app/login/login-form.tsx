@@ -4,6 +4,7 @@ import { signIn } from "next-auth/react";
 import { useState } from "react";
 import { Logo } from "@/components/shell";
 import { Button, Input } from "@/components/ui";
+import { TextReveal } from "@/components/motion/text-reveal";
 
 export function LoginForm({ next, error, googleLogin }: { next: string; error?: string; googleLogin: boolean }) {
   const [code, setCode] = useState("");
@@ -26,34 +27,55 @@ export function LoginForm({ next, error, googleLogin }: { next: string; error?: 
   };
 
   return (
-    <div className="flex min-h-dvh items-center justify-center px-4">
-      <div className="anim-rise w-full max-w-[360px]">
-        <div className="mb-8 text-center">
-          <Logo className="scale-[1.6]" />
-          <p className="mt-5 font-serif text-[17px] italic text-muted">Your quiet desk for the loud parts of crypto.</p>
+    <div className="grid min-h-dvh lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)]">
+      <div className="flex items-center justify-center px-5 py-12">
+        <div className="anim-rise w-full max-w-[360px]">
+          <Logo className="mb-10 origin-left scale-[1.35]" />
+          <TextReveal as="h1" split="word" text="Welcome back." className="font-serif text-[34px] leading-[1.1] tracking-[-0.015em] text-ink" />
+          <p className="mt-2 text-[14px] text-muted">Enter your passcode to open the desk.</p>
+          <form onSubmit={submit} className="mt-7">
+            <label htmlFor="passcode" className="mb-1.5 flex items-center gap-1.5 text-[12.5px] font-medium text-ink-2">
+              <KeyRound className="h-3.5 w-3.5 text-muted" /> Passcode
+            </label>
+            <Input id="passcode" name="passcode" type="password" autoComplete="current-password" autoFocus value={code} onChange={(e) => setCode(e.target.value)} className="h-10 text-[15px]" placeholder="••••••••••••" aria-invalid={Boolean(err) || undefined} aria-describedby={err ? "login-error" : undefined} />
+            {err && <p id="login-error" role="alert" className="mt-2 text-[12.5px] text-neg">{err}</p>}
+            <Button type="submit" variant="primary" className="mt-4 h-10 w-full text-[14px]" disabled={!code || busy}>
+              {busy ? "Unlocking…" : "Unlock"} <ArrowRight className="h-3.5 w-3.5" />
+            </Button>
+            {googleLogin && (
+              <>
+                <div className="my-5 flex items-center gap-3 text-[11.5px] text-faint">
+                  <span className="h-px flex-1 bg-line" /> or <span className="h-px flex-1 bg-line" />
+                </div>
+                <Button type="button" className="h-10 w-full text-[14px]" onClick={() => signIn("google", { redirectTo: safeNext })}>
+                  <GoogleMark /> Continue with Google
+                </Button>
+              </>
+            )}
+          </form>
+          <p className="mt-8 text-[12px] text-faint">Private workspace · wallets are read-only · nothing here can send a transaction.</p>
         </div>
-        <form onSubmit={submit} className="rounded-xl border border-line bg-panel p-5 shadow-pop">
-          <label htmlFor="passcode" className="mb-2 flex items-center gap-1.5 text-[12.5px] font-medium text-muted">
-            <KeyRound className="h-3.5 w-3.5" /> Passcode
-          </label>
-          <Input id="passcode" name="passcode" type="password" autoComplete="current-password" autoFocus value={code} onChange={(e) => setCode(e.target.value)} className="h-10 text-[15px]" placeholder="••••••••••••" />
-          {err && <p className="mt-2 text-[12.5px] text-neg">{err}</p>}
-          <Button type="submit" variant="primary" className="mt-4 h-9 w-full" disabled={!code || busy}>
-            {busy ? "Unlocking…" : "Unlock"} <ArrowRight className="h-3.5 w-3.5" />
-          </Button>
-          {googleLogin && (
-            <>
-              <div className="my-4 flex items-center gap-3 text-[11.5px] text-faint">
-                <span className="h-px flex-1 bg-line" /> or <span className="h-px flex-1 bg-line" />
-              </div>
-              <Button type="button" className="h-9 w-full" onClick={() => signIn("google", { redirectTo: safeNext })}>
-                <GoogleMark /> Continue with Google
-              </Button>
-            </>
-          )}
-        </form>
-        <p className="mt-4 text-center text-[12px] text-faint">Private workspace. Read-only for wallets.</p>
       </div>
+      <aside className="relative hidden overflow-hidden border-l border-line bg-sidebar lg:flex lg:flex-col lg:justify-between lg:p-12">
+        <div className="font-label text-[11px] font-medium uppercase tracking-[0.18em] text-muted">frioOS · personal edition</div>
+        <div className="max-w-[440px]">
+          <p className="font-serif text-[30px] italic leading-[1.2] text-ink">Your quiet desk for the loud parts of crypto.</p>
+          <ul className="mt-8 space-y-3 text-[14px] text-ink-2">
+            {[
+              ["Airdrops & testnets", "one database, table, board or list"],
+              ["Daily routine", "streaks, heatmap and a recap of every day"],
+              ["Upcoming mints", "OpenSea drops with WL checks on your wallets"],
+              ["Research desk", "your own model, live on-chain and market tools"],
+            ].map(([a, b]) => (
+              <li key={a} className="flex gap-3 border-t border-line pt-3">
+                <span className="w-44 shrink-0 font-medium text-ink">{a}</span>
+                <span className="text-muted">{b}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+        <div className="num text-[11.5px] text-faint">Read-only by design.</div>
+      </aside>
     </div>
   );
 }

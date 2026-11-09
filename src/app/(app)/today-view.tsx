@@ -12,7 +12,8 @@ import { cn } from "@/lib/cn";
 import { STATUSES } from "@/lib/constants";
 import { diffDays } from "@/lib/dates";
 import { relDay, tone, usd, pct } from "@/lib/format";
-import { api, useDiary, useGoogleStatus, useProjects } from "@/lib/client/api";
+import { api, useDiary, useGoogleStatus, useProjects, type Project } from "@/lib/client/api";
+import { Grid, GridItem } from "@/components/panelui/grid-item";
 import { catTone } from "@/lib/options";
 import { sumPnl } from "@/lib/pnl";
 import { pnlFor, projectDates } from "@/lib/project-utils";
@@ -69,6 +70,7 @@ export function TodayView() {
         </p>
       </div>
 
+      {!fresh && !isLoading && <TodayKpis projects={projects} today={today} />}
       {fresh ? (
         <Onboarding onNew={() => newProject()} />
       ) : (
@@ -262,5 +264,32 @@ function DiaryNudge({ today }: { today: string }) {
         <p className="mt-1 text-[13px] text-muted">Keep a log of what you did, what you learned, and what to try next. <span className="text-accent">Start writing →</span></p>
       )}
     </Link>
+  );
+}
+
+function TodayKpis({ projects, today }: { projects: Project[]; today: string }) {
+  const live = projects.filter((p) => p.status !== "dropped");
+  const paid = projects.filter((p) => p.rewardsReceived > 0);
+  const paidSum = paid.reduce((a, p) => a + p.rewardsReceived, 0);
+  const tba = live.filter((p) => p.status !== "done" && !p.keyDates?.tge && !p.deadline);
+  const incoming = live.filter((p) => p.status === "claimable" || [p.keyDates?.tge, p.keyDates?.snapshot, p.keyDates?.mint, p.deadline].some((d) => d && diffDays(d, today) >= 0 && diffDays(d, today) <= 30));
+  const items = [
+    { k: "Projects", v: String(live.length), sub: `${projects.filter((p) => p.status === "active").length} active`, href: "/projects" },
+    { k: "Paid out / claimed", v: usd(paidSum, { compact: true }), sub: `${paid.length} project${paid.length === 1 ? "" : "s"}`, href: "/portfolio" },
+    { k: "TBA", v: String(tba.length), sub: "no TGE or deadline yet", href: "/projects" },
+    { k: "Incoming", v: String(incoming.length), sub: "claimable or due in 30d", href: "/projects" },
+  ];
+  return (
+    <Grid className="mb-8">
+      {items.map((i) => (
+        <GridItem key={i.k} className="transition-colors hover:border-line-strong">
+          <Link href={i.href} className="block px-4 py-3">
+            <div className="font-label text-[10.5px] font-medium uppercase tracking-[0.14em] text-muted">{i.k}</div>
+            <div className="num mt-1 text-[24px] leading-tight text-ink">{i.v}</div>
+            <div className="mt-0.5 text-[11.5px] text-faint">{i.sub}</div>
+          </Link>
+        </GridItem>
+      ))}
+    </Grid>
   );
 }

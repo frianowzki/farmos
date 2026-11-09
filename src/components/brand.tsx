@@ -1,10 +1,12 @@
 /**
  * Official brand app icons (sourced from iconly.design's index of official App Store / web app icons,
- * self-hosted in /public/brands, resized to 128px). Used only to label real connections/brands.
+ * self-hosted in /public/brands, resized to 128px). Farcaster is not in iconly's index, so its official App Store icon is used. Used only to label real connections/brands.
  */
 import { cn } from "@/lib/cn";
 
 export const BRANDS = {
+  google: "Google",
+  farcaster: "Farcaster",
   x: "X",
   telegram: "Telegram",
   discord: "Discord",
