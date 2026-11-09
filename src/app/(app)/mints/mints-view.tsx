@@ -231,7 +231,7 @@ function DropDialog({ slug, onClose }: { slug: string; onClose: () => void }) {
             {!walletCount ? (
               <p className="text-[13px] text-muted">Save a wallet on the <Link href="/wallets" className="text-accent hover:underline">Wallets</Link> page to auto-check WL status.</p>
             ) : !auto ? (
-              <p className="text-[13px] text-muted">Not checked yet. frioOS asks OpenSea about the live stage and reads SeaDrop&apos;s on-chain allowlist and token gates for your {walletCount} saved wallet{walletCount > 1 ? "s" : ""}.</p>
+              <p className="text-[13px] text-muted">Not checked yet. farmOS asks OpenSea about the live stage and reads SeaDrop&apos;s on-chain allowlist and token gates for your {walletCount} saved wallet{walletCount > 1 ? "s" : ""}.</p>
             ) : (
               <ul className="divide-y divide-line rounded-lg border border-line">
                 {auto.wallets.map((r) => (

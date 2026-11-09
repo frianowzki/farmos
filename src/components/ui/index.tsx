@@ -11,7 +11,7 @@ type BtnProps = ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "primary" 
 const VARIANT = { primary: "default", outline: "outline", ghost: "ghost", subtle: "secondary", danger: "ghost" } as const;
 const SIZE = { sm: "sm", md: "sm", icon: "icon-sm" } as const;
 
-/** frioOS button: PanelUI Button (base-ui) tuned to the dense frioOS scale. */
+/** farmOS button: PanelUI Button (base-ui) tuned to the dense farmOS scale. */
 export const Button = forwardRef<HTMLButtonElement, BtnProps>(function Button({ variant = "outline", size = "md", className, ...p }, ref) {
   return (
     <PanelButton

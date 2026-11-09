@@ -134,7 +134,7 @@ export async function upsertAllDayEvent(eventId: string | null, ev: { summary: s
     end: { date: end.toISOString().slice(0, 10) },
     transparency: "transparent",
     reminders: { useDefault: false, overrides: [{ method: "popup", minutes: 24 * 60 }, { method: "popup", minutes: 15 * 60 }] },
-    source: { title: "frioOS", url: process.env.APP_URL ?? "https://frioos-iota.vercel.app" },
+    source: { title: "farmOS", url: process.env.APP_URL ?? "https://frioos-iota.vercel.app" },
   };
   if (eventId) {
     try {

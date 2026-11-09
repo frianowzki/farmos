@@ -1,4 +1,4 @@
-# frioOS setup
+# farmOS setup
 
 Production: https://frioos-iota.vercel.app (Vercel project `frioos`, team frianowzkis-projects).
 
@@ -14,11 +14,11 @@ Production: https://frioos-iota.vercel.app (Vercel project `frioos`, team friano
 ## 2. Google (Gmail read-only + Calendar sync)
 Until these env vars exist, the Mail and Calendar sections show a setup card. No fake data is shown.
 
-1. Go to https://console.cloud.google.com and create a project (for example "frioOS").
+1. Go to https://console.cloud.google.com and create a project (for example "farmOS").
 2. Under APIs & Services → Library, enable the **Gmail API** and the **Google Calendar API**.
 3. Under APIs & Services → OAuth consent screen:
    - User type: External.
-   - App name: frioOS, with your email as support/developer contact.
+   - App name: farmOS, with your email as support/developer contact.
    - Scopes: add `.../auth/gmail.readonly` and `.../auth/calendar.events` (plus openid, email, profile).
    - Publishing status: leave it in **Testing** and add your own Gmail under **Test users**. Testing mode means no Google verification is needed. Refresh tokens in Testing mode expire after 7 days, so if mail stops loading, reconnect in Settings.
 4. Under APIs & Services → Credentials → Create credentials → OAuth client ID:
@@ -31,7 +31,7 @@ Until these env vars exist, the Mail and Calendar sections show a setup card. No
    - `GOOGLE_CLIENT_SECRET`
    - `ALLOWED_EMAIL`: the only Google account allowed to sign in, for example `you@gmail.com`.
 6. Redeploy (Deployments → ⋯ → Redeploy, or `vercel --prod`).
-7. In frioOS → Settings → Google, click **Connect Google**.
+7. In farmOS → Settings → Google, click **Connect Google**.
 
 What it does:
 - Mail lists recent messages (read-only scope) and matches them to projects by each project's "Mail matchers" (domains, senders, keywords).
@@ -62,10 +62,10 @@ Tools are public read-only data: DefiLlama, DexScreener, GeckoTerminal, CoinGeck
 ## 4. Wallets
 - Injected wallets (MetaMask, Rabby, and others) work with no config.
 - For WalletConnect (mobile wallets, QR), create a project at https://cloud.reown.com, then set `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` (Production + Preview) and redeploy.
-- frioOS is **read-only**: it reads balances only and never requests signatures or sends transactions.
+- farmOS is **read-only**: it reads balances only and never requests signatures or sends transactions.
 
 ## 5. Connected accounts (Settings → Connected accounts)
-Every provider is optional. When its keys are missing, Settings shows "Not set up" with the exact env var names and callback URL, and nothing else breaks. Tokens are AES-GCM encrypted with `AUTH_SECRET` in the `connected_accounts` table and never reach the browser. Connecting needs an unlocked session first; these logins do **not** unlock frioOS (only the passcode or `ALLOWED_EMAIL` Google can).
+Every provider is optional. When its keys are missing, Settings shows "Not set up" with the exact env var names and callback URL, and nothing else breaks. Tokens are AES-GCM encrypted with `AUTH_SECRET` in the `connected_accounts` table and never reach the browser. Connecting needs an unlocked session first; these logins do **not** unlock farmOS (only the passcode or `ALLOWED_EMAIL` Google can).
 
 Callback URL pattern: `https://frioos-iota.vercel.app/api/auth/callback/<provider>`. Add the localhost one too if you develop locally.
 
@@ -89,10 +89,10 @@ Callback URL pattern: `https://frioos-iota.vercel.app/api/auth/callback/<provide
 1. In Telegram, message @BotFather → `/newbot` → copy the token into `TELEGRAM_BOT_TOKEN` (server-only).
 2. Send `/setdomain` to @BotFather, choose the bot, and enter `frioos-iota.vercel.app`.
 3. Set `NEXT_PUBLIC_TELEGRAM_BOT_USERNAME` to the bot username without `@` (public by design).
-4. frioOS checks the widget payload's HMAC with the bot token and rejects payloads older than 24 h.
+4. farmOS checks the widget payload's HMAC with the bot token and rejects payloads older than 24 h.
 
 **Farcaster** (public profile)
-No keys needed. Enter your username; frioOS reads the public profile from the Farcaster (Warpcast) API. It is a display link, not a verified sign-in (that would need a signature, which frioOS never asks for).
+No keys needed. Enter your username; farmOS reads the public profile from the Farcaster (Warpcast) API. It is a display link, not a verified sign-in (that would need a signature, which farmOS never asks for).
 
 **Google**: see section 2.
 
@@ -103,10 +103,10 @@ Redeploy after adding any env var (`vercel --prod`).
 2. NFT → Upcoming mints lists OpenSea's upcoming and featured drops with stages, price, supply, and a countdown.
 3. **Check eligibility** tests every saved wallet (Wallets page), read-only:
    - Public stage: open to everyone.
-   - The stage that is live right now: frioOS asks OpenSea to *build* (not send) a 1-token mint for the wallet with only the API key. OpenSea answers 200 (on the list) or `MINTER_NOT_ELIGIBLE`. The returned calldata is thrown away; nothing is signed or sent.
-   - SeaDrop Merkle allowlists: frioOS reads the root from the SeaDrop contract on-chain, finds the `AllowListUpdated` event's published list, rebuilds the root to confirm the file, and checks each wallet. Set `ETHERSCAN_API_KEY` to search the full log history; without it only roughly the last 49k blocks are searched.
+   - The stage that is live right now: farmOS asks OpenSea to *build* (not send) a 1-token mint for the wallet with only the API key. OpenSea answers 200 (on the list) or `MINTER_NOT_ELIGIBLE`. The returned calldata is thrown away; nothing is signed or sent.
+   - SeaDrop Merkle allowlists: farmOS reads the root from the SeaDrop contract on-chain, finds the `AllowListUpdated` event's published list, rebuilds the root to confirm the file, and checks each wallet. Set `ETHERSCAN_API_KEY` to search the full log history; without it only roughly the last 49k blocks are searched.
    - Token-gated stages: checks on-chain whether the wallet holds a gate NFT.
-   - Signed presales that are not live yet: OpenSea only reveals these to a signed-in wallet, so frioOS shows "Unknown", re-checks when the stage opens, and lets you keep a manual status, the project's own checker link, and a note.
+   - Signed presales that are not live yet: OpenSea only reveals these to a signed-in wallet, so farmOS shows "Unknown", re-checks when the stage opens, and lets you keep a manual status, the project's own checker link, and a note.
 4. **Watch** keeps a drop under Watching. **Track as project** creates an NFT project with the mint date and OpenSea link.
 
 ## 7. Attachments (Vercel Blob)

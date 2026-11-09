@@ -1,5 +1,5 @@
 /**
- * Typography — PanelUI Typography (native-only upstream), web rebuild on the frioOS type system:
+ * Typography — PanelUI Typography (native-only upstream), web rebuild on the farmOS type system:
  * Display (EB Garamond), Eyebrow (Jost caps), Body (Google Sans), Num (Google Sans Code).
  */
 import type { ElementType, ReactNode } from "react";

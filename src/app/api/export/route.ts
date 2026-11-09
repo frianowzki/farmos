@@ -16,6 +16,6 @@ export async function GET() {
   ]);
   const body = JSON.stringify({ exportedAt: new Date().toISOString(), projects, positions, tasks, completions, diary, wallets, threads }, null, 2);
   return new Response(body, {
-    headers: { "content-type": "application/json", "content-disposition": `attachment; filename="frioos-backup-${new Date().toISOString().slice(0, 10)}.json"` },
+    headers: { "content-type": "application/json", "content-disposition": `attachment; filename="farmos-backup-${new Date().toISOString().slice(0, 10)}.json"` },
   });
 }

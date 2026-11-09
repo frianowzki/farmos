@@ -49,7 +49,7 @@ function Inner() {
 
   return (
     <Page>
-      <PageHeader eyebrow="Workspace" title="Wallets" subtitle="Read-only. frioOS never asks for signatures or sends transactions." />
+      <PageHeader eyebrow="Workspace" title="Wallets" subtitle="Read-only. farmOS never asks for signatures or sends transactions." />
 
       <div className="mb-8 rounded-xl border border-line bg-panel p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -61,7 +61,7 @@ function Inner() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {isConnected && address && !isLinked && <Button size="sm" variant="primary" onClick={() => add(address, connector?.name ?? "")}><Link2 className="h-3.5 w-3.5" /> Link to frioOS</Button>}
+            {isConnected && address && !isLinked && <Button size="sm" variant="primary" onClick={() => add(address, connector?.name ?? "")}><Link2 className="h-3.5 w-3.5" /> Link to farmOS</Button>}
             {isConnected ? (
               <Button size="sm" variant="ghost" onClick={() => disconnect()}><Unplug className="h-3.5 w-3.5" /> Disconnect</Button>
             ) : (

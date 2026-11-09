@@ -57,7 +57,7 @@ export function LoginForm({ next, error, googleLogin }: { next: string; error?: 
         </div>
       </div>
       <aside className="relative hidden overflow-hidden border-l border-line bg-sidebar lg:flex lg:flex-col lg:justify-between lg:p-12">
-        <div className="font-label text-[11px] font-medium uppercase tracking-[0.18em] text-muted">frioOS · personal edition</div>
+        <div className="font-label text-[11px] font-medium uppercase tracking-[0.18em] text-muted">farmOS · personal edition</div>
         <div className="max-w-[440px]">
           <p className="font-serif text-[30px] italic leading-[1.2] text-ink">Your quiet desk for the loud parts of crypto.</p>
           <ul className="mt-8 space-y-3 text-[14px] text-ink-2">

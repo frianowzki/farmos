@@ -142,7 +142,7 @@ export async function checkEligibility(drop: DropDetail, wallets: { address: str
       const stage = s.label || s.stage_type;
       if (osCheck?.verdict && s.uuid === live && !isPublic(s)) stages.push({ stage, type: s.stage_type, verdict: osCheck.verdict, how: `OpenSea allowlist check for the live stage: ${osCheck.verdict === "eligible" ? "wallet is on the list" : "wallet is not on the list"}` });
       else if (isPublic(s)) stages.push({ stage, type: s.stage_type, verdict: "eligible", how: "Public stage, open to every wallet" });
-      else if (isSigned(s)) stages.push({ stage, type: s.stage_type, verdict: "unknown", how: "Signed presale: OpenSea answers for a wallet only once this stage is live (frioOS re-checks then). Before that, check on OpenSea; frioOS never asks for signatures" });
+      else if (isSigned(s)) stages.push({ stage, type: s.stage_type, verdict: "unknown", how: "Signed presale: OpenSea answers for a wallet only once this stage is live (farmOS re-checks then). Before that, check on OpenSea; farmOS never asks for signatures" });
       else if (isTokenGated(s)) {
         if (!client || !gated.length) stages.push({ stage, type: s.stage_type, verdict: "unknown", how: "Token-gated, gate tokens not readable on-chain" });
         else {

@@ -21,7 +21,7 @@ const connectors = connectorsForWallets(
       ]
     : [{ groupName: "Browser wallet", wallets: [injectedWallet, rabbyWallet] }],
   // RainbowKit requires a value; without a real id only injected wallets are offered (no WalletConnect relay).
-  { appName: "frioOS", projectId: projectId || "frioos-injected-only" },
+  { appName: "farmOS", projectId: projectId || "frioos-injected-only" },
 );
 
 export const wagmiConfig = createConfig({
@@ -38,7 +38,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     : lightTheme({ accentColor: "#b8572b", accentColorForeground: "#ffffff", borderRadius: "medium", fontStack: "system", overlayBlur: "none" });
   return (
     <WagmiProvider config={wagmiConfig}>
-      <RainbowKitProvider theme={theme} modalSize="compact" appInfo={{ appName: "frioOS", disclaimer: () => <p style={{ fontSize: 12 }}>frioOS is read-only. It never requests transactions or signatures.</p> }}>
+      <RainbowKitProvider theme={theme} modalSize="compact" appInfo={{ appName: "farmOS", disclaimer: () => <p style={{ fontSize: 12 }}>farmOS is read-only. It never requests transactions or signatures.</p> }}>
         {children}
       </RainbowKitProvider>
     </WagmiProvider>

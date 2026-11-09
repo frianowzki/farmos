@@ -64,8 +64,8 @@
   --heat-0: #24221f; --heat-1: #4a2f20; --heat-2: #7a4325; --heat-3: #b25f33; --heat-4: #e88a57;
 }
 
-/* shadcn/ui semantic tokens, mapped onto the frioOS palette.
-   frioOS keeps its own meaning for --muted (text) and --accent (terracotta);
+/* shadcn/ui semantic tokens, mapped onto the farmOS palette.
+   farmOS keeps its own meaning for --muted (text) and --accent (terracotta);
    shadcn components that need neutral fills use --secondary instead (edited on add). */
 :root, .dark {
   --background: var(--bg);

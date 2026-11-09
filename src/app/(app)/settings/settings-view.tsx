@@ -33,7 +33,7 @@ export function SettingsView({ appUrl, allowedEmail }: { appUrl: string; allowed
   const mounted = useMounted();
   return (
     <Page>
-      <PageHeader eyebrow="frioOS" title="Settings" />
+      <PageHeader eyebrow="farmOS" title="Settings" />
       <nav aria-label="Settings sections" className="-mx-1 mb-2 flex gap-1 overflow-x-auto pb-2 text-[12.5px]">
         {[
           ["appearance", "Appearance"],
@@ -198,7 +198,7 @@ function GoogleSection({ appUrl, allowedEmail }: { appUrl: string; allowedEmail:
         </div>
       ) : (
         <div className="max-w-xl rounded-lg border border-line bg-panel p-4">
-          <p className="mb-3 text-[13px] text-ink-2">Connect the Gmail account you farm with. frioOS asks for Gmail read-only and Calendar events access.</p>
+          <p className="mb-3 text-[13px] text-ink-2">Connect the Gmail account you farm with. farmOS asks for Gmail read-only and Calendar events access.</p>
           <Button variant="primary" onClick={() => signIn("google", { redirectTo: "/settings#google" })}><GoogleMark /> Connect Google</Button>
         </div>
       )}

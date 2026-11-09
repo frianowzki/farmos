@@ -14,7 +14,7 @@ const label = Jost({ variable: "--font-jost", subsets: ["latin"], display: "swap
 const mono = Google_Sans_Code({ variable: "--font-gmono", subsets: ["latin"], display: "swap" });
 
 export const metadata: Metadata = {
-  title: { default: "frioOS", template: "%s · frioOS" },
+  title: { default: "farmOS", template: "%s · farmOS" },
   description: "A private workspace for airdrops, testnets, NFT whitelists and degen plays.",
   robots: { index: false, follow: false },
 };

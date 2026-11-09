@@ -28,7 +28,7 @@ export async function POST(req: Request) {
       const existing = links.find((l) => l.kind === w.kind);
       const ev = await upsertAllDayEvent(existing?.eventId ?? null, {
         summary: `${p.name} · ${w.label}`,
-        description: `${p.category.toUpperCase()} · ${p.status}\n${p.summary ?? ""}\n\nOpen in frioOS: ${base}/projects/${p.id}`,
+        description: `${p.category.toUpperCase()} · ${p.status}\n${p.summary ?? ""}\n\nOpen in farmOS: ${base}/projects/${p.id}`,
         day: w.day,
       });
       await db()

@@ -1,4 +1,4 @@
-# frioOS
+# farmOS
 
 A personal crypto workspace for airdrops, testnets, NFT whitelists, and degen positions. It covers projects (ratings, audits, accents, campaign windows, files), daily tasks and streaks, a Recap of each day, a diary, a daily AI reading list plus your X timeline, upcoming OpenSea mints with read-only WL checks, read-only wallets, Gmail/Calendar, and an AI research desk.
 

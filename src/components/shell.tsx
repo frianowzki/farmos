@@ -65,7 +65,7 @@ export function Monogram({ name, size = 20, className, accent }: { name: string;
 export function Logo({ className }: { className?: string }) {
   return (
     <span className={cn("inline-flex items-baseline gap-[1px] select-none", className)}>
-      <span className="font-serif text-[19px] font-medium italic tracking-[-0.01em] text-ink">frio</span>
+      <span className="font-serif text-[19px] font-medium italic tracking-[-0.01em] text-ink">farm</span>
       <span className="font-label text-[11px] font-medium tracking-[0.16em] text-accent">OS</span>
     </span>
   );
@@ -492,7 +492,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <Ctx.Provider value={{ newProject, openPalette, openQuick }}>
       <AnimatedSidebarProvider open={sidebarOpen} onOpenChange={setSidebarOpen} className="bg-bg" style={{ "--sidebar-width": "15.5rem", "--sidebar-width-icon": "3.75rem" } as never}>
-        <AnimatedSidebar ariaLabel="frioOS" collapsible="icon" panelClassName="bg-sidebar border-line" className="[&_[data-slot=sidebar-menu-button]]:rounded-lg">
+        <AnimatedSidebar ariaLabel="farmOS" collapsible="icon" panelClassName="bg-sidebar border-line" className="[&_[data-slot=sidebar-menu-button]]:rounded-lg">
           <Suspense fallback={null}>
             <SidebarBody />
           </Suspense>

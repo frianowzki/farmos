@@ -27,7 +27,7 @@ export function GoogleSetupState({ compact }: { compact?: boolean }) {
     <Empty
       icon={<MailIcon className="h-6 w-6" />}
       title="Google is ready to connect"
-      body="Read-only Gmail access lets frioOS match whitelist, KYC and claim emails to your projects."
+      body="Read-only Gmail access lets farmOS match whitelist, KYC and claim emails to your projects."
       action={<Link href="/settings#google"><Button variant="primary">Connect Google</Button></Link>}
     />
   );

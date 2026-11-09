@@ -320,9 +320,9 @@ function Proposal({ output }: { output: { proposal: ProposalT } }) {
           {p.chains?.length ? <div className="mt-1 text-[12px] text-muted">{p.chains.join(" · ")}</div> : null}
         </div>
         {created || exists ? (
-          <Link href={`/projects/${created ?? exists!.id}`}><Button size="sm">{created ? "Open" : "In frioOS"} <ChevronRight className="h-3.5 w-3.5" /></Button></Link>
+          <Link href={`/projects/${created ?? exists!.id}`}><Button size="sm">{created ? "Open" : "In farmOS"} <ChevronRight className="h-3.5 w-3.5" /></Button></Link>
         ) : (
-          <Button size="sm" variant="primary" onClick={add} disabled={create.isPending}><Plus className="h-3.5 w-3.5" /> Add to frioOS</Button>
+          <Button size="sm" variant="primary" onClick={add} disabled={create.isPending}><Plus className="h-3.5 w-3.5" /> Add to farmOS</Button>
         )}
       </div>
     </div>
