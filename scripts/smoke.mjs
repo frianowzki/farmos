@@ -1,0 +1,50 @@
+// Usage: FRIO_PASSCODE=... node scripts/smoke.mjs https://your-app
+// Logs in, exercises CRUD on every resource, then deletes what it created.
+const base = process.argv[2] ?? "http://localhost:3000";
+const pass = process.env.FRIO_PASSCODE;
+if (!pass) throw new Error("FRIO_PASSCODE env required");
+let cookie = "";
+async function call(method, path, body) {
+  const res = await fetch(base + path, { method, headers: { "content-type": "application/json", cookie }, body: body ? JSON.stringify(body) : undefined, redirect: "manual" });
+  const sc = res.headers.get("set-cookie");
+  if (sc) cookie = sc.split(";")[0];
+  const j = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(`${method} ${path} -> ${res.status} ${JSON.stringify(j)}`);
+  return j;
+}
+const ok = (m) => console.log("✓", m);
+const gate = await fetch(base + "/", { redirect: "manual" });
+if (gate.status !== 307 && gate.status !== 308) throw new Error(`gate expected redirect, got ${gate.status}`);
+ok(`gate redirects to ${gate.headers.get("location")}`);
+const unauth = await fetch(base + "/api/projects");
+if (unauth.status !== 401) throw new Error("API not protected");
+ok("API returns 401 without session");
+await call("POST", "/api/unlock", { passcode: pass });
+ok("unlocked");
+const { project } = await call("POST", "/api/projects", { name: "SMOKE TEST (auto-deleted)", category: "degen", chains: ["Base"], costSpent: 5 });
+ok(`created project ${project.id}`);
+await call("PATCH", `/api/projects/${project.id}`, { status: "active", tier: "A", keyDates: { tge: "2026-12-01" }, capitalDeployed: 100 });
+const { position } = await call("POST", "/api/positions", { projectId: project.id, token: "TEST", size: 10, entryPrice: 2, currentPrice: 3, status: "open" });
+await call("PATCH", `/api/positions/${position.id}`, { status: "closed", exitPrice: 4 });
+const detail = await call("GET", `/api/projects/${project.id}`);
+if (detail.project.status !== "active" || detail.positions[0].exitPrice !== 4) throw new Error("readback mismatch");
+ok("project + position update/readback");
+const { task } = await call("POST", "/api/tasks", { title: "Smoke task", cadence: "daily", startDate: "2026-11-01", projectId: project.id });
+await call("POST", `/api/tasks/${task.id}/toggle`, { day: "2026-11-10", done: true });
+const t = await call("GET", "/api/tasks");
+if (!t.completions.some((c) => c.taskId === task.id)) throw new Error("completion missing");
+ok("task + completion");
+const { entry } = await call("POST", "/api/diary", { day: "2026-11-10", title: "Smoke", content: "<p>hello</p>", projectIds: [project.id] });
+const d2 = await call("GET", `/api/projects/${project.id}`);
+if (!d2.diary.some((e) => e.id === entry.id)) throw new Error("diary not linked");
+ok("diary linked to project");
+await call("DELETE", `/api/diary/${entry.id}`);
+await call("DELETE", `/api/tasks/${task.id}`);
+await call("DELETE", `/api/projects/${project.id}`);
+const after = await call("GET", "/api/projects");
+if (after.projects.some((p) => p.id === project.id)) throw new Error("delete failed");
+ok("cleanup done (project, positions, task, diary deleted)");
+const ai = await call("GET", "/api/settings/ai");
+ok(`ai settings readable (configured=${ai.configured}, key never returned: ${!("apiKey" in ai)})`);
+const g = await call("GET", "/api/google/status");
+ok(`google status: configured=${g.configured} connected=${g.connected}`);
