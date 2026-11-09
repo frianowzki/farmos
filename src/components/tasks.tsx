@@ -5,7 +5,7 @@ import Link from "next/link";
 import { AnimatePresence, motion } from "motion/react";
 import { useMemo, useState } from "react";
 import { playUi } from "@/lib/client/sound";
-import { toast } from "sonner";
+import { toast } from "@/lib/client/toast";
 import { Button, Input, NativeSelect } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import { addDays, today as todayFn } from "@/lib/dates";

@@ -32,6 +32,18 @@ export const projectInput = z
     summary: z.string().max(1000).nullable(),
     notes: z.string().max(400_000),
     pinned: z.boolean(),
+    rating: z.coerce.number().int().min(0).max(5),
+    accent: z.string().regex(/^[a-z]+$/).max(20).nullable(),
+    campaignStart: day,
+    campaignEnd: day,
+    audit: z
+      .object({
+        answers: z.record(z.string().max(40), z.array(z.string().max(40)).max(12)),
+        score: z.number().min(0).max(100),
+        updatedAt: z.string().max(40),
+      })
+      .nullable(),
+    sortOrder: z.coerce.number().int(),
   })
   .partial();
 

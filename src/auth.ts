@@ -1,5 +1,8 @@
 import NextAuth from "next-auth";
+import Discord from "next-auth/providers/discord";
+import GitHub from "next-auth/providers/github";
 import Google from "next-auth/providers/google";
+import Twitter from "next-auth/providers/twitter";
 import { cookies } from "next/headers";
 import { SESSION_COOKIE, createSessionToken, sessionCookieOptions, verifySessionToken } from "@/lib/session";
 
@@ -15,8 +18,11 @@ export const googleConfigured = Boolean(
   process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET && process.env.AUTH_SECRET,
 );
 
-export const { handlers, auth, signIn, signOut } = NextAuth({
-  providers: googleConfigured
+const has = (...k: string[]) => Boolean(process.env.AUTH_SECRET) && k.every((x) => process.env[x]);
+
+/** Every provider is gated on its env vars, so a missing key just means "not set up" in Settings. */
+const providers = [
+  ...(googleConfigured
     ? [
         Google({
           clientId: process.env.GOOGLE_CLIENT_ID,
@@ -26,13 +32,63 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           },
         }),
       ]
-    : [],
+    : []),
+  ...(has("X_CLIENT_ID", "X_CLIENT_SECRET")
+    ? [
+        Twitter({
+          id: "x",
+          name: "X",
+          clientId: process.env.X_CLIENT_ID,
+          clientSecret: process.env.X_CLIENT_SECRET,
+          authorization: { url: "https://x.com/i/oauth2/authorize", params: { scope: "users.read tweet.read follows.read offline.access" } },
+          token: "https://api.x.com/2/oauth2/token",
+          userinfo: "https://api.x.com/2/users/me?user.fields=profile_image_url,username,name,public_metrics",
+        }),
+      ]
+    : []),
+  ...(has("DISCORD_CLIENT_ID", "DISCORD_CLIENT_SECRET")
+    ? [Discord({ clientId: process.env.DISCORD_CLIENT_ID, clientSecret: process.env.DISCORD_CLIENT_SECRET, authorization: { params: { scope: "identify" } } })]
+    : []),
+  ...(has("GITHUB_CLIENT_ID", "GITHUB_CLIENT_SECRET")
+    ? [GitHub({ clientId: process.env.GITHUB_CLIENT_ID, clientSecret: process.env.GITHUB_CLIENT_SECRET, authorization: { params: { scope: "read:user" } } })]
+    : []),
+];
+
+export const { handlers, auth, signIn, signOut } = NextAuth({
+  providers,
   secret: process.env.AUTH_SECRET,
   trustHost: true,
   session: { strategy: "jwt" },
   pages: { signIn: "/login", error: "/login" },
   callbacks: {
     async signIn({ account, profile }) {
+      if (account && account.provider !== "google") {
+        // Linking only: X / Discord / GitHub never unlock the app, they attach to an unlocked session.
+        const jar = await cookies();
+        if (!(await verifySessionToken(jar.get(SESSION_COOKIE)?.value))) return "/login?error=AccessDenied";
+        const p = (profile ?? {}) as Record<string, unknown>;
+        const data = (p.data ?? p) as Record<string, unknown>;
+        const { saveConnection } = await import("@/lib/server/connections");
+        const provider = account.provider as "x" | "discord" | "github";
+        const username = String(data.username ?? data.login ?? p.username ?? "") || null;
+        const image =
+          provider === "discord" && p.avatar
+            ? `https://cdn.discordapp.com/avatars/${String(p.id)}/${String(p.avatar)}.png`
+            : (String(data.profile_image_url ?? data.avatar_url ?? "") || null);
+        await saveConnection({
+          provider,
+          providerAccountId: account.providerAccountId,
+          username,
+          name: String(data.name ?? p.global_name ?? username ?? "") || null,
+          image,
+          accessToken: account.access_token ?? null,
+          refreshToken: account.refresh_token ?? null,
+          expiresAt: account.expires_at ?? null,
+          scope: account.scope ?? null,
+          profile: provider === "x" ? { metrics: data.public_metrics ?? null } : provider === "github" ? { url: data.html_url ?? null, repos: data.public_repos ?? null } : {},
+        });
+        return true;
+      }
       const email = (profile?.email ?? "").toLowerCase();
       const allowed = (process.env.ALLOWED_EMAIL ?? "").toLowerCase().split(",").map((s) => s.trim()).filter(Boolean);
       const jar = await cookies();

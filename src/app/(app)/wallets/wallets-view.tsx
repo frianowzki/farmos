@@ -4,7 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { ChevronDown, Copy, ExternalLink, Link2, Plus, ShieldCheck, Trash2, Unplug } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
-import { toast } from "sonner";
+import { toast } from "@/lib/client/toast";
 import { formatUnits, isAddress } from "viem";
 import { useAccount, useBalance, useDisconnect } from "wagmi";
 import { Monogram, Page, PageHeader } from "@/components/shell";

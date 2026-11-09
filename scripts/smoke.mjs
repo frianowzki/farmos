@@ -48,3 +48,20 @@ const ai = await call("GET", "/api/settings/ai");
 ok(`ai settings readable (configured=${ai.configured}, key never returned: ${!("apiKey" in ai)})`);
 const g = await call("GET", "/api/google/status");
 ok(`google status: configured=${g.configured} connected=${g.connected}`);
+const mints = await call("GET", "/api/mints?type=featured");
+ok(`opensea drops: configured=${mints.configured} count=${mints.drops.length}${mints.error ? ` error=${mints.error}` : ""}`);
+const live = mints.drops.find((d) => d.is_minting) ?? mints.drops[0];
+if (mints.configured && live) {
+  const existing = (await call("GET", "/api/wallets")).wallets;
+  const temp = existing.length ? null : (await call("POST", "/api/wallets", { address: "0x1111111111111111111111111111111111111111", label: "SMOKE (auto-deleted)" })).wallet;
+  const wasWatched = mints.watch.some((w) => w.slug === live.collection_slug);
+  const { result } = await call("POST", `/api/mints/${live.collection_slug}/check`);
+  ok(`eligibility ${live.collection_slug}: ${result.wallets.map((w) => `${w.verdict} [${w.stages.map((s) => s.how).join(" | ")}]`).join("; ")}`);
+  await call("PATCH", `/api/mints/${live.collection_slug}`, { manualStatus: "applied", note: "smoke" });
+  const det = await call("GET", `/api/mints/${live.collection_slug}`);
+  if (det.watch?.manualStatus !== "applied") throw new Error("mint watch readback failed");
+  ok("mint watch save/readback");
+  if (!wasWatched) await call("DELETE", `/api/mints/${live.collection_slug}`);
+  if (temp) await call("DELETE", `/api/wallets/${temp.id}`);
+  ok("mint cleanup done");
+}

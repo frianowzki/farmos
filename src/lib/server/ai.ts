@@ -75,7 +75,7 @@ function isPrivateIp(ip: string) {
   return a === 10 || a === 127 || a === 0 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 100 && b >= 64 && b <= 127) || a >= 224;
 }
 
-async function safeFetch(url: string, maxBytes = 600_000, timeoutMs = 10_000, init: RequestInit = {}) {
+export async function safeFetch(url: string, maxBytes = 600_000, timeoutMs = 10_000, init: RequestInit = {}) {
   const u = new URL(url);
   if (!/^https?:$/.test(u.protocol)) throw new Error("Only http(s) URLs are allowed");
   const host = u.hostname;

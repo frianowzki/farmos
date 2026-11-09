@@ -4,10 +4,10 @@ import { Check, Download, KeyRound, Monitor, Moon, Sun } from "lucide-react";
 import { signIn } from "next-auth/react";
 import { useTheme } from "next-themes";
 import { useState, type ReactNode } from "react";
-import { toast } from "sonner";
+import { toast } from "@/lib/client/toast";
 import { GoogleMark } from "@/app/login/login-form";
 import { Page, PageHeader } from "@/components/shell";
-import { Switch } from "@/components/ui/switch";
+import { Switch } from "@/components/motion/switch";
 import { playUi, setSoundEnabled, useSoundEnabled } from "@/lib/client/sound";
 import { Button, Field, Input, Kbd, Pill } from "@/components/ui";
 import { cn } from "@/lib/cn";
@@ -80,7 +80,7 @@ function SoundSection() {
             setSoundEnabled(v);
             if (v) playUi("toggle");
           }}
-          aria-label="UI sounds"
+          ariaLabel="UI sounds"
         />
       </label>
     </Section>

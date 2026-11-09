@@ -8,7 +8,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { toast } from "sonner";
+import { toast } from "@/lib/client/toast";
 import { Monogram } from "@/components/shell";
 import { Button, NativeSelect, Pill } from "@/components/ui";
 import { cn } from "@/lib/cn";

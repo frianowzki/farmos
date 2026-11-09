@@ -1,41 +1,57 @@
 "use client";
 import { Command } from "cmdk";
 import {
-  ArrowRight, Flame, FlaskConical, Gift, Image as ImageIcon, Layers, ListChecks, Lock, Mail, Menu, Monitor, Moon, NotebookPen, Plus, Search,
-  Settings2, Sun, SunMedium, Telescope, Wallet, X, ChartNoAxesColumn, Pin,
+  ArrowRight, CalendarRange, Flame, FlaskConical, Gift, Image as ImageIcon, Layers, ListChecks, Lock, Mail, Menu, Monitor, Moon, Newspaper, NotebookPen,
+  PanelLeftClose, PanelLeftOpen, Plus, Search, Settings2, Sparkles, Sun, SunMedium, Telescope, Wallet, ChartNoAxesColumn,
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { createContext, Suspense, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, Suspense, useCallback, useContext, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
 import { motion } from "motion/react";
 import { useMounted } from "@/lib/client/use-mounted";
 import { playUi } from "@/lib/client/sound";
-import { toast } from "sonner";
+import { toast } from "@/lib/client/toast";
 import { Button, Dialog, Field, Input, Kbd, TagInput } from "@/components/ui";
+import {
+  AnimatedSidebar, AnimatedSidebarContent, AnimatedSidebarFooter, AnimatedSidebarGroup, AnimatedSidebarGroupLabel, AnimatedSidebarHeader,
+  AnimatedSidebarInset, AnimatedSidebarMenu, AnimatedSidebarMenuButton, AnimatedSidebarMenuItem, AnimatedSidebarProvider, AnimatedSidebarTrigger,
+  useAnimatedSidebar,
+} from "@/components/motion/animated-sidebar";
+import { Dock, DockItem } from "@/components/motion/dock";
+import { MorphingModal } from "@/components/motion/morphing-modal";
+import { Tabs, TabsList, TabsTrigger } from "@/components/motion/tabs";
+import { Fab } from "@/components/panelui/fab";
+import { AddTask } from "@/components/tasks";
 import { cn } from "@/lib/cn";
 import { CHAIN_SUGGESTIONS, CATEGORIES } from "@/lib/constants";
 import { api, useCreateProject, useProjects } from "@/lib/client/api";
 import { CATEGORY_OPTS, monoTone } from "@/lib/options";
 
-type ShellCtx = { newProject: (category?: string) => void; openPalette: () => void };
-const Ctx = createContext<ShellCtx>({ newProject: () => {}, openPalette: () => {} });
+type ShellCtx = { newProject: (category?: string) => void; openPalette: () => void; openQuick: () => void };
+const Ctx = createContext<ShellCtx>({ newProject: () => {}, openPalette: () => {}, openQuick: () => {} });
 export const useShell = () => useContext(Ctx);
 
 const CAT_ICON: Record<string, typeof Gift> = { airdrop: Gift, testnet: FlaskConical, nft: ImageIcon, degen: Flame };
 
-const NAV = [
+const NAV_TOP = [
   { href: "/", label: "Today", icon: SunMedium },
+  { href: "/recap", label: "Recap", icon: CalendarRange },
+  { href: "/feed", label: "Feed", icon: Newspaper },
+];
+
+const NAV = [
   { href: "/tasks", label: "Daily tasks", icon: ListChecks },
   { href: "/diary", label: "Diary", icon: NotebookPen },
   { href: "/portfolio", label: "Portfolio", icon: ChartNoAxesColumn },
+  { href: "/mints", label: "Upcoming mints", icon: Sparkles },
   { href: "/mail", label: "Mail", icon: Mail },
   { href: "/assistant", label: "Research desk", icon: Telescope },
   { href: "/wallets", label: "Wallets", icon: Wallet },
 ];
 
-export function Monogram({ name, size = 20, className }: { name: string; size?: number; className?: string }) {
-  const t = monoTone(name || "?");
+export function Monogram({ name, size = 20, className, accent }: { name: string; size?: number; className?: string; accent?: string | null }) {
+  const t = accent || monoTone(name || "?");
   return (
     <span
       style={{ width: size, height: size, fontSize: size * 0.55 }}
@@ -50,7 +66,7 @@ export function Logo({ className }: { className?: string }) {
   return (
     <span className={cn("inline-flex items-baseline gap-[1px] select-none", className)}>
       <span className="font-serif text-[19px] font-medium italic tracking-[-0.01em] text-ink">frio</span>
-      <span className="num text-[11px] font-semibold tracking-[0.08em] text-accent">OS</span>
+      <span className="font-label text-[11px] font-medium tracking-[0.16em] text-accent">OS</span>
     </span>
   );
 }
@@ -83,11 +99,43 @@ function ThemeSwitch() {
   );
 }
 
-function SidebarInner({ onNavigate }: { onNavigate?: () => void }) {
+function useSidebarPref() {
+  const KEY = "frioos-sidebar";
+  const open = useSyncExternalStore(
+    (cb) => { window.addEventListener("storage", cb); window.addEventListener("frioos-sidebar", cb); return () => { window.removeEventListener("storage", cb); window.removeEventListener("frioos-sidebar", cb); }; },
+    () => window.localStorage.getItem(KEY) !== "closed",
+    () => true,
+  );
+  const set = (v: boolean) => { window.localStorage.setItem(KEY, v ? "open" : "closed"); window.dispatchEvent(new Event("frioos-sidebar")); };
+  return [open, set] as const;
+}
+
+function CompactTheme() {
+  const { theme, setTheme } = useTheme();
+  const mounted = useMounted();
+  const order = ["light", "dark", "system"] as const;
+  const cur = mounted ? (theme as (typeof order)[number]) ?? "system" : "system";
+  const Icon = cur === "light" ? Sun : cur === "dark" ? Moon : Monitor;
+  return (
+    <button
+      type="button"
+      title={`Theme: ${cur === "system" ? "Auto" : cur}`}
+      aria-label="Cycle theme"
+      onClick={() => { setTheme(order[(order.indexOf(cur) + 1) % 3]); playUi("toggle"); }}
+      className="mx-auto flex h-8 w-8 items-center justify-center rounded-lg text-muted hover:bg-hover hover:text-ink"
+    >
+      <Icon className="h-4 w-4" />
+    </button>
+  );
+}
+
+function SidebarBody() {
   const pathname = usePathname();
   const sp = useSearchParams();
   const { data } = useProjects();
-  const { newProject, openPalette } = useShell();
+  const { openPalette } = useShell();
+  const { state, isMobile, toggleSidebar } = useAnimatedSidebar();
+  const collapsed = state === "collapsed" && !isMobile;
   const counts = useMemo(() => {
     const c: Record<string, number> = { all: 0 };
     for (const p of data?.projects ?? []) {
@@ -100,111 +148,144 @@ function SidebarInner({ onNavigate }: { onNavigate?: () => void }) {
   const pinned = (data?.projects ?? []).filter((p) => p.pinned).slice(0, 8);
   const isActive = (href: string) => (href === "/" ? pathname === "/" : pathname.startsWith(href));
   const cat = pathname === "/projects" ? sp.get("cat") ?? "all" : null;
+  const icon = (I: typeof Gift) => <I className="h-[17px] w-[17px]" strokeWidth={1.75} />;
+  const badge = (n?: number) => (n ? <span className="num text-[11px] text-faint">{n}</span> : undefined);
+  const btn = "min-h-[32px] rounded-lg px-2.5 text-[13.5px] font-normal text-ink-2 hover:text-ink";
 
-  const item = "group flex h-[30px] items-center gap-2.5 rounded-md px-2 text-[13.5px] text-ink-2 transition-colors hover:bg-hover hover:text-ink";
   return (
-    <div className="flex h-full flex-col">
-      <div className="flex items-center justify-between px-3 pb-2 pt-3.5">
-        <Link href="/" onClick={onNavigate} className="rounded px-1">
-          <Logo />
-        </Link>
-        <button onClick={() => newProject()} title="New project (N)" className="rounded-md p-1.5 text-muted hover:bg-hover hover:text-ink" aria-label="New project">
-          <Plus className="h-4 w-4" />
-        </button>
-      </div>
-      <div className="px-2 pb-2">
-        <button onClick={openPalette} className="flex h-8 w-full items-center gap-2 rounded-md border border-line bg-panel px-2 text-[13px] text-muted transition-colors hover:border-line-strong">
-          <Search className="h-3.5 w-3.5" />
-          <span className="flex-1 text-left">Search or jump to…</span>
-          <Kbd>⌘K</Kbd>
-        </button>
-      </div>
-      <nav className="flex-1 overflow-y-auto px-2 pb-3">
-        <div className="space-y-px">
-          {NAV.slice(0, 1).map((n) => (
-            <Link key={n.href} href={n.href} onClick={onNavigate} className={cn(item, isActive(n.href) && "bg-active text-ink")}>
-              <n.icon className="h-4 w-4 text-muted group-hover:text-ink-2" />
-              {n.label}
+    <>
+      <AnimatedSidebarHeader className="gap-2 px-3 pb-1 pt-3">
+        <div className={cn("flex items-center", collapsed ? "justify-center" : "justify-between")}>
+          {!collapsed && (
+            <Link href="/" className="rounded px-1">
+              <Logo />
             </Link>
-          ))}
+          )}
+          {!isMobile && (
+            <button type="button" onClick={toggleSidebar} aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"} title={`${collapsed ? "Expand" : "Collapse"} (⌘B)`} className="rounded-md p-1.5 text-muted hover:bg-hover hover:text-ink">
+              {collapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
+            </button>
+          )}
         </div>
-        <div className="mb-1 mt-4 px-2 text-[11.5px] font-medium text-faint">Projects</div>
-        <div className="space-y-px">
-          <Link href="/projects" onClick={onNavigate} className={cn(item, cat === "all" && "bg-active text-ink")}>
-            <Layers className="h-4 w-4 text-muted" />
-            <span className="flex-1">All projects</span>
-            <span className="num text-[11.5px] text-faint">{counts.all || ""}</span>
-          </Link>
-          {CATEGORIES.map((c) => {
-            const Icon = CAT_ICON[c.id];
-            return (
-              <Link key={c.id} href={`/projects?cat=${c.id}`} onClick={onNavigate} className={cn(item, cat === c.id && "bg-active text-ink")}>
-                <Icon className="h-4 w-4 text-muted" />
-                <span className="flex-1">{c.label}</span>
-                <span className="num text-[11.5px] text-faint">{counts[c.id] || ""}</span>
-              </Link>
-            );
-          })}
-        </div>
-        <div className="mb-1 mt-4 px-2 text-[11.5px] font-medium text-faint">Workspace</div>
-        <div className="space-y-px">
-          {NAV.slice(1).map((n) => (
-            <Link key={n.href} href={n.href} onClick={onNavigate} className={cn(item, isActive(n.href) && "bg-active text-ink")}>
-              <n.icon className="h-4 w-4 text-muted" />
-              {n.label}
-            </Link>
-          ))}
-        </div>
-        {pinned.length > 0 && (
-          <>
-            <div className="mb-1 mt-4 flex items-center gap-1 px-2 text-[11.5px] font-medium text-faint">
-              <Pin className="h-3 w-3" /> Pinned
-            </div>
-            <div className="space-y-px">
-              {pinned.map((p) => (
-                <Link key={p.id} href={`/projects/${p.id}`} onClick={onNavigate} className={cn(item, pathname === `/projects/${p.id}` && "bg-active text-ink")}>
-                  <Monogram name={p.name} size={18} />
-                  <span className="truncate">{p.name}</span>
-                </Link>
-              ))}
-            </div>
-          </>
-        )}
-      </nav>
-      <div className="space-y-2 border-t border-line p-2">
-        <div className="flex items-center gap-1">
-          <Link href="/settings" onClick={onNavigate} className={cn(item, "flex-1", isActive("/settings") && "bg-active text-ink")}>
-            <Settings2 className="h-4 w-4 text-muted" /> Settings
-          </Link>
-          <button
-            title="Lock frioOS"
-            aria-label="Lock"
-            onClick={async () => {
-              await api("/api/unlock", { method: "DELETE" });
-              // full reload so every cached query is dropped
-              // eslint-disable-next-line @next/next/no-location-assign-relative-destination
-              window.location.href = "/login";
-            }}
-            className="rounded-md p-2 text-muted hover:bg-hover hover:text-ink"
-          >
-            <Lock className="h-3.5 w-3.5" />
+        {collapsed ? (
+          <button type="button" onClick={openPalette} aria-label="Search" className="mx-auto flex h-8 w-8 items-center justify-center rounded-lg text-muted hover:bg-hover hover:text-ink">
+            <Search className="h-4 w-4" />
           </button>
-        </div>
-        <ThemeSwitch />
-      </div>
-    </div>
+        ) : (
+          <button type="button" onClick={openPalette} className="flex h-8 w-full items-center gap-2 rounded-lg border border-line bg-panel px-2.5 text-[13px] text-muted transition-colors hover:border-line-strong">
+            <Search className="h-3.5 w-3.5" />
+            <span className="flex-1 text-left">Search or jump to…</span>
+            <Kbd>⌘K</Kbd>
+          </button>
+        )}
+      </AnimatedSidebarHeader>
+      <AnimatedSidebarContent className="gap-0 px-1.5">
+        <AnimatedSidebarGroup>
+          <AnimatedSidebarMenu>
+            {NAV_TOP.map((n) => (
+              <AnimatedSidebarMenuItem key={n.href}>
+                <AnimatedSidebarMenuButton href={n.href} isActive={isActive(n.href)} icon={icon(n.icon)} className={btn}>{n.label}</AnimatedSidebarMenuButton>
+              </AnimatedSidebarMenuItem>
+            ))}
+          </AnimatedSidebarMenu>
+        </AnimatedSidebarGroup>
+        <AnimatedSidebarGroup>
+          <AnimatedSidebarGroupLabel className="font-label text-[10.5px] text-faint">Projects</AnimatedSidebarGroupLabel>
+          <AnimatedSidebarMenu>
+            <AnimatedSidebarMenuItem>
+              <AnimatedSidebarMenuButton href="/projects" isActive={cat === "all"} icon={icon(Layers)} badge={badge(counts.all)} className={btn}>All projects</AnimatedSidebarMenuButton>
+            </AnimatedSidebarMenuItem>
+            {CATEGORIES.map((c) => (
+              <AnimatedSidebarMenuItem key={c.id}>
+                <AnimatedSidebarMenuButton href={`/projects?cat=${c.id}`} isActive={cat === c.id} icon={icon(CAT_ICON[c.id])} badge={badge(counts[c.id])} className={btn}>{c.label}</AnimatedSidebarMenuButton>
+              </AnimatedSidebarMenuItem>
+            ))}
+          </AnimatedSidebarMenu>
+        </AnimatedSidebarGroup>
+        <AnimatedSidebarGroup>
+          <AnimatedSidebarGroupLabel className="font-label text-[10.5px] text-faint">Workspace</AnimatedSidebarGroupLabel>
+          <AnimatedSidebarMenu>
+            {NAV.map((n) => (
+              <AnimatedSidebarMenuItem key={n.href}>
+                <AnimatedSidebarMenuButton href={n.href} isActive={isActive(n.href)} icon={icon(n.icon)} className={btn}>{n.label}</AnimatedSidebarMenuButton>
+              </AnimatedSidebarMenuItem>
+            ))}
+          </AnimatedSidebarMenu>
+        </AnimatedSidebarGroup>
+        {pinned.length > 0 && !collapsed && (
+          <AnimatedSidebarGroup>
+            <AnimatedSidebarGroupLabel className="font-label text-[10.5px] text-faint">Pinned</AnimatedSidebarGroupLabel>
+            <AnimatedSidebarMenu>
+              {pinned.map((p) => (
+                <AnimatedSidebarMenuItem key={p.id}>
+                  <AnimatedSidebarMenuButton href={`/projects/${p.id}`} isActive={pathname === `/projects/${p.id}`} icon={<Monogram name={p.name} size={18} accent={p.accent} />} className={btn}>{p.name}</AnimatedSidebarMenuButton>
+                </AnimatedSidebarMenuItem>
+              ))}
+            </AnimatedSidebarMenu>
+          </AnimatedSidebarGroup>
+        )}
+      </AnimatedSidebarContent>
+      <AnimatedSidebarFooter className="gap-2 border-line p-2">
+        <AnimatedSidebarMenu>
+          <AnimatedSidebarMenuItem>
+            <AnimatedSidebarMenuButton href="/settings" isActive={isActive("/settings")} icon={icon(Settings2)} className={btn}>Settings</AnimatedSidebarMenuButton>
+          </AnimatedSidebarMenuItem>
+          <AnimatedSidebarMenuItem>
+            <AnimatedSidebarMenuButton
+              icon={icon(Lock)}
+              className={btn}
+              onSelect={async () => {
+                await api("/api/unlock", { method: "DELETE" });
+                // full reload so every cached query is dropped
+                // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+                window.location.href = "/login";
+              }}
+            >
+              Lock
+            </AnimatedSidebarMenuButton>
+          </AnimatedSidebarMenuItem>
+        </AnimatedSidebarMenu>
+        {collapsed ? <CompactTheme /> : <ThemeSwitch />}
+      </AnimatedSidebarFooter>
+    </>
   );
 }
 
-function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
+function MobileDock({ onAdd }: { onAdd: () => void }) {
+  const pathname = usePathname();
+  const items = [
+    { href: "/", label: "Today", icon: SunMedium },
+    { href: "/projects", label: "Projects", icon: Layers },
+    { href: "/tasks", label: "Tasks", icon: ListChecks },
+    { href: "/assistant", label: "Research", icon: Telescope },
+  ];
+  const active = (h: string) => (h === "/" ? pathname === "/" : pathname.startsWith(h));
   return (
-    <Suspense fallback={null}>
-      <SidebarInner onNavigate={onNavigate} />
-    </Suspense>
+    <nav aria-label="Quick navigation" className="fixed inset-x-0 bottom-0 z-50 flex justify-center pb-[max(0.6rem,env(safe-area-inset-bottom))] md:hidden">
+      <Dock size={46} className="items-center">
+        {items.slice(0, 2).map((i) => (
+          <DockItem key={i.href} active={active(i.href)}>
+            <Link href={i.href} aria-label={i.label} aria-current={active(i.href) ? "page" : undefined} className={cn("flex h-full w-full items-center justify-center rounded-full", active(i.href) ? "text-ink" : "text-muted")}>
+              <i.icon className="h-[19px] w-[19px]" strokeWidth={1.75} />
+            </Link>
+          </DockItem>
+        ))}
+        <DockItem onClick={onAdd} aria-label="Quick add">
+          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-accent text-accent-ink"><Plus className="h-[18px] w-[18px]" strokeWidth={2.2} /></span>
+        </DockItem>
+        {items.slice(2).map((i) => (
+          <DockItem key={i.href} active={active(i.href)}>
+            <Link href={i.href} aria-label={i.label} aria-current={active(i.href) ? "page" : undefined} className={cn("flex h-full w-full items-center justify-center rounded-full", active(i.href) ? "text-ink" : "text-muted")}>
+              <i.icon className="h-[19px] w-[19px]" strokeWidth={1.75} />
+            </Link>
+          </DockItem>
+        ))}
+      </Dock>
+    </nav>
   );
 }
 
-function NewProjectDialog({ open, onClose, initialCategory }: { open: boolean; onClose: () => void; initialCategory?: string }) {
+function NewProjectForm({ initialCategory, onDone }: { initialCategory?: string; onDone: () => void }) {
   const router = useRouter();
   const create = useCreateProject();
   const [name, setName] = useState("");
@@ -219,58 +300,86 @@ function NewProjectDialog({ open, onClose, initialCategory }: { open: boolean; o
       if (site.trim()) links.site = site.trim();
       if (x.trim()) links.x = x.trim().startsWith("http") ? x.trim() : `https://x.com/${x.trim().replace(/^@/, "")}`;
       const { project } = await create.mutateAsync({ name: name.trim(), category, chains, links, status: "research" });
-      onClose();
+      onDone();
+      toast.success(`${project.name} added`);
       router.push(`/projects/${project.id}`);
     } catch (e) {
       toast.error((e as Error).message);
     }
   };
   return (
-    <Dialog open={open} onClose={onClose} title="New project">
-      <form
-        className="space-y-3.5"
-        onSubmit={(e) => {
-          e.preventDefault();
-          submit();
-        }}
-      >
-        <Input autoFocus placeholder="Project name, e.g. Monad testnet" value={name} onChange={(e) => setName(e.target.value)} className="h-10 text-[15px]" />
-        <div className="grid grid-cols-4 gap-1 rounded-lg bg-hover p-1">
+    <form className="space-y-3.5" onSubmit={(e) => { e.preventDefault(); submit(); }}>
+      <h2 className="font-serif text-[22px] leading-tight text-ink">New project</h2>
+      <Input autoFocus placeholder="Project name, e.g. Monad testnet" value={name} onChange={(e) => setName(e.target.value)} className="h-10 text-[15px]" />
+      <Tabs value={category} onValueChange={setCategory} variant="segment">
+        <TabsList className="grid w-full grid-cols-4">
           {CATEGORY_OPTS.map((c) => {
             const Icon = CAT_ICON[c.id];
-            return (
-              <button
-                type="button"
-                key={c.id}
-                onClick={() => setCategory(c.id)}
-                className={cn("flex h-8 items-center justify-center gap-1.5 rounded-md text-[13px] transition-colors", category === c.id ? "bg-panel text-ink shadow-sm" : "text-muted hover:text-ink")}
-              >
-                <Icon className="h-3.5 w-3.5" /> {c.label}
-              </button>
-            );
+            return <TabsTrigger key={c.id} value={c.id} icon={<Icon className="h-3.5 w-3.5" />}>{c.label}</TabsTrigger>;
           })}
+        </TabsList>
+      </Tabs>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field label="Website"><Input placeholder="https://" value={site} onChange={(e) => setSite(e.target.value)} /></Field>
+        <Field label="X handle"><Input placeholder="@project" value={x} onChange={(e) => setX(e.target.value)} /></Field>
+      </div>
+      <Field label="Chains">
+        <div className="rounded-md border border-line px-1"><TagInput value={chains} onChange={setChains} suggestions={CHAIN_SUGGESTIONS} placeholder="Add chains" /></div>
+      </Field>
+      <div className="flex items-center justify-between pt-1">
+        <span className="text-[12px] text-faint">Everything else lives on the project page.</span>
+        <Button variant="primary" type="submit" loading={create.isPending} disabled={!name.trim()}>Create <ArrowRight className="h-3.5 w-3.5" /></Button>
+      </div>
+    </form>
+  );
+}
+
+type QuickView = "menu" | "project" | "task" | null;
+
+function QuickAdd({ view, setView, category }: { view: QuickView; setView: (v: QuickView) => void; category?: string }) {
+  const router = useRouter();
+  const close = () => setView(null);
+  const choices = [
+    { id: "project" as const, label: "Project", hint: "Airdrop, testnet, NFT or degen play", icon: Layers },
+    { id: "task" as const, label: "Daily task", hint: "Something you repeat on a schedule", icon: ListChecks },
+    { id: "diary", label: "Diary entry", hint: "What you did today, tagged to projects", icon: NotebookPen, href: "/diary?new=1" },
+    { id: "ask", label: "Ask the research desk", hint: "Today's promising projects", icon: Telescope, href: "/assistant?mode=daily" },
+  ];
+  return (
+    <MorphingModal viewId={view} onClose={close} placement="center" className="max-w-[520px] rounded-2xl border-line bg-panel">
+      {view === "menu" && (
+        <div>
+          <h2 className="font-serif text-[22px] leading-tight text-ink">Add something</h2>
+          <p className="mt-1 text-[13px] text-muted">Pick what you&apos;re adding.</p>
+          <ul className="mt-4 space-y-1">
+            {choices.map((c) => (
+              <li key={c.id}>
+                <button
+                  type="button"
+                  onClick={() => ("href" in c && c.href ? (close(), router.push(c.href)) : setView(c.id as QuickView))}
+                  className="flex w-full items-center gap-3 rounded-xl px-2.5 py-2.5 text-left outline-none hover:bg-hover focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                >
+                  <span className="flex h-9 w-9 items-center justify-center rounded-lg border border-line bg-bg text-ink-2"><c.icon className="h-4 w-4" strokeWidth={1.75} /></span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[14px] text-ink">{c.label}</span>
+                    <span className="block text-[12.5px] text-muted">{c.hint}</span>
+                  </span>
+                  <ArrowRight className="h-3.5 w-3.5 text-faint" />
+                </button>
+              </li>
+            ))}
+          </ul>
         </div>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="Website">
-            <Input placeholder="https://" value={site} onChange={(e) => setSite(e.target.value)} />
-          </Field>
-          <Field label="X handle">
-            <Input placeholder="@project" value={x} onChange={(e) => setX(e.target.value)} />
-          </Field>
+      )}
+      {view === "project" && <NewProjectForm initialCategory={category} onDone={close} />}
+      {view === "task" && (
+        <div className="space-y-3">
+          <h2 className="font-serif text-[22px] leading-tight text-ink">New daily task</h2>
+          <AddTask autoFocus />
+          <div className="flex justify-end"><Button variant="ghost" onClick={close}>Done</Button></div>
         </div>
-        <Field label="Chains">
-          <div className="rounded-md border border-line px-1">
-            <TagInput value={chains} onChange={setChains} suggestions={CHAIN_SUGGESTIONS} placeholder="Add chains" />
-          </div>
-        </Field>
-        <div className="flex items-center justify-between pt-1">
-          <span className="text-[12px] text-faint">Everything else lives on the project page.</span>
-          <Button variant="primary" type="submit" disabled={!name.trim() || create.isPending}>
-            Create project <ArrowRight className="h-3.5 w-3.5" />
-          </Button>
-        </div>
-      </form>
-    </Dialog>
+      )}
+    </MorphingModal>
   );
 }
 
@@ -286,8 +395,8 @@ function Palette({ open, onClose }: { open: boolean; onClose: () => void }) {
   const itemCls = "flex h-9 cursor-pointer items-center gap-2.5 rounded-md px-2.5 text-[13.5px] text-ink-2 data-[selected=true]:bg-hover data-[selected=true]:text-ink";
   const group = "[&_[cmdk-group-heading]]:px-2.5 [&_[cmdk-group-heading]]:pb-1 [&_[cmdk-group-heading]]:pt-2.5 [&_[cmdk-group-heading]]:text-[11.5px] [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-faint";
   return (
-    <Dialog open={open} onClose={onClose} width={600}>
-      <Command label="Command palette" className="-m-4">
+    <Dialog open={open} onClose={onClose} width={600} bare>
+      <Command label="Command palette">
         <div className="flex items-center gap-2 border-b border-line px-4">
           <Search className="h-4 w-4 text-muted" />
           <Command.Input autoFocus placeholder="Search projects, pages, actions…" className="h-12 flex-1 bg-transparent text-[15px] outline-none placeholder:text-faint" />
@@ -320,7 +429,7 @@ function Palette({ open, onClose }: { open: boolean; onClose: () => void }) {
             </Command.Group>
           )}
           <Command.Group heading="Go to" className={group}>
-            {[...NAV, { href: "/projects", label: "All projects", icon: Layers }, { href: "/settings", label: "Settings", icon: Settings2 }].map((n) => (
+            {[...NAV_TOP, ...NAV, { href: "/projects", label: "All projects", icon: Layers }, { href: "/settings", label: "Settings", icon: Settings2 }].map((n) => (
               <Command.Item key={n.href} className={itemCls} onSelect={() => go(n.href)}>
                 <n.icon className="h-4 w-4 text-muted" /> {n.label}
               </Command.Item>
@@ -347,11 +456,12 @@ function Palette({ open, onClose }: { open: boolean; onClose: () => void }) {
 
 export function AppShell({ children }: { children: ReactNode }) {
   const [palette, setPalette] = useState(false);
-  const [np, setNp] = useState<{ open: boolean; cat?: string; n: number }>({ open: false, n: 0 });
-  const [drawer, setDrawer] = useState(false);
+  const [quick, setQuick] = useState<{ view: QuickView; cat?: string }>({ view: null });
+  const [sidebarOpen, setSidebarOpen] = useSidebarPref();
 
-  const newProject = useCallback((cat?: string) => setNp((s) => ({ open: true, cat, n: s.n + 1 })), []);
+  const newProject = useCallback((cat?: string) => setQuick({ view: "project", cat }), []);
   const openPalette = useCallback(() => setPalette(true), []);
+  const openQuick = useCallback(() => setQuick({ view: "menu" }), []);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -378,41 +488,40 @@ export function AppShell({ children }: { children: ReactNode }) {
   }, [newProject]);
 
   return (
-    <Ctx.Provider value={{ newProject, openPalette }}>
-      <div className="flex min-h-dvh">
-        <aside className="sticky top-0 hidden h-dvh w-[248px] shrink-0 border-r border-line bg-sidebar md:block">
-          <Sidebar />
-        </aside>
-        {drawer && (
-          <div className="anim-fade fixed inset-0 z-[60] bg-black/30 md:hidden" onClick={() => setDrawer(false)}>
-            <aside className="anim-rise h-full w-[280px] border-r border-line bg-sidebar" onClick={(e) => e.stopPropagation()}>
-              <button className="absolute left-[244px] top-3 rounded-md p-1.5 text-muted" onClick={() => setDrawer(false)} aria-label="Close menu">
-                <X className="h-4 w-4" />
-              </button>
-              <Sidebar onNavigate={() => setDrawer(false)} />
-            </aside>
-          </div>
-        )}
-        <div className="flex min-w-0 flex-1 flex-col">
-          <header className="sticky top-0 z-40 flex h-12 items-center justify-between border-b border-line bg-bg/90 px-3 backdrop-blur md:hidden">
-            <button onClick={() => setDrawer(true)} className="rounded-md p-1.5 text-ink-2 hover:bg-hover" aria-label="Open menu">
+    <Ctx.Provider value={{ newProject, openPalette, openQuick }}>
+      <AnimatedSidebarProvider open={sidebarOpen} onOpenChange={setSidebarOpen} className="bg-bg" style={{ "--sidebar-width": "15.5rem", "--sidebar-width-icon": "3.75rem" } as never}>
+        <AnimatedSidebar ariaLabel="frioOS" collapsible="icon" panelClassName="bg-sidebar border-line" className="[&_[data-slot=sidebar-menu-button]]:rounded-lg">
+          <Suspense fallback={null}>
+            <SidebarBody />
+          </Suspense>
+        </AnimatedSidebar>
+        <AnimatedSidebarInset className="bg-bg">
+          <header className="sticky top-0 z-40 flex h-12 items-center justify-between border-b border-line bg-bg px-3 md:hidden">
+            <AnimatedSidebarTrigger className="rounded-md p-1.5 text-ink-2 hover:bg-hover" aria-label="Open menu">
               <Menu className="h-5 w-5" />
-            </button>
+            </AnimatedSidebarTrigger>
             <Link href="/"><Logo /></Link>
-            <div className="flex">
-              <button onClick={openPalette} className="rounded-md p-1.5 text-ink-2 hover:bg-hover" aria-label="Search">
-                <Search className="h-[18px] w-[18px]" />
-              </button>
-              <button onClick={() => newProject()} className="rounded-md p-1.5 text-ink-2 hover:bg-hover" aria-label="New project">
-                <Plus className="h-[18px] w-[18px]" />
-              </button>
-            </div>
+            <button onClick={openPalette} className="rounded-md p-1.5 text-ink-2 hover:bg-hover" aria-label="Search">
+              <Search className="h-[18px] w-[18px]" />
+            </button>
           </header>
-          <main className="min-w-0 flex-1">{children}</main>
-        </div>
-      </div>
+          <div className="min-w-0 flex-1 pb-20 md:pb-0">{children}</div>
+        </AnimatedSidebarInset>
+      </AnimatedSidebarProvider>
+      <Suspense fallback={null}>
+        <MobileDock onAdd={openQuick} />
+      </Suspense>
+      <Fab
+        className="bottom-6 right-6 hidden md:flex"
+        label="Create"
+        actions={[
+          { id: "project", label: "New project", icon: <Layers />, shortcut: "N", onSelect: () => newProject() },
+          { id: "task", label: "New daily task", icon: <ListChecks />, onSelect: () => setQuick({ view: "task" }) },
+          { id: "diary", label: "New diary entry", icon: <NotebookPen />, onSelect: () => (window.location.href = "/diary?new=1") },
+        ]}
+      />
       <Palette open={palette} onClose={() => setPalette(false)} />
-      <NewProjectDialog key={np.n} open={np.open} initialCategory={np.cat} onClose={() => setNp((s) => ({ ...s, open: false }))} />
+      <QuickAdd view={quick.view} category={quick.cat} setView={(v) => setQuick((q) => ({ ...q, view: v }))} />
     </Ctx.Provider>
   );
 }

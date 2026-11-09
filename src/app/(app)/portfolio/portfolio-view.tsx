@@ -3,7 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { RefreshCw } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { toast } from "sonner";
+import { toast } from "@/lib/client/toast";
 import { Monogram, Page, PageHeader } from "@/components/shell";
 import { Button, Empty, Pill, SectionTitle, Skeleton } from "@/components/ui";
 import { cn } from "@/lib/cn";

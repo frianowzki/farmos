@@ -14,7 +14,8 @@ for (const scheme of ["light", "dark"]) {
         const r = await page.request.post(base + "/api/unlock", { data: { passcode: process.env.FRIO_PASSCODE } });
         if (!r.ok()) throw new Error("unlock failed " + r.status());
       }
-      await page.goto(base + p, { waitUntil: "networkidle" });
+      await page.goto(base + p, { waitUntil: "load" });
+      await page.waitForLoadState("networkidle", { timeout: 8000 }).catch(() => {});
       await page.waitForTimeout(700);
       const name = `${prefix}${p === "/" ? "today" : p.replace(/^\//, "").replace(/[/?=&]/g, "-")}-${vp.name}-${scheme}.png`;
       await page.screenshot({ path: `${out}/${name}`, fullPage: false });

@@ -7,7 +7,7 @@ import {
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, type ReactNode } from "react";
-import { toast } from "sonner";
+import { toast } from "@/lib/client/toast";
 import { Editor } from "@/components/editor";
 import { MailList } from "@/components/mail";
 import { Monogram, Page } from "@/components/shell";

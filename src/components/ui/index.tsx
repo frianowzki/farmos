@@ -4,24 +4,32 @@ import { forwardRef, useEffect, useLayoutEffect, useRef, useState, type ButtonHT
 import { AnimatePresence, motion } from "motion/react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/cn";
+import { Button as PanelButton } from "@/components/panelui/button";
+import { Dialog as PanelDialog } from "@/components/panelui/dialog";
 
-type BtnProps = ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "primary" | "ghost" | "outline" | "danger" | "subtle"; size?: "sm" | "md" | "icon" };
+type BtnProps = ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "primary" | "ghost" | "outline" | "danger" | "subtle"; size?: "sm" | "md" | "icon"; loading?: boolean };
 
+const VARIANT = { primary: "default", outline: "outline", ghost: "ghost", subtle: "secondary", danger: "ghost" } as const;
+const SIZE = { sm: "sm", md: "sm", icon: "icon-sm" } as const;
+
+/** frioOS button: PanelUI Button (base-ui) tuned to the dense frioOS scale. */
 export const Button = forwardRef<HTMLButtonElement, BtnProps>(function Button({ variant = "outline", size = "md", className, ...p }, ref) {
   return (
-    <button
+    <PanelButton
       ref={ref}
+      variant={VARIANT[variant]}
+      size={SIZE[size]}
       {...p}
       className={cn(
-        "inline-flex select-none items-center justify-center gap-1.5 whitespace-nowrap rounded-md font-medium transition-[background,color,border,box-shadow,transform] duration-150 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50",
-        size === "sm" && "h-7 px-2.5 text-[12.5px]",
-        size === "md" && "h-8 px-3 text-[13px]",
-        size === "icon" && "h-7 w-7 text-[13px]",
-        variant === "primary" && "bg-accent text-accent-ink shadow-[inset_0_-1px_0_rgba(0,0,0,0.12)] hover:brightness-[1.06]",
-        variant === "outline" && "border border-line bg-panel text-ink hover:bg-hover",
-        variant === "ghost" && "text-ink-2 hover:bg-hover hover:text-ink",
-        variant === "subtle" && "bg-hover text-ink hover:bg-active",
-        variant === "danger" && "text-neg hover:bg-[var(--t-red-bg)]",
+        "gap-1.5 font-medium",
+        size === "sm" && "h-7 rounded-md px-2.5 text-[12.5px]",
+        size === "md" && "h-8 rounded-md px-3 text-[13px]",
+        size === "icon" && "size-7 rounded-md",
+        variant === "outline" && "border-line bg-panel text-ink shadow-none hover:not-disabled:bg-hover dark:bg-panel",
+        variant === "ghost" && "text-ink-2 hover:not-disabled:bg-hover hover:not-disabled:text-ink",
+        variant === "subtle" && "bg-hover text-ink hover:not-disabled:bg-active",
+        variant === "danger" && "text-neg hover:not-disabled:bg-[var(--t-red-bg)] hover:not-disabled:text-neg",
+        variant === "primary" && "inset-shadow-[0_1px_0_rgb(255_255_255/0.14)] hover:not-disabled:bg-primary/92",
         className,
       )}
     />
@@ -234,48 +242,15 @@ export function InlineText({ value, onSave, placeholder = "Empty", className, in
   );
 }
 
-export function Dialog({ open, onClose, title, children, width = 520 }: { open: boolean; onClose: () => void; title?: ReactNode; children: ReactNode; width?: number }) {
-  useEffect(() => {
-    if (!open) return;
-    const k = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    document.addEventListener("keydown", k);
-    return () => document.removeEventListener("keydown", k);
-  }, [open, onClose]);
-  if (typeof document === "undefined") return null;
-  return createPortal(
-    <AnimatePresence>
-      {open && (
-    <motion.div
-      key="dialog"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0, transition: { duration: 0.14, ease: "easeIn" } }}
-      className="fixed inset-0 z-[70] flex items-start justify-center bg-black/25 px-3 pt-[12vh] dark:bg-black/50"
-      onMouseDown={onClose}
-    >
-      <motion.div
-        initial={{ opacity: 0, y: -6, scale: 0.985 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        exit={{ opacity: 0, y: -4, scale: 0.99, transition: { duration: 0.14, ease: "easeIn" } }}
-        transition={{ duration: 0.22, ease: [0.2, 0.8, 0.2, 1] }}
-        style={{ maxWidth: width }}
-        className="w-full rounded-xl border border-line bg-panel shadow-pop"
-        onMouseDown={(e) => e.stopPropagation()}
-      >
-        {title && (
-          <div className="flex items-center justify-between border-b border-line px-4 py-3">
-            <div className="text-[14px] font-semibold">{title}</div>
-            <button type="button" onClick={onClose} className="rounded-md p-1 text-muted hover:bg-hover" aria-label="Close">
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-        )}
-        <div className="p-4">{children}</div>
-      </motion.div>
-    </motion.div>
-      )}
-    </AnimatePresence>,
-    document.body,
+/** Dialog built on PanelUI's Dialog (base-ui): focus trap, Escape, outside press, bottom sheet on phones. */
+export function Dialog({ open, onClose, title, children, width = 520, bare }: { open: boolean; onClose: () => void; title?: ReactNode; children: ReactNode; width?: number; bare?: boolean }) {
+  return (
+    <PanelDialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <PanelDialog.Content variant="plain" size={width > 560 ? "lg" : "md"} showClose={Boolean(title)} style={{ maxWidth: width }} className="border-line bg-panel">
+        {title && <PanelDialog.Header title={title} />}
+        {bare ? children : <PanelDialog.Body>{children}</PanelDialog.Body>}
+      </PanelDialog.Content>
+    </PanelDialog>
   );
 }
 
@@ -320,7 +295,7 @@ export function Skeleton({ className }: { className?: string }) {
 export function SectionTitle({ children, right }: { children: ReactNode; right?: ReactNode }) {
   return (
     <div className="mb-2 flex items-center justify-between">
-      <h2 className="text-[12px] font-semibold uppercase tracking-[0.06em] text-muted">{children}</h2>
+      <h2 className="font-label text-[11.5px] font-medium uppercase tracking-[0.14em] text-muted">{children}</h2>
       {right}
     </div>
   );

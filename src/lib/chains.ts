@@ -40,5 +40,5 @@ export function rpcFor(chain: Chain) {
 
 export function findChain(q: string | number) {
   const s = String(q).toLowerCase().replace(/\s+/g, "");
-  return EVM_CHAINS.find((c) => c.key === s || c.name.toLowerCase().replace(/\s+/g, "") === s || String(c.chain.id) === s || (s === "bsc" && c.key === "bnb") || (s === "eth" && c.key === "ethereum") || (s === "mainnet" && c.key === "ethereum"));
+  return EVM_CHAINS.find((c) => c.key === s || c.name.toLowerCase().replace(/\s+/g, "") === s || String(c.chain.id) === s || (s === "bsc" && c.key === "bnb") || (s === "matic" && c.key === "polygon") || (s === "hyperliquid" && c.key === "hyperevm") || (s === "eth" && c.key === "ethereum") || (s === "mainnet" && c.key === "ethereum"));
 }

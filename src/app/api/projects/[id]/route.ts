@@ -14,13 +14,14 @@ export async function GET(_: Request, ctx: Ctx) {
   if (!isUuid(id)) return bad("not found", 404);
   const [project] = await db().select().from(schema.projects).where(eq(schema.projects.id, id)).limit(1);
   if (!project) return bad("not found", 404);
-  const [positions, tasks, diary, calendar] = await Promise.all([
+  const [positions, tasks, diary, calendar, attachments] = await Promise.all([
     db().select().from(schema.positions).where(eq(schema.positions.projectId, id)).orderBy(desc(schema.positions.createdAt)),
     db().select().from(schema.tasks).where(eq(schema.tasks.projectId, id)),
     db().select().from(schema.diaryEntries).where(arrayContains(schema.diaryEntries.projectIds, [id])).orderBy(desc(schema.diaryEntries.day)),
     db().select().from(schema.calendarLinks).where(eq(schema.calendarLinks.projectId, id)),
+    db().select().from(schema.attachments).where(eq(schema.attachments.projectId, id)).orderBy(desc(schema.attachments.createdAt)),
   ]);
-  return NextResponse.json({ project, positions, tasks, diary, calendar });
+  return NextResponse.json({ project, positions, tasks, diary, calendar, attachments });
 }
 
 export async function PATCH(req: Request, ctx: Ctx) {

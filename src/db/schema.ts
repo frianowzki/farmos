@@ -32,6 +32,12 @@ export type KeyDates = {
   claimEnd?: string | null;
 };
 
+export type ProjectAudit = {
+  answers: Record<string, string[]>;
+  score: number;
+  updatedAt: string;
+};
+
 export const projects = pgTable(
   "projects",
   {
@@ -58,6 +64,12 @@ export const projects = pgTable(
     summary: text("summary"),
     notes: text("notes").notNull().default(""),
     pinned: boolean("pinned").notNull().default(false),
+    rating: integer("rating").notNull().default(0),
+    accent: text("accent"),
+    campaignStart: date("campaign_start"),
+    campaignEnd: date("campaign_end"),
+    audit: jsonb("audit").$type<ProjectAudit | null>(),
+    sortOrder: integer("sort_order").notNull().default(0),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -178,7 +190,78 @@ export const calendarLinks = pgTable(
   (t) => [primaryKey({ columns: [t.projectId, t.kind] })],
 );
 
+export const attachments = pgTable(
+  "attachments",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    projectId: uuid("project_id").references(() => projects.id, { onDelete: "cascade" }),
+    diaryId: uuid("diary_id").references(() => diaryEntries.id, { onDelete: "cascade" }),
+    url: text("url").notNull(),
+    pathname: text("pathname").notNull(),
+    name: text("name").notNull(),
+    size: integer("size").notNull().default(0),
+    contentType: text("content_type"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("attachments_project_idx").on(t.projectId), index("attachments_diary_idx").on(t.diaryId)],
+);
+
+/** OAuth / login-widget identities linked from Settings → Connected accounts. Tokens are AES-GCM encrypted. */
+export const connectedAccounts = pgTable("connected_accounts", {
+  provider: text("provider").primaryKey(),
+  providerAccountId: text("provider_account_id").notNull(),
+  username: text("username"),
+  name: text("name"),
+  image: text("image"),
+  accessTokenEnc: text("access_token_enc"),
+  refreshTokenEnc: text("refresh_token_enc"),
+  expiresAt: integer("expires_at"),
+  scope: text("scope"),
+  profile: jsonb("profile").$type<Record<string, unknown>>().notNull().default({}),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** Daily AI-picked reading list (news, early projects). Generated on demand from real sources. */
+export const feedItems = pgTable(
+  "feed_items",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    day: date("day").notNull(),
+    kind: text("kind").notNull().default("news"),
+    title: text("title").notNull(),
+    summary: text("summary").notNull().default(""),
+    url: text("url"),
+    source: text("source"),
+    category: text("category"),
+    score: integer("score").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("feed_day_idx").on(t.day)],
+);
+
+/** Upcoming NFT mints the user is watching: manual WL status + last automatic check. */
+export const mintWatch = pgTable("mint_watch", {
+  slug: text("slug").primaryKey(),
+  name: text("name"),
+  chain: text("chain"),
+  contract: text("contract"),
+  startTime: timestamp("start_time", { withTimezone: true }),
+  manualStatus: text("manual_status").notNull().default("unknown"),
+  checkerUrl: text("checker_url"),
+  note: text("note"),
+  auto: jsonb("auto").$type<Record<string, unknown> | null>(),
+  checkedAt: timestamp("checked_at", { withTimezone: true }),
+  projectId: uuid("project_id").references(() => projects.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export type Project = typeof projects.$inferSelect;
+export type MintWatch = typeof mintWatch.$inferSelect;
+export type Attachment = typeof attachments.$inferSelect;
+export type ConnectedAccount = typeof connectedAccounts.$inferSelect;
+export type FeedItem = typeof feedItems.$inferSelect;
 export type Position = typeof positions.$inferSelect;
 export type Task = typeof tasks.$inferSelect;
 export type DiaryEntry = typeof diaryEntries.$inferSelect;

@@ -3,7 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, NotebookPen, Plus, Trash2 } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { toast } from "sonner";
+import { toast } from "@/lib/client/toast";
 import { Editor } from "@/components/editor";
 import { Page, PageHeader } from "@/components/shell";
 import { Button, Empty, Pill, Skeleton, TagInput } from "@/components/ui";
