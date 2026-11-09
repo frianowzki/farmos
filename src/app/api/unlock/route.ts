@@ -5,7 +5,7 @@ import { SESSION_COOKIE, createSessionToken, sessionCookieOptions, timingSafeEqu
 const attempts = new Map<string, { n: number; t: number }>();
 
 export async function POST(req: Request) {
-  const expected = process.env.APP_PASSCODE;
+  const expected = process.env.APP_PASSCODE?.trim();
   if (!expected) return NextResponse.json({ error: "APP_PASSCODE is not configured on the server." }, { status: 500 });
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "local";
   const a = attempts.get(ip);

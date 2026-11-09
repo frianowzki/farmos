@@ -7,6 +7,8 @@ import { useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { GoogleMark } from "@/app/login/login-form";
 import { Page, PageHeader } from "@/components/shell";
+import { Switch } from "@/components/ui/switch";
+import { playUi, setSoundEnabled, useSoundEnabled } from "@/lib/client/sound";
 import { Button, Field, Input, Kbd, Pill } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import { api, keys, useAiConfig, useGoogleStatus, type AiPublic } from "@/lib/client/api";
@@ -37,12 +39,13 @@ export function SettingsView({ appUrl, allowedEmail }: { appUrl: string; allowed
             { id: "dark", label: "Dark", icon: Moon },
             { id: "system", label: "Auto", icon: Monitor },
           ].map((o) => (
-            <button key={o.id} onClick={() => setTheme(o.id)} className={cn("flex flex-col items-center gap-2 rounded-lg border p-3 text-[13px] transition-colors", mounted && theme === o.id ? "border-accent bg-accent-soft text-ink" : "border-line bg-panel text-muted hover:border-line-strong hover:text-ink")}>
+            <button key={o.id} onClick={() => { setTheme(o.id); playUi("toggle"); }} className={cn("flex flex-col items-center gap-2 rounded-lg border p-3 text-[13px] transition-colors", mounted && theme === o.id ? "border-accent bg-accent-soft text-ink" : "border-line bg-panel text-muted hover:border-line-strong hover:text-ink")}>
               <o.icon className="h-4 w-4" /> {o.label}
             </button>
           ))}
         </div>
       </Section>
+      <SoundSection />
       <AiSection />
       <GoogleSection appUrl={appUrl} allowedEmail={allowedEmail} />
       <Section title="Keyboard" desc="Work without the mouse.">
@@ -62,6 +65,25 @@ export function SettingsView({ appUrl, allowedEmail }: { appUrl: string; allowed
         <a href="/api/export"><Button><Download className="h-3.5 w-3.5" /> Export JSON backup</Button></a>
       </Section>
     </Page>
+  );
+}
+
+function SoundSection() {
+  const on = useSoundEnabled();
+  return (
+    <Section title="Sound" desc="Quiet ticks when you complete tasks and a soft chime when the day is clear. Off by default if your system prefers reduced motion.">
+      <label className="flex max-w-md items-center justify-between rounded-lg border border-line bg-panel px-3 py-2.5 text-[13.5px]">
+        <span className="text-ink-2">UI sounds</span>
+        <Switch
+          checked={on}
+          onCheckedChange={(v) => {
+            setSoundEnabled(v);
+            if (v) playUi("toggle");
+          }}
+          aria-label="UI sounds"
+        />
+      </label>
+    </Section>
   );
 }
 

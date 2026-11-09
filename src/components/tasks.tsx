@@ -2,7 +2,9 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { Check, ExternalLink, Flame, Plus, Trash2 } from "lucide-react";
 import Link from "next/link";
+import { AnimatePresence, motion } from "motion/react";
 import { useMemo, useState } from "react";
+import { playUi } from "@/lib/client/sound";
 import { toast } from "sonner";
 import { Button, Input, NativeSelect } from "@/components/ui";
 import { cn } from "@/lib/cn";
@@ -50,6 +52,13 @@ export function useToggleTask() {
   const qc = useQueryClient();
   return async (taskId: string, day: string, done: boolean) => {
     const prev = qc.getQueryData<{ tasks: Task[]; completions: { taskId: string; day: string }[] }>(keys.tasks);
+    if (prev && done) {
+      // chime when this tick clears everything due today
+      const doneToday = new Set(prev.completions.filter((c) => c.day === day).map((c) => c.taskId));
+      doneToday.add(taskId);
+      const dueOpen = prev.tasks.filter((t) => t.active && isDue({ ...t, weekdays: t.weekdays ?? [] }, day) && !doneToday.has(t.id));
+      playUi(dueOpen.length === 0 ? "allDone" : "check");
+    } else if (!done) playUi("uncheck");
     if (prev) {
       const completions = done ? [...prev.completions, { taskId, day }] : prev.completions.filter((c) => !(c.taskId === taskId && c.day === day));
       qc.setQueryData(keys.tasks, { ...prev, completions });
@@ -79,7 +88,13 @@ export function TaskRow({ row, showProject = true, onDelete }: { row: ReturnType
           done ? "border-accent bg-accent text-accent-ink" : "border-line-strong bg-panel hover:border-accent",
         )}
       >
-        {done && <Check className="anim-pop h-3 w-3" strokeWidth={3} />}
+        <AnimatePresence initial={false}>
+          {done && (
+            <motion.span key="c" initial={{ scale: 0.4, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.6, opacity: 0, transition: { duration: 0.1 } }} transition={{ type: "spring", stiffness: 600, damping: 26 }}>
+              <Check className="h-3 w-3" strokeWidth={3} />
+            </motion.span>
+          )}
+        </AnimatePresence>
       </button>
       <div className="min-w-0 flex-1">
         <div className={cn("truncate text-[14px] transition-colors", done && "text-muted line-through decoration-faint")}>{row.task.title}</div>
@@ -97,7 +112,12 @@ export function TaskRow({ row, showProject = true, onDelete }: { row: ReturnType
         </a>
       )}
       <span title={`Best ${row.streak.best}`} className={cn("num flex items-center gap-0.5 text-[12px]", row.streak.current > 0 ? "text-accent" : "text-faint")}>
-        <Flame className="h-3 w-3" /> {row.streak.current}
+        <Flame className="h-3 w-3" />
+        <AnimatePresence mode="popLayout" initial={false}>
+          <motion.span key={row.streak.current} initial={{ y: 6, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: -6, opacity: 0 }} transition={{ duration: 0.2 }}>
+            {row.streak.current}
+          </motion.span>
+        </AnimatePresence>
       </span>
       {onDelete && (
         <button onClick={onDelete} className="rounded p-1 text-faint opacity-0 hover:text-neg group-hover:opacity-100" aria-label="Delete task">

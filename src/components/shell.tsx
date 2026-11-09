@@ -8,7 +8,9 @@ import { useTheme } from "next-themes";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { createContext, Suspense, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { motion } from "motion/react";
 import { useMounted } from "@/lib/client/use-mounted";
+import { playUi } from "@/lib/client/sound";
 import { toast } from "sonner";
 import { Button, Dialog, Field, Input, Kbd, TagInput } from "@/components/ui";
 import { cn } from "@/lib/cn";
@@ -39,7 +41,7 @@ export function Monogram({ name, size = 20, className }: { name: string; size?: 
       style={{ width: size, height: size, fontSize: size * 0.55 }}
       className={cn("inline-flex shrink-0 items-center justify-center rounded-[5px] font-serif font-medium leading-none", `tone-${t}`, className)}
     >
-      {(name.trim()[0] ?? "?").toUpperCase()}
+      {(name.match(/[\p{L}\p{N}]/u)?.[0] ?? "?").toUpperCase()}
     </span>
   );
 }
@@ -69,11 +71,12 @@ function ThemeSwitch() {
           role="radio"
           aria-checked={mounted && theme === o.id}
           title={o.label}
-          onClick={() => setTheme(o.id)}
-          className={cn("flex h-6 flex-1 items-center justify-center gap-1 rounded-[5px] px-2 text-[11.5px] text-muted transition-colors", mounted && theme === o.id ? "bg-active text-ink" : "hover:text-ink")}
+          onClick={() => { setTheme(o.id); playUi("toggle"); }}
+          className={cn("relative flex h-6 flex-1 items-center justify-center gap-1 rounded-[5px] px-2 text-[11.5px] text-muted transition-colors", mounted && theme === o.id ? "text-ink" : "hover:text-ink")}
         >
-          <o.icon className="h-3.5 w-3.5" />
-          <span className="hidden lg:inline">{o.label}</span>
+          {mounted && theme === o.id && <motion.span layoutId="theme-pill" className="absolute inset-0 rounded-[5px] bg-active" transition={{ type: "spring", stiffness: 500, damping: 38 }} />}
+          <o.icon className="relative h-3.5 w-3.5" />
+          <span className="relative hidden lg:inline">{o.label}</span>
         </button>
       ))}
     </div>
@@ -428,5 +431,14 @@ export function PageHeader({ title, subtitle, right, eyebrow }: { title: ReactNo
 }
 
 export function Page({ children, wide }: { children: ReactNode; wide?: boolean }) {
-  return <div className={cn("anim-fade mx-auto w-full px-4 pb-24 pt-6 sm:px-8 md:pt-10", wide ? "max-w-[1280px]" : "max-w-[980px]")}>{children}</div>;
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.28, ease: [0.2, 0.8, 0.2, 1] }}
+      className={cn("mx-auto w-full px-4 pb-24 pt-6 sm:px-8 md:pt-10", wide ? "max-w-[1280px]" : "max-w-[980px]")}
+    >
+      {children}
+    </motion.div>
+  );
 }

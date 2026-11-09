@@ -2,6 +2,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { ArrowUpRight, CalendarDays, Check, Flame, ListChecks, NotebookPen, Plus, Telescope, Wallet } from "lucide-react";
 import Link from "next/link";
+import { LayoutGroup, motion } from "motion/react";
 import { useMemo } from "react";
 import { useMounted } from "@/lib/client/use-mounted";
 import { Monogram, Page, useShell } from "@/components/shell";
@@ -83,12 +84,17 @@ export function TodayView() {
                 </Link>
               ) : (
                 <div className="rounded-lg border border-line bg-panel p-1">
-                  {open.map((r) => <TaskRow key={r.task.id} row={r} />)}
-                  {done.length > 0 && open.length > 0 && <div className="mx-2 my-1 h-px bg-line" />}
-                  {done.map((r) => <TaskRow key={r.task.id} row={r} />)}
+                  <LayoutGroup>
+                    {[...open, ...done].map((r, i) => (
+                      <motion.div key={r.task.id} layout="position" transition={{ type: "spring", stiffness: 420, damping: 38 }}>
+                        {i === open.length && open.length > 0 && <div className="mx-2 my-1 h-px bg-line" />}
+                        <TaskRow row={r} />
+                      </motion.div>
+                    ))}
+                  </LayoutGroup>
                   <div className="px-2 pb-1 pt-2">
                     <div className="h-1 overflow-hidden rounded-full bg-hover">
-                      <div className="h-full rounded-full bg-accent transition-[width] duration-500" style={{ width: `${(done.length / Math.max(1, due.length)) * 100}%` }} />
+                      <motion.div className="h-full origin-left rounded-full bg-accent" initial={false} animate={{ scaleX: done.length / Math.max(1, due.length) }} transition={{ type: "spring", stiffness: 200, damping: 30 }} />
                     </div>
                     <div className="mt-1.5 flex justify-between text-[11.5px] text-faint">
                       <span>{done.length} of {due.length} done</span>

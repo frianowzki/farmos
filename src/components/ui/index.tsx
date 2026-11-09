@@ -1,6 +1,7 @@
 "use client";
 import { Check, ChevronDown, X } from "lucide-react";
 import { forwardRef, useEffect, useLayoutEffect, useRef, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type TextareaHTMLAttributes } from "react";
+import { AnimatePresence, motion } from "motion/react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/cn";
 
@@ -240,10 +241,27 @@ export function Dialog({ open, onClose, title, children, width = 520 }: { open: 
     document.addEventListener("keydown", k);
     return () => document.removeEventListener("keydown", k);
   }, [open, onClose]);
-  if (!open || typeof document === "undefined") return null;
+  if (typeof document === "undefined") return null;
   return createPortal(
-    <div className="anim-fade fixed inset-0 z-[70] flex items-start justify-center bg-black/25 px-3 pt-[12vh] backdrop-blur-[1px] dark:bg-black/50" onMouseDown={onClose}>
-      <div style={{ maxWidth: width }} className="anim-pop w-full rounded-xl border border-line bg-panel shadow-pop" onMouseDown={(e) => e.stopPropagation()}>
+    <AnimatePresence>
+      {open && (
+    <motion.div
+      key="dialog"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0, transition: { duration: 0.14, ease: "easeIn" } }}
+      className="fixed inset-0 z-[70] flex items-start justify-center bg-black/25 px-3 pt-[12vh] dark:bg-black/50"
+      onMouseDown={onClose}
+    >
+      <motion.div
+        initial={{ opacity: 0, y: -6, scale: 0.985 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: -4, scale: 0.99, transition: { duration: 0.14, ease: "easeIn" } }}
+        transition={{ duration: 0.22, ease: [0.2, 0.8, 0.2, 1] }}
+        style={{ maxWidth: width }}
+        className="w-full rounded-xl border border-line bg-panel shadow-pop"
+        onMouseDown={(e) => e.stopPropagation()}
+      >
         {title && (
           <div className="flex items-center justify-between border-b border-line px-4 py-3">
             <div className="text-[14px] font-semibold">{title}</div>
@@ -253,8 +271,10 @@ export function Dialog({ open, onClose, title, children, width = 520 }: { open: 
           </div>
         )}
         <div className="p-4">{children}</div>
-      </div>
-    </div>,
+      </motion.div>
+    </motion.div>
+      )}
+    </AnimatePresence>,
     document.body,
   );
 }
