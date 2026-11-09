@@ -13,5 +13,5 @@ npm run typecheck && npm run lint && npm test && npm run build
 ```
 
 - Setup for Google, the AI desk, and WalletConnect: see [SETUP.md](./SETUP.md).
-- Smoke test: `FRIO_PASSCODE=… node scripts/smoke.mjs https://frioos.vercel.app`
+- Smoke test: `FRIO_PASSCODE=… node scripts/smoke.mjs https://frioos-iota.vercel.app`
 - Screenshots: `FRIO_PASSCODE=… node scripts/shots.mjs <base> screenshots`

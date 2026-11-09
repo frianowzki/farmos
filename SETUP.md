@@ -1,6 +1,6 @@
 # frioOS setup
 
-Production: https://frioos.vercel.app (Vercel project `frioos`, team frianowzkis-projects).
+Production: https://frioos-iota.vercel.app (Vercel project `frioos`, team frianowzkis-projects).
 
 ## 0. Unlock
 - The app is behind a passcode gate (`APP_PASSCODE`, kept in an httpOnly signed cookie for 30 days).
@@ -23,8 +23,8 @@ Until these env vars exist, the Mail and Calendar sections show a setup card. No
    - Publishing status: leave it in **Testing** and add your own Gmail under **Test users**. Testing mode means no Google verification is needed. Refresh tokens in Testing mode expire after 7 days, so if mail stops loading, reconnect in Settings.
 4. Under APIs & Services → Credentials → Create credentials → OAuth client ID:
    - Type: **Web application**.
-   - Authorized JavaScript origin: `https://frioos.vercel.app`.
-   - Authorized redirect URI: `https://frioos.vercel.app/api/auth/callback/google`.
+   - Authorized JavaScript origin: `https://frioos-iota.vercel.app`.
+   - Authorized redirect URI: `https://frioos-iota.vercel.app/api/auth/callback/google`.
    - For local dev, also add `http://localhost:3000` and `http://localhost:3000/api/auth/callback/google`.
 5. In Vercel → frioos → Settings → Environment Variables (Production + Preview), add:
    - `GOOGLE_CLIENT_ID`
@@ -70,7 +70,7 @@ Tools are public read-only data: DefiLlama, DexScreener, GeckoTerminal, CoinGeck
 | `DATABASE_URL` (+ Neon vars) | yes | set by the Neon integration |
 | `APP_PASSCODE` | yes | passcode gate |
 | `AUTH_SECRET` | yes | signs sessions, encrypts stored secrets |
-| `APP_URL` | yes | `https://frioos.vercel.app` |
+| `APP_URL` | yes | `https://frioos-iota.vercel.app` |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `ALLOWED_EMAIL` | optional | enables Google |
 | `AI_BASE_URL`, `AI_API_KEY`, `AI_MODEL` | optional | or configure in Settings |
 | `ETHERSCAN_API_KEY` | optional | richer audits |
