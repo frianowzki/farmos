@@ -47,10 +47,17 @@ const providers = [
       ]
     : []),
   ...(has("DISCORD_CLIENT_ID", "DISCORD_CLIENT_SECRET")
-    ? [Discord({ clientId: process.env.DISCORD_CLIENT_ID, clientSecret: process.env.DISCORD_CLIENT_SECRET, authorization: { params: { scope: "identify" } } })]
+    ? [
+        // Discord now sends the RFC 9207 `iss` param on the callback. Without an explicit issuer Auth.js
+        // compares it to its "https://authjs.dev" placeholder and every callback fails.
+        Discord({ clientId: process.env.DISCORD_CLIENT_ID, clientSecret: process.env.DISCORD_CLIENT_SECRET, issuer: "https://discord.com", authorization: { params: { scope: "identify" } } }),
+      ]
     : []),
   ...(has("GITHUB_CLIENT_ID", "GITHUB_CLIENT_SECRET")
-    ? [GitHub({ clientId: process.env.GITHUB_CLIENT_ID, clientSecret: process.env.GITHUB_CLIENT_SECRET, authorization: { params: { scope: "read:user" } } })]
+    ? [
+        // Same RFC 9207 guard as Discord; GitHub has rolled `iss` out before. Unused while GitHub omits it.
+        GitHub({ clientId: process.env.GITHUB_CLIENT_ID, clientSecret: process.env.GITHUB_CLIENT_SECRET, issuer: "https://github.com/login/oauth", authorization: { params: { scope: "read:user" } } }),
+      ]
     : []),
 ];
 
@@ -59,7 +66,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   secret: process.env.AUTH_SECRET,
   trustHost: true,
   session: { strategy: "jwt" },
-  pages: { signIn: "/login", error: "/login" },
+  // Errors go through /auth-error: with a live farmOS session a failed link returns to Settings instead of looking like a logout.
+  pages: { signIn: "/login", error: "/auth-error" },
   callbacks: {
     async signIn({ account, profile }) {
       if (account && account.provider !== "google") {

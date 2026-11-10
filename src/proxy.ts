@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { SESSION_COOKIE, verifySessionToken } from "@/lib/session";
 
-const PUBLIC = [/^\/login$/, /^\/api\/unlock$/, /^\/api\/auth(\/|$)/, /^\/api\/health$/, /^\/api\/cron\//];
+const PUBLIC = [/^\/login$/, /^\/auth-error$/, /^\/api\/unlock$/, /^\/api\/auth(\/|$)/, /^\/api\/health$/, /^\/api\/cron\//];
 
 /**
  * One canonical domain keeps OAuth simple: every provider (Google, X, Discord, GitHub, Telegram) only needs

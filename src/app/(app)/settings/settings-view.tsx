@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, ExternalLink, KeyRound, Monitor, Moon, RefreshCw, ShieldAlert, Sun, Trash2 } from "lucide-react";
 import { signIn } from "next-auth/react";
 import { useTheme } from "next-themes";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { BrandIcon, type BrandId } from "@/components/brand";
 import { Marker } from "@/components/panelui/marker";
 import { toast } from "@/lib/client/toast";
@@ -308,7 +308,24 @@ function ConnectionsSection({ appUrl }: { appUrl: string }) {
   const qc = useQueryClient();
   const q = useQuery({ queryKey: ["connections"], queryFn: () => api<{ providers: Conn[]; telegramBot: string | null }>("/api/connections") });
   const origin = typeof window !== "undefined" ? window.location.origin : appUrl;
-  const refresh = () => qc.invalidateQueries({ queryKey: ["connections"] });
+  const refresh = useCallback(() => qc.invalidateQueries({ queryKey: ["connections"] }), [qc]);
+  // Result of an OAuth link / Telegram redirect: show it here instead of bouncing to /login.
+  useEffect(() => {
+    const sp = new URLSearchParams(window.location.search);
+    const err = sp.get("connect_error");
+    const ok = sp.get("connected");
+    if (!err && !ok) return;
+    const msg: Record<string, string> = {
+      AccessDenied: "Access was denied. Approve the request on the provider's page and try again.",
+      Configuration: "The provider rejected the callback. Check its redirect URL and keys (SETUP.md).",
+      OAuthAccountNotLinked: "That account is already linked elsewhere.",
+      telegram_signature: "Telegram's signature check failed. Try again.",
+      telegram_not_configured: "Telegram isn't set up on the server.",
+    };
+    if (err) toast.error(msg[err] ?? "Couldn't connect that account. Try again.");
+    if (ok) toast.success(`${ok[0].toUpperCase()}${ok.slice(1)} connected`);
+    window.history.replaceState(null, "", "/settings#connections");
+  }, []);
   const disconnect = async (id: string) => {
     try {
       await api(`/api/connections/${id}`, { method: "DELETE" });
@@ -389,41 +406,75 @@ function FarcasterLink({ onDone }: { onDone: () => void }) {
   );
 }
 
-declare global {
-  interface Window {
-    frioTelegramAuth?: (u: Record<string, unknown>) => void;
-  }
-}
 
-/** Official Telegram Login Widget, loaded only when the user asks for it. */
+/**
+ * Telegram linking. Primary: a one-time deep link to the bot (tap Start in Telegram, the server
+ * reads the /start message), so there's no popup or phone-number step at all. Fallback: the
+ * official Login Widget in redirect mode (data-auth-url), which doesn't depend on popup postMessage.
+ */
 function TelegramButton({ bot, onDone }: { bot: string | null; onDone: () => void }) {
+  const [link, setLink] = useState<{ url: string; token: string; expiresAt: number } | null>(null);
+  const [widget, setWidget] = useState(false);
   const [host, setHost] = useState<HTMLDivElement | null>(null);
-  const [shown, setShown] = useState(false);
   useEffect(() => {
-    if (!shown || !host || !bot) return;
-    window.frioTelegramAuth = async (u) => {
+    if (!link) return;
+    let stop = false;
+    const tick = async () => {
+      if (stop) return;
+      if (Date.now() > link.expiresAt) { setLink(null); toast.error("Telegram link expired. Try again."); return; }
       try {
-        await api("/api/connections/telegram", { method: "POST", body: u });
-        onDone();
-        toast.success("Telegram connected");
-      } catch (e) {
-        toast.error((e as Error).message);
-      }
+        const r = await api<{ status: string; username?: string | null; error?: string }>(`/api/connections/telegram/link?token=${link.token}`);
+        if (r.status === "linked") { setLink(null); onDone(); toast.success(r.username ? `Telegram @${r.username} connected` : "Telegram connected"); return; }
+        if (r.status === "error") { setLink(null); toast.error(r.error ?? "Telegram link failed"); return; }
+      } catch {}
+      if (!stop) setTimeout(tick, 2500);
     };
+    const t = setTimeout(tick, 2500);
+    return () => { stop = true; clearTimeout(t); };
+  }, [link, onDone]);
+  useEffect(() => {
+    if (!widget || !host || !bot) return;
     const s = document.createElement("script");
     s.src = "https://telegram.org/js/telegram-widget.js?22";
     s.async = true;
     s.setAttribute("data-telegram-login", bot);
     s.setAttribute("data-size", "medium");
     s.setAttribute("data-radius", "6");
-    s.setAttribute("data-request-access", "read");
-    s.setAttribute("data-onauth", "frioTelegramAuth(user)");
+    s.setAttribute("data-request-access", "write");
+    s.setAttribute("data-auth-url", `${window.location.origin}/api/connections/telegram/callback`);
     host.appendChild(s);
-    return () => {
-      host.innerHTML = "";
-      delete window.frioTelegramAuth;
-    };
-  }, [shown, host, bot, onDone]);
+    return () => { host.innerHTML = ""; };
+  }, [widget, host, bot]);
   if (!bot) return null;
-  return shown ? <div ref={setHost} className="min-h-7" /> : <Button size="sm" onClick={() => setShown(true)}>Connect</Button>;
+  const start = async () => {
+    // Open the tab synchronously (popup blockers), then point it at the deep link.
+    const w = window.open("about:blank", "_blank");
+    try {
+      const r = await api<{ url: string; token: string; expiresAt: number }>("/api/connections/telegram/link", { method: "POST" });
+      setLink(r);
+      if (w) w.location.href = r.url;
+      else window.location.href = r.url;
+    } catch (e) {
+      w?.close();
+      toast.error((e as Error).message);
+    }
+  };
+  if (widget) return <div className="flex flex-col items-end gap-1"><div ref={setHost} className="min-h-7" /><button type="button" onClick={() => setWidget(false)} className="text-[11.5px] text-faint hover:text-ink">Back</button></div>;
+  if (link) {
+    return (
+      <div className="flex flex-col items-end gap-1 text-right">
+        <span className="inline-flex items-center gap-1.5 text-[12.5px] text-ink-2"><span className="h-1.5 w-1.5 animate-pulse rounded-full bg-accent" /> Tap <b>Start</b> in Telegram…</span>
+        <span className="flex gap-2 text-[11.5px]">
+          <a href={link.url} target="_blank" rel="noreferrer" className="text-muted underline underline-offset-2 hover:text-ink">Open again</a>
+          <button type="button" onClick={() => setLink(null)} className="text-faint hover:text-ink">Cancel</button>
+        </span>
+      </div>
+    );
+  }
+  return (
+    <div className="flex flex-col items-end gap-1">
+      <Button size="sm" onClick={start}>Connect</Button>
+      <button type="button" onClick={() => setWidget(true)} className="text-[11.5px] text-faint hover:text-ink">or use Telegram Login</button>
+    </div>
+  );
 }

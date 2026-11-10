@@ -11,7 +11,7 @@ export const PROVIDERS: { id: ProviderId; label: string; env: string[]; purpose:
   { id: "x", label: "X", env: ["X_CLIENT_ID", "X_CLIENT_SECRET"], purpose: "Your X timeline in the Feed (read-only)" },
   { id: "discord", label: "Discord", env: ["DISCORD_CLIENT_ID", "DISCORD_CLIENT_SECRET"], purpose: "Identity (username and avatar) on your project pages" },
   { id: "github", label: "GitHub", env: ["GITHUB_CLIENT_ID", "GITHUB_CLIENT_SECRET"], purpose: "Identity and public profile for dev-heavy testnets" },
-  { id: "telegram", label: "Telegram", env: ["TELEGRAM_BOT_TOKEN", "NEXT_PUBLIC_TELEGRAM_BOT_USERNAME"], purpose: "Identity via the official Login Widget" },
+  { id: "telegram", label: "Telegram", env: ["TELEGRAM_BOT_TOKEN", "NEXT_PUBLIC_TELEGRAM_BOT_USERNAME"], purpose: "Tap Start in your bot to link (Login Widget as fallback)" },
   { id: "farcaster", label: "Farcaster", env: [], purpose: "Public profile by username (read from the Farcaster API, no sign-in)" },
 ];
 

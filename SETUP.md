@@ -88,7 +88,10 @@ Callback URL pattern: `https://farmos-os.vercel.app/api/auth/callback/<provider>
 2. Homepage `https://farmos-os.vercel.app`, callback `https://farmos-os.vercel.app/api/auth/callback/github`.
 3. `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`. Scope: `read:user`.
 
-**Telegram** (official Login Widget)
+**Telegram** (bot deep link; Login Widget as fallback)
+
+Settings → Connected accounts → Telegram → **Connect** opens `t.me/<bot>?start=<one-time token>`. Press **Start** in Telegram and farmOS links the account within a few seconds (it reads the `/start` message with `getUpdates`, so the bot must not have a webhook). No phone number or popup. "or use Telegram Login" shows the official widget in redirect mode (`data-auth-url` → `/api/connections/telegram/callback`); with the widget, Telegram sends a confirmation message to your Telegram app that you must accept.
+
 1. In Telegram, message @BotFather → `/newbot` → copy the token into `TELEGRAM_BOT_TOKEN` (server-only).
 2. Send `/setdomain` to @BotFather, choose the bot, and enter `farmos-os.vercel.app`.
 3. Set `NEXT_PUBLIC_TELEGRAM_BOT_USERNAME` to the bot username without `@` (public by design).
