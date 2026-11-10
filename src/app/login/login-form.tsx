@@ -32,7 +32,7 @@ export function LoginForm({ next, error, googleLogin }: { next: string; error?: 
         <div className="anim-rise w-full max-w-[360px]">
           <Logo mark className="mb-10 h-[52px]" />
           <TextReveal as="h1" split="word" text="Welcome back." className="font-serif text-[34px] leading-[1.1] tracking-[-0.015em] text-ink" />
-          <p className="mt-2 text-[14px] text-muted">Enter your passcode to open the desk.</p>
+          <p className="mt-2 text-[14px] text-muted">Everything you farmed is right behind this door.</p>
           <form onSubmit={submit} className="mt-7">
             <label htmlFor="passcode" className="mb-1.5 flex items-center gap-1.5 text-[12.5px] font-medium text-ink-2">
               <KeyRound className="h-3.5 w-3.5 text-muted" /> Passcode
