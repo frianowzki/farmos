@@ -1,16 +1,16 @@
 import { and, eq, isNotNull } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { db, schema } from "@/db";
-import { readJson, requireSession } from "@/lib/server/guard";
+import { readJson, requireProfile } from "@/lib/server/guard";
 
 /** Refresh current prices of open positions that have a token address, via DexScreener (public). */
 export async function POST(req: Request) {
-  const denied = await requireSession();
-  if (denied) return denied;
+  const pid = await requireProfile();
+  if (pid instanceof NextResponse) return pid;
   const { projectId } = await readJson<{ projectId?: string }>(req);
   const where = projectId
-    ? and(eq(schema.positions.status, "open"), isNotNull(schema.positions.tokenAddress), eq(schema.positions.projectId, projectId))
-    : and(eq(schema.positions.status, "open"), isNotNull(schema.positions.tokenAddress));
+    ? and(eq(schema.positions.profileId, pid), eq(schema.positions.status, "open"), isNotNull(schema.positions.tokenAddress), eq(schema.positions.projectId, projectId))
+    : and(eq(schema.positions.profileId, pid), eq(schema.positions.status, "open"), isNotNull(schema.positions.tokenAddress));
   const rows = await db().select().from(schema.positions).where(where);
   const addrs = [...new Set(rows.map((r) => r.tokenAddress!.trim()).filter(Boolean))];
   const prices = new Map<string, number>();
@@ -36,7 +36,7 @@ export async function POST(req: Request) {
   for (const r of rows) {
     const p = prices.get(r.tokenAddress!.trim().toLowerCase());
     if (p == null) continue;
-    await db().update(schema.positions).set({ currentPrice: p, priceUpdatedAt: new Date() }).where(eq(schema.positions.id, r.id));
+    await db().update(schema.positions).set({ currentPrice: p, priceUpdatedAt: new Date() }).where(and(eq(schema.positions.profileId, pid), eq(schema.positions.id, r.id)));
     updated++;
   }
   return NextResponse.json({ checked: rows.length, updated });

@@ -72,7 +72,7 @@ export function TodayHeader({ name, line }: { name: string; line: React.ReactNod
           <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.25 }} className="mt-2 font-serif text-[22px] leading-tight text-ink-2 sm:text-[26px]">
             <ChromaticTextReveal
               prefix={`${greeting(now.getHours())},`}
-              words={[`${name}.`, "stay early.", "farm smart.", "ship daily."]}
+              words={[...(name ? [`${name}.`] : []), "stay early.", "farm smart.", "ship daily."]}
               colors={["#a3e635", "#34d399", "#22d3ee", "#818cf8", "#f472b6"]}
               foregroundColor="var(--ink-2)"
               duration={1.1}

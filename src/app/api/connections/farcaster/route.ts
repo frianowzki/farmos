@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
-import { bad, readJson, requireSession } from "@/lib/server/guard";
+import { bad, readJson, requireProfile } from "@/lib/server/guard";
 import { saveConnection } from "@/lib/server/connections";
 
 /** Link a Farcaster profile by username from the public Farcaster (Warpcast) API. Display only, not a verified login. */
 export async function POST(req: Request) {
-  const denied = await requireSession();
-  if (denied) return denied;
+  const pid = await requireProfile();
+  if (pid instanceof NextResponse) return pid;
   const { username } = await readJson<{ username?: string }>(req);
   const u = String(username ?? "").trim().replace(/^@/, "").toLowerCase();
   if (!/^[a-z0-9][a-z0-9-.]{0,31}$/.test(u)) return bad("Enter a Farcaster username");
@@ -15,7 +15,7 @@ export async function POST(req: Request) {
   const j = (await res.json()) as { result?: { user?: { fid: number; username: string; displayName?: string; pfp?: { url?: string }; followerCount?: number; followingCount?: number; profile?: { bio?: { text?: string } } } } };
   const user = j.result?.user;
   if (!user) return bad("No Farcaster user with that name", 404);
-  await saveConnection({
+  await saveConnection(pid, {
     provider: "farcaster",
     providerAccountId: String(user.fid),
     username: user.username,

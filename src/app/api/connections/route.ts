@@ -1,17 +1,19 @@
 import { NextResponse } from "next/server";
 import { googleConfigured } from "@/auth";
-import { requireSession } from "@/lib/server/guard";
+import { requireProfile } from "@/lib/server/guard";
 import { PROVIDERS, isConfigured, listConnections } from "@/lib/server/connections";
+import { eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const denied = await requireSession();
-  if (denied) return denied;
-  const [rows, google] = await Promise.all([listConnections(), db().select().from(schema.googleTokens).limit(1)]);
+  const pid = await requireProfile();
+  if (pid instanceof NextResponse) return pid;
+  const [rows, google] = await Promise.all([listConnections(pid), db().select().from(schema.googleTokens).where(eq(schema.googleTokens.id, pid)).limit(1)]);
   const providers = PROVIDERS.map((p) => {
-    const configured = p.id === "google" ? googleConfigured : isConfigured(p.id);
+    // Google (Gmail/Calendar) stays on Iya's default profile only.
+    const configured = p.id === "google" ? googleConfigured && pid === "default" : isConfigured(p.id);
     const row = rows.find((r) => r.provider === p.id);
     const account =
       p.id === "google"

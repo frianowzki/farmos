@@ -1,4 +1,5 @@
 import "server-only";
+import { guardedFetch } from "./ssrf";
 import { createPublicClient, formatUnits, getAddress, http, isAddress, parseAbiItem, type AbiFunction } from "viem";
 import type { AirdropChecker } from "@/db/schema";
 import { findChain, rpcFor } from "@/lib/chains";
@@ -31,7 +32,8 @@ function judge(v: unknown): Pick<Result, "status" | "amount"> {
 async function getJson(url: string) {
   const u = new URL(url);
   if (u.protocol !== "https:") throw new Error("Only https URLs");
-  const res = await fetch(u, { headers: { accept: "application/json" }, cache: "no-store", signal: AbortSignal.timeout(12_000), redirect: "follow" });
+  // User-supplied URL: block internal addresses on every hop and follow at most 3 redirects.
+  const res = await guardedFetch(u.toString(), { headers: { accept: "application/json" }, cache: "no-store", signal: AbortSignal.timeout(12_000) }, 3);
   if (res.status === 404) return { notFound: true as const };
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const len = Number(res.headers.get("content-length") ?? 0);

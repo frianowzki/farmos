@@ -1,5 +1,6 @@
 import "server-only";
 import { getSetting, setSetting } from "./settings";
+import { GLOBAL_PROFILE } from "@/lib/profiles";
 
 /**
  * News wire: free public RSS/Atom feeds from crypto newsrooms and airdrop trackers. No keys.
@@ -95,9 +96,9 @@ export async function fetchNews(): Promise<NewsSnapshot> {
 }
 
 export async function getNews(force = false): Promise<NewsSnapshot & { cached: boolean }> {
-  const c = await getSetting<NewsSnapshot>("news_wire");
+  const c = await getSetting<NewsSnapshot>(GLOBAL_PROFILE, "news_wire");
   if (!force && c?.fetchedAt && Date.now() - +new Date(c.fetchedAt) < TTL_MS) return { ...c, cached: true };
   const snap = await fetchNews();
-  if (snap.items.length) await setSetting("news_wire", snap);
+  if (snap.items.length) await setSetting(GLOBAL_PROFILE, "news_wire", snap);
   return { ...snap, cached: false };
 }

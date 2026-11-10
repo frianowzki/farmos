@@ -1,4 +1,5 @@
 import "server-only";
+import { eq } from "drizzle-orm";
 import { isAddress } from "viem";
 import { db, schema } from "@/db";
 import { walletFamily } from "@/lib/wallet-chains";
@@ -37,9 +38,9 @@ async function nftsFor(chain: string, address: string): Promise<OsNft[]> {
   return out;
 }
 
-export async function scanNfts(): Promise<NftSnapshot> {
+export async function scanNfts(pid: string): Promise<NftSnapshot> {
   if (!process.env.OPENSEA_API_KEY?.trim()) return { fetchedAt: new Date().toISOString(), collections: [], count: 0, totalUsd: null, totalNative: [], errors: [], configured: false };
-  const wallets = await db().select().from(schema.wallets);
+  const wallets = await db().select().from(schema.wallets).where(eq(schema.wallets.profileId, pid));
   const jobs: { chain: string; address: string; label: string }[] = [];
   for (const w of wallets) {
     const f = walletFamily(w);
@@ -102,11 +103,11 @@ export async function scanNfts(): Promise<NftSnapshot> {
   };
 }
 
-export async function getNfts(force = false): Promise<NftSnapshot & { cached: boolean }> {
-  const cached = await getSetting<NftSnapshot & { key?: string }>("wallet_nfts");
-  const key = (await db().select({ a: schema.wallets.address }).from(schema.wallets)).map((w) => w.a.toLowerCase()).sort().join();
+export async function getNfts(pid: string, force = false): Promise<NftSnapshot & { cached: boolean }> {
+  const cached = await getSetting<NftSnapshot & { key?: string }>(pid, "wallet_nfts");
+  const key = (await db().select({ a: schema.wallets.address }).from(schema.wallets).where(eq(schema.wallets.profileId, pid))).map((w) => w.a.toLowerCase()).sort().join();
   if (!force && cached?.fetchedAt && cached.key === key && Date.now() - +new Date(cached.fetchedAt) < TTL_MS) return { ...cached, cached: true };
-  const snap = await scanNfts();
-  await setSetting("wallet_nfts", { ...snap, key });
+  const snap = await scanNfts(pid);
+  await setSetting(pid, "wallet_nfts", { ...snap, key });
   return { ...snap, cached: false };
 }

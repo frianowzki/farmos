@@ -1,3 +1,4 @@
+import { NextResponse } from "next/server";
 import { bad, requireSession } from "@/lib/server/guard";
 
 type Ctx = { params: Promise<{ handle: string }> };

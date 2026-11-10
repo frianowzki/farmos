@@ -1,20 +1,20 @@
-import { asc } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { db, schema } from "@/db";
-import { bad, readJson, requireSession } from "@/lib/server/guard";
+import { bad, readJson, requireProfile } from "@/lib/server/guard";
 import { isWalletBrand } from "@/lib/wallet-brands";
 import { familiesFor, normalizeAddress, walletFamily, type WalletFamily } from "@/lib/wallet-chains";
 
 export async function GET() {
-  const denied = await requireSession();
-  if (denied) return denied;
-  const wallets = await db().select().from(schema.wallets).orderBy(asc(schema.wallets.createdAt));
+  const pid = await requireProfile();
+  if (pid instanceof NextResponse) return pid;
+  const wallets = await db().select().from(schema.wallets).where(eq(schema.wallets.profileId, pid)).orderBy(asc(schema.wallets.createdAt));
   return NextResponse.json({ wallets });
 }
 
 export async function POST(req: Request) {
-  const denied = await requireSession();
-  if (denied) return denied;
+  const pid = await requireProfile();
+  if (pid instanceof NextResponse) return pid;
   const { address, label, provider, chain } = await readJson<{ address?: string; label?: string; provider?: string; chain?: string }>(req);
   const prov = provider && isWalletBrand(provider) ? provider : "";
   const raw = (address ?? "").trim();
@@ -27,8 +27,8 @@ export async function POST(req: Request) {
   const lbl = (label ?? "").trim().slice(0, 60);
   const [row] = await db()
     .insert(schema.wallets)
-    .values({ address: a, label: lbl, provider: prov, chain: fam ?? "" })
-    .onConflictDoUpdate({ target: schema.wallets.address, set: { label: lbl, chain: fam ?? "", ...(prov ? { provider: prov } : {}) } })
+    .values({ address: a, label: lbl, provider: prov, chain: fam ?? "", profileId: pid })
+    .onConflictDoUpdate({ target: [schema.wallets.profileId, schema.wallets.address], set: { label: lbl, chain: fam ?? "", ...(prov ? { provider: prov } : {}) } })
     .returning();
   return NextResponse.json({ wallet: row }, { status: 201 });
 }

@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 import { generateText, isStepCount } from "ai";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db, schema } from "@/db";
 import type { AiReview } from "@/db/schema";
 import { AUDIT, auditScore, scoreToRating } from "@/lib/audit";
 import { aiModel, aiToolsEnabled, buildTools, systemFor } from "@/lib/server/ai";
-import { bad, requireSession } from "@/lib/server/guard";
+import { bad, requireProfile } from "@/lib/server/guard";
 import { extractJson } from "@/lib/server/json-out";
 import { getAiConfig } from "@/lib/server/settings";
 
@@ -38,28 +38,28 @@ Reasons: 3–7 short bullets with numbers/dates where you have them. Sources: on
 
 /** AI-suggested audit answers + rating with reasoning. Nothing is saved: the user accepts it in the UI. */
 export async function POST(_: Request, ctx: Ctx) {
-  const denied = await requireSession();
-  if (denied) return denied;
+  const pid = await requireProfile();
+  if (pid instanceof NextResponse) return pid;
   const { id } = await ctx.params;
   if (!/^[0-9a-f-]{36}$/i.test(id)) return bad("invalid id");
-  const [p] = await db().select().from(schema.projects).where(eq(schema.projects.id, id)).limit(1);
+  const [p] = await db().select().from(schema.projects).where(and(eq(schema.projects.profileId, pid), eq(schema.projects.id, id))).limit(1);
   if (!p) return bad("not found", 404);
   let model;
   try {
-    model = await aiModel();
+    model = await aiModel(pid);
   } catch (e) {
     return bad((e as Error).message, 412);
   }
   const { notes, audit, ...rest } = p;
   const context = JSON.stringify({ ...rest, currentAudit: audit ? { answers: audit.answers, score: audit.score } : null, notes: notes.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").slice(0, 3000) });
-  const useTools = await aiToolsEnabled();
+  const useTools = await aiToolsEnabled(pid);
   let text = "";
   try {
     const r = await generateText({
       model,
       system: systemFor("audit", context),
       prompt: INSTRUCTIONS,
-      ...(useTools ? { tools: buildTools(), stopWhen: isStepCount(8) } : {}),
+      ...(useTools ? { tools: buildTools(pid), stopWhen: isStepCount(8) } : {}),
     });
     text = r.text;
   } catch (e) {
@@ -75,7 +75,7 @@ export async function POST(_: Request, ctx: Ctx) {
     if (ids.length) answers[q.id] = [...new Set(ids)];
   }
   const score = auditScore(answers);
-  const cfg = await getAiConfig();
+  const cfg = await getAiConfig(pid);
   const review: AiReview = {
     rating: o.rating ?? scoreToRating(score),
     score,

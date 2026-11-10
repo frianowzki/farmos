@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { generateText, isStepCount } from "ai";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db, schema } from "@/db";
 import { aiModel, aiToolsEnabled, buildTools, systemFor } from "@/lib/server/ai";
-import { bad, readJson, requireSession } from "@/lib/server/guard";
+import { bad, readJson, requireProfile } from "@/lib/server/guard";
 import { getNews } from "@/lib/server/news";
 
 export const maxDuration = 300;
@@ -27,17 +27,17 @@ Reply with ONLY a JSON array, no prose, no code fences. Shape:
 [{"kind":"project"|"news","title":"…","summary":"one or two sentences: what it is and why today","url":"https://…","source":"DefiLlama","category":"airdrop"|"testnet"|"nft"|"degen"|"news","score":72}]`;
 
 export async function POST(req: Request) {
-  const denied = await requireSession();
-  if (denied) return denied;
+  const pid = await requireProfile();
+  if (pid instanceof NextResponse) return pid;
   const { day } = await readJson<{ day?: string }>(req);
   if (!day || !/^\d{4}-\d{2}-\d{2}$/.test(day)) return bad("day required");
   let model;
   try {
-    model = await aiModel();
+    model = await aiModel(pid);
   } catch (e) {
     return bad((e as Error).message, 412);
   }
-  const useTools = await aiToolsEnabled();
+  const useTools = await aiToolsEnabled(pid);
   // Free newsroom + airdrop-tracker RSS headlines count as tool data: the model may pick from them.
   const news = await getNews(false).catch(() => null);
   const wire = (news?.items ?? [])
@@ -51,7 +51,7 @@ export async function POST(req: Request) {
     model,
     system: systemFor("daily"),
     prompt,
-    ...(useTools ? { tools: buildTools(), stopWhen: isStepCount(8) } : {}),
+    ...(useTools ? { tools: buildTools(pid), stopWhen: isStepCount(8) } : {}),
   });
   const text = result.text.trim().replace(/^```(?:json)?/i, "").replace(/```$/, "").trim();
   const start = text.indexOf("[");
@@ -64,10 +64,10 @@ export async function POST(req: Request) {
     return bad("The model didn't return a usable list. Try again, or check the model supports tools.", 502);
   }
   if (!parsed.length) return bad("No items came back. Try again.", 502);
-  await db().delete(schema.feedItems).where(eq(schema.feedItems.day, day));
+  await db().delete(schema.feedItems).where(and(eq(schema.feedItems.profileId, pid), eq(schema.feedItems.day, day)));
   const rows = await db()
     .insert(schema.feedItems)
-    .values(parsed.map((p) => ({ ...p, day, category: p.category ?? null })))
+    .values(parsed.map((p) => ({ ...p, day, category: p.category ?? null, profileId: pid })))
     .returning();
   return NextResponse.json({ items: rows });
 }

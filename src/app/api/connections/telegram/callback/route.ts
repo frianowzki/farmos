@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { SESSION_COOKIE, verifySessionToken } from "@/lib/session";
+import { SESSION_COOKIE, sessionProfileFromToken } from "@/lib/session";
 import { isConfigured, saveConnection, verifyTelegram } from "@/lib/server/connections";
 
 export const dynamic = "force-dynamic";
@@ -12,7 +12,8 @@ export const dynamic = "force-dynamic";
 export async function GET(req: Request) {
   const url = new URL(req.url);
   const back = (q: string) => NextResponse.redirect(new URL(`/settings?${q}#connections`, url.origin));
-  if (!(await verifySessionToken((await cookies()).get(SESSION_COOKIE)?.value))) return NextResponse.redirect(new URL("/login", url.origin));
+  const pid = await sessionProfileFromToken((await cookies()).get(SESSION_COOKIE)?.value);
+  if (!pid) return NextResponse.redirect(new URL("/login", url.origin));
   if (!isConfigured("telegram")) return back("connect_error=telegram_not_configured");
   const data: Record<string, string> = {};
   for (const k of ["id", "first_name", "last_name", "username", "photo_url", "auth_date", "hash"]) {
@@ -20,7 +21,7 @@ export async function GET(req: Request) {
     if (v != null) data[k] = v;
   }
   if (!verifyTelegram(data)) return back("connect_error=telegram_signature");
-  await saveConnection({
+  await saveConnection(pid, {
     provider: "telegram",
     providerAccountId: data.id,
     username: data.username ?? null,

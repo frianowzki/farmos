@@ -1,6 +1,6 @@
 import "server-only";
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { decrypt, encrypt } from "@/lib/server/crypto";
 
@@ -22,7 +22,7 @@ export const isConfigured = (id: ProviderId) => {
   return p.env.every((k) => process.env[k]) && (!needsAuthJs || Boolean(process.env.AUTH_SECRET));
 };
 
-export async function saveConnection(input: {
+export async function saveConnection(pid: string, input: {
   provider: Exclude<ProviderId, "google">;
   providerAccountId: string;
   username?: string | null;
@@ -35,6 +35,7 @@ export async function saveConnection(input: {
   profile?: Record<string, unknown>;
 }) {
   const row = {
+    profileId: pid,
     provider: input.provider,
     providerAccountId: input.providerAccountId,
     username: input.username ?? null,
@@ -47,22 +48,22 @@ export async function saveConnection(input: {
     profile: input.profile ?? {},
     updatedAt: new Date(),
   };
-  await db().insert(schema.connectedAccounts).values(row).onConflictDoUpdate({ target: schema.connectedAccounts.provider, set: row });
+  await db().insert(schema.connectedAccounts).values(row).onConflictDoUpdate({ target: [schema.connectedAccounts.profileId, schema.connectedAccounts.provider], set: row });
 }
 
-export async function listConnections() {
-  const rows = await db().select().from(schema.connectedAccounts);
+export async function listConnections(pid: string) {
+  const rows = await db().select().from(schema.connectedAccounts).where(eq(schema.connectedAccounts.profileId, pid));
   // Public shape only: never tokens.
   return rows.map((r) => ({ provider: r.provider, username: r.username, name: r.name, image: r.image, scope: r.scope, profile: r.profile, updatedAt: r.updatedAt }));
 }
 
-export async function removeConnection(provider: string) {
-  await db().delete(schema.connectedAccounts).where(eq(schema.connectedAccounts.provider, provider));
+export async function removeConnection(pid: string, provider: string) {
+  await db().delete(schema.connectedAccounts).where(and(eq(schema.connectedAccounts.profileId, pid), eq(schema.connectedAccounts.provider, provider)));
 }
 
 /** Access token for a provider, refreshing X tokens when they expire (X issues 2h tokens + refresh tokens). */
-export async function accessToken(provider: "x" | "discord" | "github"): Promise<string | null> {
-  const [row] = await db().select().from(schema.connectedAccounts).where(eq(schema.connectedAccounts.provider, provider)).limit(1);
+export async function accessToken(pid: string, provider: "x" | "discord" | "github"): Promise<string | null> {
+  const [row] = await db().select().from(schema.connectedAccounts).where(and(eq(schema.connectedAccounts.profileId, pid), eq(schema.connectedAccounts.provider, provider))).limit(1);
   if (!row) return null;
   const token = decrypt(row.accessTokenEnc);
   const fresh = !row.expiresAt || row.expiresAt * 1000 > Date.now() + 60_000;
@@ -88,7 +89,7 @@ export async function accessToken(provider: "x" | "discord" | "github"): Promise
       expiresAt: j.expires_in ? Math.floor(Date.now() / 1000) + j.expires_in : null,
       updatedAt: new Date(),
     })
-    .where(eq(schema.connectedAccounts.provider, "x"));
+    .where(and(eq(schema.connectedAccounts.profileId, pid), eq(schema.connectedAccounts.provider, "x")));
   return j.access_token;
 }
 

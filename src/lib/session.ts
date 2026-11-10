@@ -1,4 +1,5 @@
 // Edge/Node-safe signed session cookie for the passcode gate (Web Crypto only).
+import { isProfileId, type ProfileId } from "./profiles";
 export const SESSION_COOKIE = "frio_session";
 export const SESSION_TTL_SECONDS = 60 * 60 * 24 * 30;
 
@@ -29,14 +30,37 @@ export async function createSessionToken(subject: string): Promise<string> {
 }
 
 export async function verifySessionToken(token: string | undefined | null): Promise<boolean> {
-  if (!token) return false;
+  return (await sessionProfileFromToken(token)) !== null;
+}
+
+/**
+ * The profile a session belongs to. Tokens minted before profiles existed ("passcode",
+ * "google:…") are Iya's, so they map to "default" and nobody gets logged out.
+ */
+export async function sessionProfileFromToken(token: string | undefined | null): Promise<ProfileId | null> {
+  const subject = await verifiedSubject(token);
+  if (subject === null) return null;
+  if (subject.startsWith("profile:")) {
+    const id = subject.slice("profile:".length);
+    return isProfileId(id) ? id : null;
+  }
+  return "default";
+}
+
+async function verifiedSubject(token: string | undefined | null): Promise<string | null> {
+  if (!token) return null;
   const parts = token.split(".");
-  if (parts.length !== 4 || parts[0] !== "v1") return false;
+  if (parts.length !== 4 || parts[0] !== "v1") return null;
   const exp = Number(parts[1]);
-  if (!Number.isFinite(exp) || exp < Date.now() / 1000) return false;
+  if (!Number.isFinite(exp) || exp < Date.now() / 1000) return null;
   const payload = parts.slice(0, 3).join(".");
   const expected = await hmac(payload);
-  return timingSafeEqual(expected, parts[3]);
+  if (!timingSafeEqual(expected, parts[3])) return null;
+  try {
+    return new TextDecoder().decode(Uint8Array.from(atob(parts[2].replace(/-/g, "+").replace(/_/g, "/")), (c) => c.charCodeAt(0)));
+  } catch {
+    return null;
+  }
 }
 
 export function timingSafeEqual(a: string, b: string) {

@@ -77,6 +77,8 @@ export const projects = pgTable(
   "projects",
   {
     id: uuid("id").primaryKey().defaultRandom(),
+    /** Which farmOS profile owns the row ("default" = Iya). Always set explicitly; scoped in every query. */
+    profileId: text("profile_id").notNull(),
     name: text("name").notNull(),
     category: text("category").notNull().default("airdrop"),
     status: text("status").notNull().default("research"),
@@ -118,6 +120,8 @@ export const positions = pgTable(
   "positions",
   {
     id: uuid("id").primaryKey().defaultRandom(),
+    /** Which farmOS profile owns the row ("default" = Iya). Always set explicitly; scoped in every query. */
+    profileId: text("profile_id").notNull(),
     projectId: uuid("project_id")
       .notNull()
       .references(() => projects.id, { onDelete: "cascade" }),
@@ -140,6 +144,8 @@ export const positions = pgTable(
 
 export const tasks = pgTable("tasks", {
   id: uuid("id").primaryKey().defaultRandom(),
+  /** Which farmOS profile owns the row ("default" = Iya). Always set explicitly; scoped in every query. */
+  profileId: text("profile_id").notNull(),
   projectId: uuid("project_id").references(() => projects.id, { onDelete: "cascade" }),
   title: text("title").notNull(),
   cadence: text("cadence").notNull().default("daily"),
@@ -155,6 +161,8 @@ export const tasks = pgTable("tasks", {
 export const taskCompletions = pgTable(
   "task_completions",
   {
+    /** Which farmOS profile owns the row ("default" = Iya). Always set explicitly; scoped in every query. */
+    profileId: text("profile_id").notNull(),
     taskId: uuid("task_id")
       .notNull()
       .references(() => tasks.id, { onDelete: "cascade" }),
@@ -168,6 +176,8 @@ export const diaryEntries = pgTable(
   "diary_entries",
   {
     id: uuid("id").primaryKey().defaultRandom(),
+    /** Which farmOS profile owns the row ("default" = Iya). Always set explicitly; scoped in every query. */
+    profileId: text("profile_id").notNull(),
     day: date("day").notNull(),
     title: text("title").notNull().default(""),
     content: text("content").notNull().default(""),
@@ -182,6 +192,8 @@ export const wallets = pgTable(
   "wallets",
   {
     id: uuid("id").primaryKey().defaultRandom(),
+    /** Which farmOS profile owns the row ("default" = Iya). Always set explicitly; scoped in every query. */
+    profileId: text("profile_id").notNull(),
     address: text("address").notNull(),
     label: text("label").notNull().default(""),
     /** Wallet app it lives in (metamask, rabby, phantom…), for the icon. Empty = unknown. */
@@ -190,17 +202,25 @@ export const wallets = pgTable(
     chain: text("chain").notNull().default(""),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [uniqueIndex("wallets_address_idx").on(t.address)],
+  (t) => [uniqueIndex("wallets_profile_address_idx").on(t.profileId, t.address)],
 );
 
-export const settings = pgTable("settings", {
-  key: text("key").primaryKey(),
-  value: jsonb("value").notNull(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-});
+/** Key/value settings per profile. Shared caches (news wire…) live under profile "_global". */
+export const settings = pgTable(
+  "settings",
+  {
+    profileId: text("profile_id").notNull(),
+    key: text("key").notNull(),
+    value: jsonb("value").notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.profileId, t.key] })],
+);
 
 export const chatThreads = pgTable("chat_threads", {
   id: text("id").primaryKey(),
+  /** Which farmOS profile owns the row ("default" = Iya). Always set explicitly; scoped in every query. */
+  profileId: text("profile_id").notNull(),
   title: text("title").notNull().default("New chat"),
   mode: text("mode").notNull().default("chat"),
   messages: jsonb("messages").notNull().default([]),
@@ -209,7 +229,9 @@ export const chatThreads = pgTable("chat_threads", {
 });
 
 export const googleTokens = pgTable("google_tokens", {
+  /** One Google account per profile: the row id equals the profile id. */
   id: text("id").primaryKey(),
+  profileId: text("profile_id").notNull(),
   email: text("email").notNull(),
   accessToken: text("access_token").notNull(),
   refreshToken: text("refresh_token"),
@@ -221,6 +243,8 @@ export const googleTokens = pgTable("google_tokens", {
 export const calendarLinks = pgTable(
   "calendar_links",
   {
+    /** Which farmOS profile owns the row ("default" = Iya). Always set explicitly; scoped in every query. */
+    profileId: text("profile_id").notNull(),
     projectId: uuid("project_id")
       .notNull()
       .references(() => projects.id, { onDelete: "cascade" }),
@@ -236,6 +260,8 @@ export const attachments = pgTable(
   "attachments",
   {
     id: uuid("id").primaryKey().defaultRandom(),
+    /** Which farmOS profile owns the row ("default" = Iya). Always set explicitly; scoped in every query. */
+    profileId: text("profile_id").notNull(),
     projectId: uuid("project_id").references(() => projects.id, { onDelete: "cascade" }),
     diaryId: uuid("diary_id").references(() => diaryEntries.id, { onDelete: "cascade" }),
     url: text("url").notNull(),
@@ -250,7 +276,8 @@ export const attachments = pgTable(
 
 /** OAuth / login-widget identities linked from Settings → Connected accounts. Tokens are AES-GCM encrypted. */
 export const connectedAccounts = pgTable("connected_accounts", {
-  provider: text("provider").primaryKey(),
+  profileId: text("profile_id").notNull(),
+  provider: text("provider").notNull(),
   providerAccountId: text("provider_account_id").notNull(),
   username: text("username"),
   name: text("name"),
@@ -262,13 +289,15 @@ export const connectedAccounts = pgTable("connected_accounts", {
   profile: jsonb("profile").$type<Record<string, unknown>>().notNull().default({}),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-});
+}, (t) => [primaryKey({ columns: [t.profileId, t.provider] })]);
 
 /** Daily AI-picked reading list (news, early projects). Generated on demand from real sources. */
 export const feedItems = pgTable(
   "feed_items",
   {
     id: uuid("id").primaryKey().defaultRandom(),
+    /** Which farmOS profile owns the row ("default" = Iya). Always set explicitly; scoped in every query. */
+    profileId: text("profile_id").notNull(),
     day: date("day").notNull(),
     kind: text("kind").notNull().default("news"),
     title: text("title").notNull(),
@@ -284,7 +313,8 @@ export const feedItems = pgTable(
 
 /** Upcoming NFT mints the user is watching: manual WL status + last automatic check. */
 export const mintWatch = pgTable("mint_watch", {
-  slug: text("slug").primaryKey(),
+  profileId: text("profile_id").notNull(),
+  slug: text("slug").notNull(),
   name: text("name"),
   chain: text("chain"),
   contract: text("contract"),
@@ -297,7 +327,7 @@ export const mintWatch = pgTable("mint_watch", {
   projectId: uuid("project_id").references(() => projects.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-});
+}, (t) => [primaryKey({ columns: [t.profileId, t.slug] })]);
 
 export type Project = typeof projects.$inferSelect;
 export type MintWatch = typeof mintWatch.$inferSelect;

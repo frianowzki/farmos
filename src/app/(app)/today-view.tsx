@@ -13,7 +13,7 @@ import { cn } from "@/lib/cn";
 import { STATUSES } from "@/lib/constants";
 import { diffDays } from "@/lib/dates";
 import { relDay, tone, usd, pct } from "@/lib/format";
-import { api, useDiary, useGoogleStatus, useProjects, type Project } from "@/lib/client/api";
+import { api, useDiary, useGoogleStatus, useProfile, useProjects, type Project } from "@/lib/client/api";
 import { Grid, GridItem } from "@/components/panelui/grid-item";
 import { catTone } from "@/lib/options";
 import { sumPnl } from "@/lib/pnl";
@@ -23,6 +23,7 @@ export function TodayView() {
   const { data, isLoading } = useProjects();
   const model = useTaskModel();
   const { newProject } = useShell();
+  const profile = useProfile();
   const today = model.today;
 
   const projects = useMemo(() => data?.projects ?? [], [data]);
@@ -47,7 +48,7 @@ export function TodayView() {
   return (
     <Page wide>
       <TodayHeader
-        name="Iya"
+        name={profile.data?.name ?? ""}
         line={isLoading ? "\u00a0" : fresh ? "A clean desk. Let's set it up." : (
           <>
             {open.length ? `${open.length} task${open.length > 1 ? "s" : ""} left today` : model.rows.length ? "All of today's tasks are done" : "No recurring tasks yet"}

@@ -14,9 +14,9 @@ type Pending = { hash: string; exp: number };
 
 const sha = (s: string) => createHash("sha256").update(s).digest("hex");
 
-export async function startTelegramLink() {
+export async function startTelegramLink(pid: string) {
   const token = randomBytes(16).toString("hex");
-  await setSetting(KEY, { hash: sha(token), exp: Date.now() + TTL_MS } satisfies Pending);
+  await setSetting(pid, KEY, { hash: sha(token), exp: Date.now() + TTL_MS } satisfies Pending);
   return { token, expiresAt: Date.now() + TTL_MS };
 }
 
@@ -34,8 +34,8 @@ async function bot<T>(method: string, body: Record<string, unknown>): Promise<{ 
 }
 
 /** Checks for the /start message. Returns linked user, "pending", or an error string. */
-export async function checkTelegramLink(token: string): Promise<{ status: "linked"; username: string | null } | { status: "pending" } | { status: "error"; error: string }> {
-  const p = await getSetting<Pending>(KEY);
+export async function checkTelegramLink(pid: string, token: string): Promise<{ status: "linked"; username: string | null } | { status: "pending" } | { status: "error"; error: string }> {
+  const p = await getSetting<Pending>(pid, KEY);
   if (!p || p.hash !== sha(token)) return { status: "error", error: "Link expired. Start again." };
   if (Date.now() > p.exp) return { status: "error", error: "Link expired. Start again." };
   const res = await bot<Update[]>("getUpdates", { timeout: 0, allowed_updates: ["message"] });
@@ -50,18 +50,18 @@ export async function checkTelegramLink(token: string): Promise<{ status: "linke
   if (last != null) await bot("getUpdates", { offset: last + 1, timeout: 0 }).catch(() => null);
   if (!hit?.message?.from) return { status: "pending" };
   const f = hit.message.from;
-  await saveConnection({
+  await saveConnection(pid, {
     provider: "telegram",
     providerAccountId: String(f.id),
     username: f.username ?? null,
     name: [f.first_name, f.last_name].filter(Boolean).join(" ") || null,
     image: null,
   });
-  await setSetting(KEY, { hash: "", exp: 0 } satisfies Pending);
+  await setSetting(pid, KEY, { hash: "", exp: 0 } satisfies Pending);
   // Same private chat works for notifications; link it too if none is set yet.
   const { getNotify, saveNotify } = await import("./telegram");
-  const n = await getNotify().catch(() => null);
-  if (n && !n.chatId && hit.message.chat?.type === "private") await saveNotify({ chatId: String(hit.message.chat.id), chatName: f.username ? `@${f.username}` : f.first_name ?? null }).catch(() => null);
+  const n = await getNotify(pid).catch(() => null);
+  if (n && !n.chatId && hit.message.chat?.type === "private") await saveNotify(pid, { chatId: String(hit.message.chat.id), chatName: f.username ? `@${f.username}` : f.first_name ?? null }).catch(() => null);
   if (hit.message.chat?.id) await bot("sendMessage", { chat_id: hit.message.chat.id, text: "Linked to farmOS. You can close this chat." }).catch(() => null);
   return { status: "linked", username: f.username ?? null };
 }

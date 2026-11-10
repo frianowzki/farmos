@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db, schema } from "@/db";
-import { requireSession } from "@/lib/server/guard";
+import { requireProfile } from "@/lib/server/guard";
 import { accessToken, isConfigured } from "@/lib/server/connections";
 
 export const dynamic = "force-dynamic";
@@ -10,20 +10,22 @@ type XUser = { id: string; name: string; username: string; profile_image_url?: s
 type XTweet = { id: string; text: string; created_at?: string; author_id?: string; public_metrics?: { like_count: number; retweet_count: number; reply_count: number; quote_count?: number; impression_count?: number }; attachments?: { media_keys?: string[] } };
 type XMedia = { media_key: string; type: string; url?: string; preview_image_url?: string; width?: number; height?: number };
 
-let cache: { at: number; key: string; body: unknown } | null = null;
+// Per-profile cache: one profile must never be served another profile's timeline.
+const caches = new Map<string, { at: number; key: string; body: unknown }>();
 
 /** Reverse-chronological home timeline of the connected X account (read-only). */
 export async function GET(req: Request) {
-  const denied = await requireSession();
-  if (denied) return denied;
+  const pid = await requireProfile();
+  if (pid instanceof NextResponse) return pid;
   if (!isConfigured("x")) return NextResponse.json({ state: "not-configured", posts: [] });
-  const [row] = await db().select().from(schema.connectedAccounts).where(eq(schema.connectedAccounts.provider, "x")).limit(1);
+  const [row] = await db().select().from(schema.connectedAccounts).where(and(eq(schema.connectedAccounts.profileId, pid), eq(schema.connectedAccounts.provider, "x"))).limit(1);
   if (!row) return NextResponse.json({ state: "not-connected", posts: [] });
   const source = new URL(req.url).searchParams.get("source") === "me" ? "me" : "home";
-  const key = `${source}`;
+  const key = `${source}:${row.providerAccountId}`;
+  const cache = caches.get(pid);
   // X API reads are metered; keep a 5-minute cache to stay inside small tiers.
   if (cache && cache.key === key && Date.now() - cache.at < 5 * 60_000) return NextResponse.json(cache.body);
-  const token = await accessToken("x");
+  const token = await accessToken(pid, "x");
   if (!token) return NextResponse.json({ state: "reconnect", posts: [], message: "X token expired. Reconnect X in Settings." });
   const path = source === "me" ? `users/${row.providerAccountId}/tweets` : `users/${row.providerAccountId}/timelines/reverse_chronological`;
   const qs = new URLSearchParams({
@@ -37,7 +39,7 @@ export async function GET(req: Request) {
   if (res.status === 403 || res.status === 402) {
     // Plan without timeline reads: remember for an hour so the Feed simply hides the X tab.
     const body = { state: "plan", posts: [] };
-    cache = { at: Date.now() + 55 * 60_000, key, body };
+    caches.set(pid, { at: Date.now() + 55 * 60_000, key, body });
     return NextResponse.json(body);
   }
   if (!res.ok) {
@@ -63,6 +65,6 @@ export async function GET(req: Request) {
     };
   });
   const body = { state: "ok", source, posts };
-  cache = { at: Date.now(), key, body };
+  caches.set(pid, { at: Date.now(), key, body });
   return NextResponse.json(body);
 }

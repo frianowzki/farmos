@@ -35,7 +35,15 @@ export const keys = {
   google: ["google-status"] as QueryKey,
   ai: ["ai-config"] as QueryKey,
   threads: ["threads"] as QueryKey,
+  profile: ["profile"] as QueryKey,
 };
+
+export type ProfileInfo = { id: string; name: string };
+
+/** The signed-in profile (Iya's "default" or profile 2) and its display name. */
+export function useProfile() {
+  return useQuery({ queryKey: keys.profile, queryFn: () => api<ProfileInfo>("/api/profile"), staleTime: 5 * 60_000 });
+}
 
 export function useProjects() {
   return useQuery({

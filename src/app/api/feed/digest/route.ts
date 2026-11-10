@@ -1,20 +1,21 @@
+import { NextResponse } from "next/server";
 import { streamText } from "ai";
-import { desc } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { aiModel, systemFor } from "@/lib/server/ai";
-import { bad, readJson, requireSession } from "@/lib/server/guard";
+import { bad, readJson, requireProfile } from "@/lib/server/guard";
 import { getNews } from "@/lib/server/news";
 
 export const maxDuration = 120;
 
 /** Streams a short AI digest of the reading list (today's, or the latest day). Plain text/markdown stream. */
 export async function POST(req: Request) {
-  const denied = await requireSession();
-  if (denied) return denied;
+  const pid = await requireProfile();
+  if (pid instanceof NextResponse) return pid;
   const { day, category, from, source } = await readJson<{ day?: string; category?: string; from?: "list" | "wire"; source?: string }>(req);
   let model;
   try {
-    model = await aiModel();
+    model = await aiModel(pid);
   } catch (e) {
     return bad((e as Error).message, 412);
   }
@@ -38,7 +39,7 @@ Use only facts in the items; link sources inline with markdown. Max 180 words.`,
     });
     return result.toTextStreamResponse();
   }
-  const rows = await db().select().from(schema.feedItems).orderBy(desc(schema.feedItems.day), desc(schema.feedItems.score)).limit(60);
+  const rows = await db().select().from(schema.feedItems).where(eq(schema.feedItems.profileId, pid)).orderBy(desc(schema.feedItems.day), desc(schema.feedItems.score)).limit(60);
   const pick = day && rows.some((r) => r.day === day) ? day : rows[0]?.day;
   const items = rows.filter((r) => r.day === pick && (!category || category === "all" || (r.category ?? "news") === category)).map((r) => ({ title: r.title, summary: r.summary, category: r.category, source: r.source, url: r.url }));
   if (!items.length) return bad(category && category !== "all" ? "Nothing in this category today." : "No reading list yet. Build today's list first.", 404);

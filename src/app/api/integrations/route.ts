@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
-import { requireSession } from "@/lib/server/guard";
+import { requireProfile } from "@/lib/server/guard";
 import { maskSecret } from "@/lib/server/mask";
 
 export const dynamic = "force-dynamic";
 
 /** Which optional server-side keys are present, with a masked preview (prefix + last 4) only. */
 export async function GET() {
-  const denied = await requireSession();
-  if (denied) return denied;
+  const pid = await requireProfile();
+  if (pid instanceof NextResponse) return pid;
   const has = (k: string) => Boolean(process.env[k]?.trim());
   const items = [
     { id: "opensea", label: "OpenSea", env: "OPENSEA_API_KEY", ok: has("OPENSEA_API_KEY"), note: "Upcoming mints and live-stage allowlist checks" },

@@ -4,7 +4,7 @@ import GitHub from "next-auth/providers/github";
 import Google from "next-auth/providers/google";
 import Twitter from "next-auth/providers/twitter";
 import { cookies } from "next/headers";
-import { SESSION_COOKIE, createSessionToken, sessionCookieOptions, verifySessionToken } from "@/lib/session";
+import { SESSION_COOKIE, createSessionToken, sessionCookieOptions, sessionProfileFromToken } from "@/lib/session";
 
 export const GOOGLE_SCOPES = [
   "openid",
@@ -73,7 +73,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (account && account.provider !== "google") {
         // Linking only: X / Discord / GitHub never unlock the app, they attach to an unlocked session.
         const jar = await cookies();
-        if (!(await verifySessionToken(jar.get(SESSION_COOKIE)?.value))) return "/login?error=AccessDenied";
+        const pid = await sessionProfileFromToken(jar.get(SESSION_COOKIE)?.value);
+        if (!pid) return "/login?error=AccessDenied";
         const p = (profile ?? {}) as Record<string, unknown>;
         const data = (p.data ?? p) as Record<string, unknown>;
         const { saveConnection } = await import("@/lib/server/connections");
@@ -83,7 +84,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           provider === "discord" && p.avatar
             ? `https://cdn.discordapp.com/avatars/${String(p.id)}/${String(p.avatar)}.png`
             : (String(data.profile_image_url ?? data.avatar_url ?? "") || null);
-        await saveConnection({
+        await saveConnection(pid, {
           provider,
           providerAccountId: account.providerAccountId,
           username,
@@ -100,13 +101,16 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       const email = (profile?.email ?? "").toLowerCase();
       const allowed = (process.env.ALLOWED_EMAIL ?? "").toLowerCase().split(",").map((s) => s.trim()).filter(Boolean);
       const jar = await cookies();
-      const unlocked = await verifySessionToken(jar.get(SESSION_COOKIE)?.value);
+      const current = await sessionProfileFromToken(jar.get(SESSION_COOKIE)?.value);
+      // Google (sign-in, Gmail, Calendar) belongs to Iya's default profile only.
+      if (current && current !== "default") return "/settings?connect_error=google_default_only#connections";
+      const unlocked = current === "default";
       // Without ALLOWED_EMAIL, Google can only be *linked* from an already-unlocked session.
       const ok = allowed.length ? allowed.includes(email) && profile?.email_verified !== false : unlocked;
       if (!ok) return "/login?error=AccessDenied";
       if (account?.access_token) {
         const { saveGoogleTokens } = await import("@/lib/server/google");
-        await saveGoogleTokens({
+        await saveGoogleTokens("default", {
           email,
           accessToken: account.access_token,
           refreshToken: account.refresh_token ?? null,

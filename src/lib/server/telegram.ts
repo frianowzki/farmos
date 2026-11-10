@@ -23,13 +23,13 @@ export type NotifySettings = {
 
 const DEFAULTS: NotifySettings = { enabled: true, mints: true, deadlines: true, tasks: true, streaks: true };
 
-export async function getNotify(): Promise<NotifySettings> {
-  return { ...DEFAULTS, ...((await getSetting<NotifySettings>("notify")) ?? {}) };
+export async function getNotify(pid: string): Promise<NotifySettings> {
+  return { ...DEFAULTS, ...((await getSetting<NotifySettings>(pid, "notify")) ?? {}) };
 }
 
-export async function saveNotify(patch: Partial<NotifySettings>) {
-  const next = { ...(await getNotify()), ...patch };
-  await setSetting("notify", next);
+export async function saveNotify(pid: string, patch: Partial<NotifySettings>) {
+  const next = { ...(await getNotify(pid)), ...patch };
+  await setSetting(pid, "notify", next);
   return next;
 }
 
@@ -94,7 +94,7 @@ const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replac
 export type Digest = { sections: { title: string; lines: string[] }[]; empty: boolean };
 
 /** Builds the daily digest from live data. Pure read. */
-export async function buildDigest(n: NotifySettings, now = new Date()): Promise<Digest> {
+export async function buildDigest(pid: string, n: NotifySettings, now = new Date()): Promise<Digest> {
   const d = db();
   const today = dayIn(now);
   const sections: Digest["sections"] = [];
@@ -102,7 +102,7 @@ export async function buildDigest(n: NotifySettings, now = new Date()): Promise<
 
   if (n.mints) {
     const soon = new Date(now.getTime() + 24 * 3600_000);
-    const rows = await d.select().from(schema.mintWatch).where(and(gte(schema.mintWatch.startTime, now), lte(schema.mintWatch.startTime, soon)));
+    const rows = await d.select().from(schema.mintWatch).where(and(eq(schema.mintWatch.profileId, pid), gte(schema.mintWatch.startTime, now), lte(schema.mintWatch.startTime, soon)));
     const lines = rows
       .sort((a, b) => +a.startTime! - +b.startTime!)
       .map((m) => {
@@ -110,7 +110,7 @@ export async function buildDigest(n: NotifySettings, now = new Date()): Promise<
         const wl = m.manualStatus && m.manualStatus !== "unknown" ? ` · WL: ${esc(m.manualStatus)}` : "";
         return `• <b>${esc(m.name || m.slug)}</b> in ~${h}h (${timeIn(m.startTime!)} ${tzLabel()})${wl}`;
       });
-    const projects = await d.select({ name: schema.projects.name, keyDates: schema.projects.keyDates, status: schema.projects.status }).from(schema.projects);
+    const projects = await d.select({ name: schema.projects.name, keyDates: schema.projects.keyDates, status: schema.projects.status }).from(schema.projects).where(eq(schema.projects.profileId, pid));
     for (const p of projects) {
       const mint = p.keyDates?.mint;
       if (mint && (mint === today || mint === addDays(today, 1)) && !["done", "dropped"].includes(p.status)) lines.push(`• <b>${esc(p.name)}</b> mint ${mint === today ? "today" : "tomorrow"}`);
@@ -119,7 +119,7 @@ export async function buildDigest(n: NotifySettings, now = new Date()): Promise<
   }
 
   if (n.deadlines) {
-    const projects = await d.select().from(schema.projects);
+    const projects = await d.select().from(schema.projects).where(eq(schema.projects.profileId, pid));
     const lines: string[] = [];
     for (const p of projects) {
       if (["done", "dropped"].includes(p.status)) continue;
@@ -143,9 +143,9 @@ export async function buildDigest(n: NotifySettings, now = new Date()): Promise<
 
   if (n.tasks || n.streaks) {
     const [tasks, comps, projects] = await Promise.all([
-      d.select().from(schema.tasks).where(eq(schema.tasks.active, true)),
-      d.select().from(schema.taskCompletions).where(gte(schema.taskCompletions.day, addDays(today, -400))),
-      d.select({ id: schema.projects.id, name: schema.projects.name }).from(schema.projects),
+      d.select().from(schema.tasks).where(and(eq(schema.tasks.profileId, pid), eq(schema.tasks.active, true))),
+      d.select().from(schema.taskCompletions).where(and(eq(schema.taskCompletions.profileId, pid), gte(schema.taskCompletions.day, addDays(today, -400)))),
+      d.select({ id: schema.projects.id, name: schema.projects.name }).from(schema.projects).where(eq(schema.projects.profileId, pid)),
     ]);
     const pname = new Map(projects.map((p) => [p.id, p.name]));
     const byTask = new Map<string, string[]>();
@@ -180,20 +180,20 @@ export function renderDigest(dg: Digest, now = new Date()) {
 }
 
 /** Sends the digest if linked + enabled. Returns a short status string. */
-export async function sendDigest(opts: { force?: boolean; test?: boolean } = {}) {
-  const n = await getNotify();
+export async function sendDigest(pid: string, opts: { force?: boolean; test?: boolean } = {}) {
+  const n = await getNotify(pid);
   if (!process.env.TELEGRAM_BOT_TOKEN) return "telegram not configured";
   if (!n.chatId) return "no chat linked";
   if (!n.enabled && !opts.force) return "disabled";
-  const dg = await buildDigest(n);
+  const dg = await buildDigest(pid, n);
   const text = (opts.test ? "<i>Test from farmOS settings</i>\n\n" : "") + renderDigest(dg);
   try {
     await sendTelegram(n.chatId, text);
-    await saveNotify({ lastSentAt: new Date().toISOString(), lastResult: "ok" });
+    await saveNotify(pid, { lastSentAt: new Date().toISOString(), lastResult: "ok" });
     return "sent";
   } catch (e) {
     const msg = (e as Error).message.slice(0, 200);
-    await saveNotify({ lastResult: msg });
+    await saveNotify(pid, { lastResult: msg });
     throw e;
   }
 }

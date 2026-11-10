@@ -1,13 +1,14 @@
-import { bad, requireSession } from "@/lib/server/guard";
+import { NextResponse } from "next/server";
+import { bad, requireProfile } from "@/lib/server/guard";
 import { collectBackup, columnsOf, TABLE_NAMES, toCsv, type TableName } from "@/lib/server/backup";
 
 /** GET /api/export → full JSON backup. GET /api/export?format=csv&table=projects → one table as CSV. */
 export async function GET(req: Request) {
-  const denied = await requireSession();
-  if (denied) return denied;
+  const pid = await requireProfile();
+  if (pid instanceof NextResponse) return pid;
   const u = new URL(req.url);
   const day = new Date().toISOString().slice(0, 10);
-  const b = await collectBackup();
+  const b = await collectBackup(pid);
   if (u.searchParams.get("format") === "csv") {
     const t = u.searchParams.get("table") as TableName | null;
     if (!t || !TABLE_NAMES.includes(t)) return bad(`table must be one of: ${TABLE_NAMES.join(", ")}`);

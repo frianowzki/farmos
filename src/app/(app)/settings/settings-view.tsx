@@ -14,7 +14,7 @@ import { Switch } from "@/components/motion/switch";
 import { playUi, setSoundEnabled, useSoundEnabled } from "@/lib/client/sound";
 import { Button, Field, Input, Kbd, Pill } from "@/components/ui";
 import { cn } from "@/lib/cn";
-import { api, keys, useAiConfig, useGoogleStatus, type AiPublic } from "@/lib/client/api";
+import { api, keys, useAiConfig, useGoogleStatus, useProfile, type AiPublic, type ProfileInfo } from "@/lib/client/api";
 import { useMounted } from "@/lib/client/use-mounted";
 import { Section } from "./section";
 import { DataSection, NotifySection } from "./notify-data";
@@ -22,15 +22,18 @@ import { DataSection, NotifySection } from "./notify-data";
 export function SettingsView({ appUrl, allowedEmail }: { appUrl: string; allowedEmail: boolean }) {
   const { theme, setTheme } = useTheme();
   const mounted = useMounted();
+  const profile = useProfile();
+  const isDefault = profile.data ? profile.data.id === "default" : true;
   return (
     <Page>
       <PageHeader title="Settings" />
       <nav aria-label="Settings sections" className="-mx-1 mb-2 flex gap-1 overflow-x-auto pb-2 text-[12.5px]">
         {[
+          ["profile", "Profile"],
           ["appearance", "Appearance"],
           ["sound", "Sound"],
           ["ai", "Research desk"],
-          ["google", "Google"],
+          ...(isDefault ? [["google", "Google"]] : []),
           ["connections", "Connected accounts"],
           ["keys", "API keys"],
           ["notifications", "Notifications"],
@@ -40,6 +43,7 @@ export function SettingsView({ appUrl, allowedEmail }: { appUrl: string; allowed
           <a key={id} href={`#${id}`} className="shrink-0 rounded-md px-2.5 py-1 text-muted transition-colors hover:bg-hover hover:text-ink">{label}</a>
         ))}
       </nav>
+      {profile.data ? <ProfileForm key={profile.data.name} data={profile.data} /> : <Section id="profile" title="Profile"><div className="h-16 animate-pulse rounded-lg bg-hover" /></Section>}
       <Section id="appearance" title="Appearance" desc="Auto follows your system setting.">
         <div className="grid max-w-md grid-cols-3 gap-2">
           {[
@@ -55,7 +59,7 @@ export function SettingsView({ appUrl, allowedEmail }: { appUrl: string; allowed
       </Section>
       <SoundSection />
       <AiSection />
-      <GoogleSection appUrl={appUrl} allowedEmail={allowedEmail} />
+      {isDefault && <GoogleSection appUrl={appUrl} allowedEmail={allowedEmail} />}
       <ConnectionsSection appUrl={appUrl} />
       <ApiKeysSection />
       <NotifySection />
@@ -92,6 +96,32 @@ function SoundSection() {
           ariaLabel="UI sounds"
         />
       </label>
+    </Section>
+  );
+}
+
+function ProfileForm({ data }: { data: ProfileInfo }) {
+  const qc = useQueryClient();
+  const [name, setName] = useState(data.name);
+  const [busy, setBusy] = useState(false);
+  const save = async () => {
+    setBusy(true);
+    try {
+      await api("/api/profile", { method: "PUT", body: { name } });
+      qc.invalidateQueries({ queryKey: keys.profile });
+      toast.success("Name saved");
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Section id="profile" title="Profile" desc="Your name in greetings. Each profile has its own projects, wallets, tasks and settings.">
+      <div className="flex max-w-md items-end gap-2">
+        <div className="flex-1"><Field label="Display name"><Input value={name} maxLength={40} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && save()} /></Field></div>
+        <Button variant="primary" onClick={save} disabled={busy || !name.trim() || name.trim() === data.name}>Save</Button>
+      </div>
     </Section>
   );
 }

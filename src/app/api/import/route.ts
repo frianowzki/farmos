@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { bad, requireSession } from "@/lib/server/guard";
+import { bad, requireProfile } from "@/lib/server/guard";
 import { restoreBackup, snapshotToBlob, summarize, validateBackup } from "@/lib/server/backup";
 
 export const maxDuration = 60;
@@ -9,8 +9,8 @@ export const maxDuration = 60;
  * With ?confirm=1 it first snapshots current data to Blob (if available), then replaces everything.
  */
 export async function POST(req: Request) {
-  const denied = await requireSession();
-  if (denied) return denied;
+  const pid = await requireProfile();
+  if (pid instanceof NextResponse) return pid;
   const text = await req.text();
   if (text.length > 4_000_000) return bad("Backup too large for upload (4 MB). Restore from a Blob snapshot instead.", 413);
   let b: unknown;
@@ -25,13 +25,13 @@ export async function POST(req: Request) {
   let safety: string | null = null;
   if (process.env.BLOB_READ_WRITE_TOKEN) {
     try {
-      safety = (await snapshotToBlob()).pathname;
+      safety = (await snapshotToBlob(pid)).pathname;
     } catch {
       /* continue: user confirmed */
     }
   }
   try {
-    await restoreBackup(b);
+    await restoreBackup(pid, b);
   } catch (e) {
     return bad(`Restore failed, nothing changed: ${(e as Error).message.slice(0, 200)}`, 500);
   }

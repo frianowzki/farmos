@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
-import { requireSession } from "@/lib/server/guard";
+import { requireProfile } from "@/lib/server/guard";
 import { googleStatus } from "@/lib/server/google";
 
 export async function GET() {
-  const denied = await requireSession();
-  if (denied) return denied;
-  return NextResponse.json(await googleStatus());
+  const pid = await requireProfile();
+  if (pid instanceof NextResponse) return pid;
+  return NextResponse.json(await googleStatus(pid));
 }

@@ -174,9 +174,9 @@ async function zcashBalances(addr: string): Promise<Bal[]> {
 const NON_EVM: Record<string, (a: string) => Promise<Bal[]>> = { solana: solanaBalances, aptos: aptosBalances, sui: suiBalances, zcash: zcashBalances };
 const FAMILY_NAME: Record<string, string> = { solana: "Solana", aptos: "Aptos", sui: "Sui", zcash: "Zcash" };
 
-export async function trackWallets(): Promise<TrackSnapshot> {
+export async function trackWallets(pid: string): Promise<TrackSnapshot> {
   const d = db();
-  const all = await d.select().from(schema.wallets);
+  const all = await d.select().from(schema.wallets).where(eq(schema.wallets.profileId, pid));
   const other = all.map((w) => ({ w, fam: walletFamily(w) })).filter((x) => x.fam && x.fam !== "evm") as { w: (typeof all)[number]; fam: string }[];
   const wallets = all.filter((w) => isAddress(w.address));
   const addrs = wallets.map((w) => getAddress(w.address));
@@ -249,20 +249,20 @@ export async function trackWallets(): Promise<TrackSnapshot> {
   }
   for (const w of res.values()) w.holdings.sort((a, b) => (b.usd ?? 0) - (a.usd ?? 0));
 
-  const positions = await trackPositions(addrs);
+  const positions = await trackPositions(pid, addrs);
   const list = [...res.values()];
   return { fetchedAt: new Date().toISOString(), wallets: list, positions, totalUsd: list.reduce((s, w) => s + w.totalUsd, 0), sources, priceSource: "CoinGecko (natives), stables at $1" };
 }
 
 /** Open positions with a token address on a known EVM chain: read on-chain size across linked wallets. */
-async function trackPositions(addrs: Address[]): Promise<PositionTrack[]> {
+async function trackPositions(pid: string, addrs: Address[]): Promise<PositionTrack[]> {
   if (!addrs.length) return [];
   const d = db();
   const rows = await d
     .select({ p: schema.positions, name: schema.projects.name })
     .from(schema.positions)
     .innerJoin(schema.projects, eq(schema.projects.id, schema.positions.projectId))
-    .where(and(eq(schema.positions.status, "open"), isNotNull(schema.positions.tokenAddress)));
+    .where(and(eq(schema.positions.profileId, pid), eq(schema.projects.profileId, pid), eq(schema.positions.status, "open"), isNotNull(schema.positions.tokenAddress)));
   const out: PositionTrack[] = [];
   for (const { p, name } of rows) {
     const c = p.chain ? findChain(p.chain) : null;
@@ -291,19 +291,19 @@ async function trackPositions(addrs: Address[]): Promise<PositionTrack[]> {
   return out;
 }
 
-export async function getTrack(force = false): Promise<TrackSnapshot & { cached: boolean }> {
-  const cached = await getSetting<TrackSnapshot>("wallet_track");
+export async function getTrack(pid: string, force = false): Promise<TrackSnapshot & { cached: boolean }> {
+  const cached = await getSetting<TrackSnapshot>(pid, "wallet_track");
   if (!force && cached && Date.now() - +new Date(cached.fetchedAt) < TTL_MS) {
     // invalidate when the set of linked wallets changed
-    const now = (await db().select().from(schema.wallets)).filter((w) => walletFamily(w)).map((w) => (isAddress(w.address) ? w.address.toLowerCase() : w.address)).sort().join();
+    const now = (await db().select().from(schema.wallets).where(eq(schema.wallets.profileId, pid))).filter((w) => walletFamily(w)).map((w) => (isAddress(w.address) ? w.address.toLowerCase() : w.address)).sort().join();
     const was = cached.wallets.map((w) => (isAddress(w.address) ? w.address.toLowerCase() : w.address)).sort().join();
     if (now === was) return { ...cached, cached: true };
   }
-  const snap = await trackWallets();
-  await setSetting("wallet_track", snap);
+  const snap = await trackWallets(pid);
+  await setSetting(pid, "wallet_track", snap);
   return { ...snap, cached: false };
 }
 
-export async function getCachedTrack() {
-  return getSetting<TrackSnapshot>("wallet_track");
+export async function getCachedTrack(pid: string) {
+  return getSetting<TrackSnapshot>(pid, "wallet_track");
 }
