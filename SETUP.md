@@ -41,13 +41,15 @@ What it does:
 
 Google sign-in can also unlock the app instead of the passcode, but only for `ALLOWED_EMAIL`.
 
-## 3. AI desk (OpenAI-compatible, e.g. DeepSeek)
+## 3. AI desk (OpenAI-compatible)
+Works with any OpenAI-compatible endpoint: official DeepSeek, a custom DeepSeek-compatible gateway, or your own server. There are no hardcoded provider defaults; if these values are unset in both Settings and env, the AI desk stays unconfigured.
+
 Option A, in the UI: Settings → AI, enter Base URL, API key, and Model, then **Test connection**. The key is encrypted server-side (with `AUTH_SECRET`). It is never returned to the browser; the UI only shows "key saved".
 
 Option B, env vars (used as fallback when the Settings fields are empty; Settings wins if both are set):
-- `AI_BASE_URL`: for DeepSeek, `https://api.deepseek.com/v1`
-- `AI_API_KEY`: your DeepSeek key (`sk-...`)
-- `AI_MODEL`: `deepseek-chat`. `deepseek-reasoner` also works, but tool calling is best on deepseek-chat.
+- `AI_BASE_URL`: the provider base URL, including `/v1` if the provider uses it (example: `https://api.deepseek.com/v1`)
+- `AI_API_KEY`: your provider API key
+- `AI_MODEL`: the model id your provider expects (example for official DeepSeek: `deepseek-chat`; `deepseek-reasoner` also works there, but tool calling is best on `deepseek-chat`)
 
 Optional: `ETHERSCAN_API_KEY` (Etherscan v2 multichain). It lets the Audit mode fetch verified source and scan it for red flags. Without it, audits use on-chain checks only: bytecode, proxy slots, and owner().
 
