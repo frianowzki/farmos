@@ -157,7 +157,7 @@ function WalletRow({ w }: { w: { id: string; address: string; label: string; pro
           <InlineText value={w.label} placeholder="Add label" onSave={async (v) => { await api(`/api/wallets/${w.id}`, { method: "PATCH", body: { label: v } }); qc.invalidateQueries({ queryKey: keys.wallets }); }} />
         </div>
         <span className="num min-w-0 flex-1 truncate text-[12.5px] text-ink-2">{w.address}</span>
-        {w.isDefault && <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-accent/10 px-1.5 py-0.5 text-[10.5px] font-medium text-accent"><Star className="h-2.5 w-2.5 fill-current" />Default</span>}
+        {w.isDefault && <span className="hidden shrink-0 items-center sm:inline-flex gap-1 rounded-full bg-accent/10 px-1.5 py-0.5 text-[10.5px] font-medium text-accent"><Star className="h-2.5 w-2.5 fill-current" />Default</span>}
         {held.length > 0 ? <span className="hidden md:inline-flex"><ChainStack chains={held} size={16} max={5} /></span> : !evm && fam && <span className="hidden md:inline-flex"><ChainLogo chain={FAMILY_CHAIN[fam]} size={16} /></span>}
         <div className="hidden items-center gap-1 sm:flex">{used.slice(0, 3).map((p) => <Link key={p.id} href={`/projects/${p.id}`} title={p.name}><ProjectMark p={p} size={18} /></Link>)}{used.length > 3 && <span className="text-[11.5px] text-faint">+{used.length - 3}</span>}</div>
         <button onClick={() => { navigator.clipboard.writeText(w.address); toast.success("Copied"); }} className="rounded p-1 text-faint hover:text-ink" aria-label="Copy"><Copy className="h-3.5 w-3.5" /></button>
