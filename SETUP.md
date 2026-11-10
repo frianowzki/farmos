@@ -129,5 +129,5 @@ The private Blob store `frioos-files` is linked to the project, which provides `
 | `BLOB_READ_WRITE_TOKEN` | optional | attachments (set by the Blob integration) |
 | `X_CLIENT_ID`, `X_CLIENT_SECRET` | optional | X connection + Feed timeline; set on Production + Preview |
 | `DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET` | optional | Discord connection; set on Production + Preview |
-| `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | optional | GitHub connection |
-| `TELEGRAM_BOT_TOKEN`, `NEXT_PUBLIC_TELEGRAM_BOT_USERNAME` | optional | Telegram Login Widget |
+| `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | optional | GitHub connection; set on Production + Preview |
+| `TELEGRAM_BOT_TOKEN`, `NEXT_PUBLIC_TELEGRAM_BOT_USERNAME` | optional | Telegram Login Widget; set on Production + Preview (`NEXT_PUBLIC_TELEGRAM_BOT_USERNAME` is `friofarmOS_bot`) |
