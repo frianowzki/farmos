@@ -9,6 +9,7 @@ import { toast } from "@/lib/client/toast";
 import { Page, PageHeader } from "@/components/shell";
 import { Button, Empty, Pill, Popover, SectionTitle, Skeleton } from "@/components/ui";
 import { earningTotals, useEarnings } from "@/components/earnings";
+import { costTotals, ledgerRoi, useCosts } from "@/components/costs";
 import { money } from "@/lib/fiat";
 import { useFx } from "@/lib/client/prices";
 import { cn } from "@/lib/cn";
@@ -217,6 +218,50 @@ function EarningsCard({ projects }: { projects: { id: string; name: string; acce
                 <span className="flex min-w-0 items-center gap-2 truncate text-ink-2">{p && <ProjectMark p={p} size={16} />}<span className="truncate">{p?.name ?? "Deleted"}</span></span>
                 <div className="h-3 overflow-hidden rounded-sm bg-hover"><div className="h-full rounded-sm bg-accent/80 transition-all duration-500" style={{ width: `${(v.now / max) * 100}%` }} /></div>
                 <span className="num text-right">{usd(v.now, { compact: true })}</span>
+              </Link>
+            );
+          })}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/** Gas & capital ledger vs earnings: spent, earned, ROI, and the projects with the best ROI. */
+function LedgerCard({ projects }: { projects: { id: string; name: string; accent?: string | null; links?: unknown }[] }) {
+  const c = useCosts();
+  const e = useEarnings();
+  if (c.isLoading || e.isLoading) return null;
+  const rows = c.data ?? [];
+  if (!rows.length) return null;
+  const t = costTotals(rows);
+  const et = earningTotals(e.data ?? []);
+  const roi = ledgerRoi(t.spent, et.now);
+  const per = [...t.byProject.entries()].map(([pid, v]) => {
+    const earned = et.byProject.get(pid)?.now ?? 0;
+    return { pid, spent: v.spent, earned, roi: ledgerRoi(v.spent, earned) };
+  }).sort((a, b) => (b.roi ?? -9) - (a.roi ?? -9)).slice(0, 5);
+  return (
+    <section id="ledger" className="mb-8 grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
+      <div className="rounded-xl border border-line bg-panel p-4">
+        <SectionTitle>Gas &amp; capital</SectionTitle>
+        <div className="grid grid-cols-3 gap-3">
+          <div><div className="text-[11.5px] text-muted">Spent</div><div className="num text-[20px] leading-tight">{usd(t.spent, { compact: true })}</div></div>
+          <div><div className="text-[11.5px] text-muted">Earned</div><div className="num text-[20px] leading-tight">{usd(et.now, { compact: true })}</div></div>
+          <div><div className="text-[11.5px] text-muted">ROI</div><div className={cn("num text-[20px] leading-tight", tone(roi))}>{roi == null ? "—" : pct(roi)}</div></div>
+        </div>
+        <div className="num mt-2 text-[12px] text-faint">gas {usd(t.gas, { compact: true })} · capital {usd(t.capital, { compact: true })}{t.other ? ` · other ${usd(t.other, { compact: true })}` : ""}</div>
+      </div>
+      <div className="rounded-xl border border-line bg-panel p-4">
+        <SectionTitle>Best ROI</SectionTitle>
+        <div className="space-y-2">
+          {per.map((x) => {
+            const p = projects.find((y) => y.id === x.pid);
+            return (
+              <Link key={x.pid} href={`/projects/${x.pid}`} className="grid grid-cols-[minmax(0,1fr)_auto_64px] items-center gap-3 text-[13px] hover:text-ink">
+                <span className="flex min-w-0 items-center gap-2 text-ink-2">{p && <ProjectMark p={p as { name: string; accent?: string | null; links?: { x?: string } | null }} size={16} />}<span className="truncate">{p?.name ?? "Deleted"}</span></span>
+                <span className="num text-[12px] text-faint">{usd(x.spent, { compact: true })} → {usd(x.earned, { compact: true })}</span>
+                <span className={cn("num text-right", tone(x.roi))}>{x.roi == null ? "—" : pct(x.roi)}</span>
               </Link>
             );
           })}

@@ -32,7 +32,7 @@ type ShellCtx = { newProject: (category?: string) => void; openPalette: () => vo
 const Ctx = createContext<ShellCtx>({ newProject: () => {}, openPalette: () => {}, openQuick: () => {} });
 export const useShell = () => useContext(Ctx);
 
-const CAT_ICON: Record<string, typeof Gift> = { airdrop: Gift, testnet: FlaskConical, nft: ImageIcon, degen: Flame };
+export const CAT_ICON: Record<string, typeof Gift> = { airdrop: Gift, testnet: FlaskConical, nft: ImageIcon, degen: Flame };
 
 const NAV_TOP = [
   { href: "/", label: "Today", icon: SunMedium },

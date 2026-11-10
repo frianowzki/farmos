@@ -3,17 +3,17 @@ import { Checkbox } from "@/components/motion/checkbox";
 import { ProjectMark } from "@/components/project-mark";
 import { ChainInline, ChainLabel } from "@/components/chain-logo";
 import { AnimatePresence, motion } from "motion/react";
-import { ArrowUpRight, BadgeCheck, Trash2, CalendarClock, ChevronDown, Columns3, Filter, LayoutList, Plus, Rows3, Search, SlidersHorizontal } from "lucide-react";
+import { ArrowUpRight, BadgeCheck, Trash2, CalendarClock, ChevronDown, Columns3, Filter, Layers, LayoutList, Plus, Rows3, Search, SlidersHorizontal } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
-import { Page, PageHeader, useShell } from "@/components/shell";
+import { CAT_ICON, Page, PageHeader, useShell } from "@/components/shell";
 import { Button, DateField, Empty, InlineText, NativeSelect, Pill, Popover, SelectPill, Skeleton } from "@/components/ui";
 import { DeleteProjectDialog } from "@/components/delete-project";
 import { cn } from "@/lib/cn";
 import { CATEGORIES, STATUSES } from "@/lib/constants";
-import { today as todayFn } from "@/lib/dates";
-import { pct, relDay, tone, usd } from "@/lib/format";
+import { nowMinInZone, today as todayFn } from "@/lib/dates";
+import { pct, relWhen, tone, usd } from "@/lib/format";
 import { useProjects, useUpdateProject, type Project } from "@/lib/client/api";
 import { CATEGORY_OPTS, ELIGIBILITY_OPTS, PRIORITY_OPTS, RISK_OPTS, STATUS_OPTS, TIER_OPTS, catTone } from "@/lib/options";
 import { Rating } from "@/components/panelui/rating";
@@ -89,15 +89,19 @@ export function ProjectsView() {
         }
       />
       <div className="mb-3 flex gap-5 overflow-x-auto border-b border-line">
-        {[{ id: "all", label: "All" }, ...CATEGORIES].map((c) => (
-          <button
-            key={c.id}
-            onClick={() => setParam("cat", c.id)}
-            className={cn("relative -mb-px whitespace-nowrap border-b-2 pb-2 pt-1 text-[13.5px] transition-colors", cat === c.id ? "border-ink font-medium text-ink" : "border-transparent text-muted hover:text-ink")}
-          >
-            {c.label}
-          </button>
-        ))}
+        {[{ id: "all", label: "All" }, ...CATEGORIES].map((c) => {
+          const Icon = c.id === "all" ? Layers : CAT_ICON[c.id];
+          return (
+            <button
+              key={c.id}
+              onClick={() => setParam("cat", c.id)}
+              className={cn("relative -mb-px flex items-center gap-1.5 whitespace-nowrap border-b-2 pb-2 pt-1 text-[13.5px] transition-colors", cat === c.id ? "border-ink font-medium text-ink" : "border-transparent text-muted hover:text-ink")}
+            >
+              {Icon && <Icon className="h-3.5 w-3.5" strokeWidth={1.9} />}
+              {c.label}
+            </button>
+          );
+        })}
       </div>
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <div className="flex rounded-md border border-line bg-panel p-0.5">
@@ -111,7 +115,8 @@ export function ProjectsView() {
           <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-faint" />
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Filter by name, tag, chain" className="h-8 w-full rounded-md border border-line bg-panel pl-8 pr-2 text-[13px] outline-none placeholder:text-faint focus:ring-2 focus:ring-[var(--ring)]" />
         </div>
-        <Button ref={setFilterBtn} size="md" variant={statusFilter.length ? "subtle" : "ghost"} onClick={() => setFilterOpen((o) => !o)}>
+        <div className="flex w-full min-w-0 flex-nowrap items-center gap-0.5 sm:w-auto sm:gap-1">
+        <Button ref={setFilterBtn} size="md" className="shrink-0" variant={statusFilter.length ? "subtle" : "ghost"} onClick={() => setFilterOpen((o) => !o)}>
           <Filter className="h-3.5 w-3.5" /> Status{statusFilter.length ? ` · ${statusFilter.length}` : ""}
         </Button>
         <Popover anchor={filterBtn} open={filterOpen} onClose={() => setFilterOpen(false)} width={220}>
@@ -127,7 +132,8 @@ export function ProjectsView() {
             </div>
           </div>
         </Popover>
-        <Button ref={setEligBtn} size="md" variant={eligFilter.length ? "subtle" : "ghost"} onClick={() => setEligOpen((o) => !o)}>
+        <NativeSelect variant="ghost" icon={<SlidersHorizontal />} label="Sort" value={sort} onChange={setSort} options={SORTS} width={200} className="min-w-0 shrink" />
+        <Button ref={setEligBtn} size="md" className="shrink-0" variant={eligFilter.length ? "subtle" : "ghost"} onClick={() => setEligOpen((o) => !o)}>
           <BadgeCheck className="h-3.5 w-3.5" /> Eligibility{eligFilter.length ? ` · ${eligFilter.length}` : ""}
         </Button>
         <Popover anchor={eligBtn} open={eligOpen} onClose={() => setEligOpen(false)} width={220}>
@@ -143,7 +149,7 @@ export function ProjectsView() {
             </div>
           )}
         </Popover>
-        <NativeSelect variant="ghost" icon={<SlidersHorizontal />} label="Sort" value={sort} onChange={setSort} options={SORTS} width={200} />
+        </div>
       </div>
 
       {isLoading ? (
@@ -220,7 +226,7 @@ function TableView({ projects, pnl, today, showCat, onNew }: ViewProps & { onNew
                   <Link href={`/projects/${p.id}`} className="flex items-center gap-2 rounded-md px-1.5 py-1 hover:bg-hover">
                     <ProjectMark p={p} />
                     <span className="truncate font-medium">{p.name}</span>
-                    {nd && <span className="ml-auto hidden shrink-0 items-center gap-1 text-[11.5px] text-muted group-hover:flex"><CalendarClock className="h-3 w-3" />{nd.label} {relDay(nd.day, today)}</span>}
+                    {nd && <span className="ml-auto hidden shrink-0 items-center gap-1 text-[11.5px] text-muted group-hover:flex"><CalendarClock className="h-3 w-3" />{nd.label} {relWhen(nd.day, nd.time, today, nowMinInZone())}</span>}
                   </Link>
                 </td>
                 {showCat && <td className={td}><SelectPill value={p.category} options={CATEGORY_OPTS} onChange={(v) => set(p.id, { category: v })} dot={false} /></td>}
@@ -280,7 +286,7 @@ function MobileCards({ projects, pnl, today, showCat, set, onNew }: ViewProps & 
               <div className="min-w-0 flex-1">
                 <div className="truncate text-[14px] font-medium text-ink">{p.name}</div>
                 <div className="mt-0.5 flex items-center gap-1.5 text-[11.5px] text-muted">
-                  {nd ? <><CalendarClock className="h-3 w-3 shrink-0" /><span className="truncate">{nd.label} {relDay(nd.day, today)}</span></> : (p.chains.length ? <ChainInline chains={p.chains} /> : <span className="truncate">No dates</span>)}
+                  {nd ? <><CalendarClock className="h-3 w-3 shrink-0" /><span className="truncate">{nd.label} {relWhen(nd.day, nd.time, today, nowMinInZone())}</span></> : (p.chains.length ? <ChainInline chains={p.chains} /> : <span className="truncate">No dates</span>)}
                   {r.invested > 0 && <span className={cn("num ml-auto shrink-0", tone(r.net))}>{usd(r.net, { sign: true, compact: true })}</span>}
                 </div>
               </div>
@@ -376,7 +382,7 @@ function Board({ projects, pnl, today, showCat }: ViewProps) {
                       </div>
                       {(nd || r.invested > 0) && (
                         <div className="mt-2 flex items-center justify-between text-[11.5px] text-muted">
-                          <span className="flex items-center gap-1">{nd && <><CalendarClock className="h-3 w-3" /> {nd.label} · {relDay(nd.day, today)}</>}</span>
+                          <span className="flex items-center gap-1">{nd && <><CalendarClock className="h-3 w-3" /> {nd.label} · {relWhen(nd.day, nd.time, today, nowMinInZone())}</>}</span>
                           {r.invested > 0 && <span className={cn("num", tone(r.net))}>{usd(r.net, { sign: true, compact: true })}</span>}
                         </div>
                       )}
@@ -411,7 +417,7 @@ function ListView({ projects, pnl, today }: ViewProps) {
               </div>
               <div className="flex min-w-0 text-[12.5px] text-muted">{p.summary ? <span className="truncate">{p.summary}</span> : p.chains.length ? <ChainInline chains={p.chains} max={3} /> : <span className="truncate">No summary yet</span>}</div>
             </div>
-            <div className="hidden text-right text-[12px] text-muted sm:block">{nd ? <>{nd.label}<div className="num text-ink-2">{relDay(nd.day, today)}</div></> : null}</div>
+            <div className="hidden text-right text-[12px] text-muted sm:block">{nd ? <>{nd.label}<div className="num text-ink-2">{relWhen(nd.day, nd.time, today, nowMinInZone())}</div></> : null}</div>
             <div className={cn("num hidden w-[90px] text-right text-[13px] md:block", tone(r.net))}>{r.invested ? usd(r.net, { sign: true, compact: true }) : ""}</div>
             {p.eligibility && p.eligibility !== "unknown" && (() => { const e = ELIGIBILITY_OPTS.find((x) => x.id === p.eligibility); return e ? <Pill tone={e.tone} dot className="hidden sm:inline-flex">{e.label}</Pill> : null; })()}
             <ClaimPill p={p} today={today} className="hidden sm:inline-flex" />

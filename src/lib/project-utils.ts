@@ -1,4 +1,4 @@
-import type { Position, Project } from "@/db/schema";
+import type { KeyDates, Position, Project } from "@/db/schema";
 import { KEY_DATES } from "./constants";
 import { diffDays } from "./dates";
 import { projectPnl, type ProjectPnl } from "./pnl";
@@ -7,20 +7,20 @@ export function pnlFor(p: Project, positions: Position[]): ProjectPnl {
   return projectPnl(p, positions.filter((x) => x.projectId === p.id));
 }
 
-export type DatedEvent = { projectId: string; projectName: string; kind: string; label: string; day: string; category: string };
+export type DatedEvent = { projectId: string; projectName: string; kind: string; label: string; day: string; time?: string | null; category: string };
 
 export function projectDates(p: Project): DatedEvent[] {
   const out: DatedEvent[] = [];
   if (p.deadline) out.push({ projectId: p.id, projectName: p.name, kind: "deadline", label: "Deadline", day: p.deadline, category: p.category });
   for (const k of KEY_DATES) {
     const d = p.keyDates?.[k.id as keyof typeof p.keyDates];
-    if (d) out.push({ projectId: p.id, projectName: p.name, kind: k.id, label: k.label, day: d, category: p.category });
+    if (typeof d === "string" && d) out.push({ projectId: p.id, projectName: p.name, kind: k.id, label: k.label, day: d, time: p.keyDates?.times?.[k.id as keyof NonNullable<KeyDates["times"]>] ?? null, category: p.category });
   }
   return out;
 }
 
 export function nextDate(p: Project, today: string): DatedEvent | null {
-  const up = projectDates(p).filter((d) => diffDays(d.day, today) >= 0).sort((a, b) => a.day.localeCompare(b.day));
+  const up = projectDates(p).filter((d) => diffDays(d.day, today) >= 0).sort((a, b) => a.day.localeCompare(b.day) || (a.time ?? "99").localeCompare(b.time ?? "99"));
   return up[0] ?? null;
 }
 

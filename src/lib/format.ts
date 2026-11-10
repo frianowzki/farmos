@@ -45,3 +45,32 @@ export function relDay(day: string, todayDay: string) {
   if (d < -1 && d > -7) return `${-d} days ago`;
   return new Date(day + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
+
+/** "14:05" → "2:05 PM". */
+export function time12(hm: string | null | undefined) {
+  const m = hm?.match(/^(\d{1,2}):(\d{2})$/);
+  if (!m) return "";
+  const h = Number(m[1]);
+  return `${h % 12 || 12}:${m[2]} ${h < 12 ? "AM" : "PM"}`;
+}
+
+/**
+ * Countdown for a key date. With a time (profile zone) and less than a day away it counts hours and
+ * minutes ("In 5h 20m", "40m ago"); otherwise the day label plus the time ("Tomorrow · 9:00 AM").
+ * nowMin = minutes since midnight in the profile zone (pass from the clock).
+ */
+export function relWhen(day: string, hm: string | null | undefined, todayDay: string, nowMin?: number) {
+  const base = relDay(day, todayDay);
+  const t = hm?.match(/^(\d{1,2}):(\d{2})$/);
+  if (!t) return base;
+  if (nowMin != null) {
+    const days = Math.round((new Date(day + "T00:00:00").getTime() - new Date(todayDay + "T00:00:00").getTime()) / 86_400_000);
+    const diff = days * 1440 + Number(t[1]) * 60 + Number(t[2]) - nowMin;
+    if (Math.abs(diff) < 1440) {
+      const a = Math.abs(diff);
+      const s = a < 60 ? `${a}m` : `${Math.floor(a / 60)}h${a % 60 ? ` ${a % 60}m` : ""}`;
+      return diff >= 0 ? (diff === 0 ? "Now" : `In ${s}`) : `${s} ago`;
+    }
+  }
+  return `${base} · ${time12(hm)}`;
+}

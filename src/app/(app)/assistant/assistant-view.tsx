@@ -25,10 +25,10 @@ const MODES = [
 ];
 
 const SUGGEST: Record<string, (p?: string) => string[]> = {
-  chat: () => ["What should I prioritise this week based on my projects?", "Explain how sybil filters usually work for points programs.", "Compare the cost of farming on Base vs Arbitrum right now."],
+  chat: () => ["What's claimable or closing in the next 2 weeks?", "Which of my projects has the best ROI after gas?", "Summarize today's news that mentions my projects.", "Suggest new projects or mints from the wire that I'm not tracking yet."],
   research: (p) => (p ? [`Deep research on ${p}. What's the latest, and is it still worth farming?`] : ["Deep research on Monad: ecosystem, airdrop expectations, what to do now.", "Research the top 5 points programs without a token yet."]),
   audit: (p) => (p ? [`Audit ${p}. Check the contracts and links, and give me a verdict.`] : ["Audit this contract on Base: 0x…", "Audit this mint site before I connect: https://…"]),
-  daily: () => ["What are today's most promising projects for me?", "Give me 5 low-cost testnets worth doing today."],
+  daily: () => ["Plan my day: today's tasks, dates coming up, and anything to claim.", "What are today's most promising projects for me?", "Any upcoming mints I'm eligible for this week?"],
   early: () => ["Find early projects that raised in the last 30 days with no token.", "What new pools on Base have real liquidity today?"],
 };
 
@@ -421,6 +421,17 @@ const TOOL_LABEL: Record<string, string> = {
   contractCheck: "Contract check",
   listProjects: "Your projects",
   getProject: "Project",
+  claimableSoon: "Claims & dates",
+  todayTasks: "Today's tasks",
+  portfolio: "Wallets",
+  earningsRoi: "Earnings & ROI",
+  newsWire: "News wire",
+  readingList: "Reading list",
+  upcomingMints: "Upcoming mints",
+  nftsHeld: "NFTs",
+  tokenPrice: "Prices",
+  recapCalendar: "Recap & calendar",
+  untrackedLeads: "New leads",
   proposeProject: "Proposal",
 };
 

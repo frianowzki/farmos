@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { generateText, isStepCount } from "ai";
-import { and, eq } from "drizzle-orm";
+import { and, eq, ne } from "drizzle-orm";
 import { z } from "zod";
 import { db, schema } from "@/db";
 import { aiModel, aiToolsEnabled, buildTools, systemFor } from "@/lib/server/ai";
@@ -64,7 +64,7 @@ export async function POST(req: Request) {
     return bad("The model didn't return a usable list. Try again, or check the model supports tools.", 502);
   }
   if (!parsed.length) return bad("No items came back. Try again.", 502);
-  await db().delete(schema.feedItems).where(and(eq(schema.feedItems.profileId, pid), eq(schema.feedItems.day, day)));
+  await db().delete(schema.feedItems).where(and(eq(schema.feedItems.profileId, pid), eq(schema.feedItems.day, day), ne(schema.feedItems.kind, "saved")));
   const rows = await db()
     .insert(schema.feedItems)
     .values(parsed.map((p) => ({ ...p, day, category: p.category ?? null, profileId: pid })))

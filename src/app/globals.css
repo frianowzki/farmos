@@ -206,10 +206,37 @@ button, a, input, textarea, select, label, [role="button"] {
 ::selection {
   background: var(--accent-soft);
 }
-* {
-  scrollbar-width: thin;
-  scrollbar-color: var(--line-strong) transparent;
+/* Accent themes (src/lib/accent.ts): the html element carries data-accent plus --acc-light/--acc-dark. */
+html[data-accent] {
+  --accent: var(--acc-light);
+  --accent-ink: #ffffff;
+  --accent-soft: color-mix(in oklab, var(--accent) 13%, var(--panel));
+  --ring: color-mix(in oklab, var(--accent) 38%, transparent);
+  --heat-1: color-mix(in oklab, var(--accent) 28%, var(--heat-0));
+  --heat-2: color-mix(in oklab, var(--accent) 55%, var(--heat-0));
+  --heat-3: color-mix(in oklab, var(--accent) 80%, var(--heat-0));
+  --heat-4: color-mix(in oklab, var(--accent) 100%, black 12%);
 }
+html.dark[data-accent] {
+  --accent: var(--acc-dark);
+  --accent-ink: #141311;
+  --accent-soft: color-mix(in oklab, var(--accent) 18%, var(--panel));
+  --ring: color-mix(in oklab, var(--accent) 42%, transparent);
+  --heat-4: var(--accent);
+}
+
+/* Scrollbars are hidden everywhere (sidebar, panels, lists, dashboard); scrolling still works by wheel, touch and keys. */
+* {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+*::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+.no-scrollbar, .scrollbar-hide { scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar, .scrollbar-hide::-webkit-scrollbar { display: none; }
 :focus-visible {
   outline: 2px solid var(--ring);
   outline-offset: 1px;

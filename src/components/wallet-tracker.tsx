@@ -54,9 +54,6 @@ export function WalletTracker({ hasEvm }: { hasEvm: boolean }) {
         <>
           <div className="mb-3 flex flex-wrap items-baseline gap-x-4 gap-y-1">
             <span className="num text-[26px] font-medium tracking-tight">{usd(data.totalUsd)}</span>
-            <span className="text-[12px] text-muted">
-              Native + main tokens on {Object.keys(data.sources).length} chains · updated {new Date(data.fetchedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-            </span>
           </div>
           <div className="divide-y divide-line rounded-lg border border-line bg-panel">
             {data.wallets.map((w) => <TrackRow key={w.address} w={w} provider={providerOf(w.address)} />)}

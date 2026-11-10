@@ -11,14 +11,15 @@ import { Heatmap, TaskRow, useTaskModel, weekRate } from "@/components/tasks";
 import { Button, Pill, SectionTitle, Skeleton } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import { STATUSES } from "@/lib/constants";
-import { diffDays } from "@/lib/dates";
-import { relDay, tone, usd, pct } from "@/lib/format";
+import { diffDays, nowMinInZone } from "@/lib/dates";
+import { relDay, relWhen, tone, usd, pct } from "@/lib/format";
 import { api, useDiary, useGoogleStatus, useProfile, useProjects, type Project } from "@/lib/client/api";
 import { Grid, GridItem } from "@/components/panelui/grid-item";
 import { catTone } from "@/lib/options";
 import { sumPnl } from "@/lib/pnl";
 import { Converter } from "@/components/converter";
 import { earningTotals, useEarnings } from "@/components/earnings";
+import { costTotals, ledgerRoi, useCosts } from "@/components/costs";
 import { pnlFor, projectDates } from "@/lib/project-utils";
 
 export function TodayView() {
@@ -107,7 +108,7 @@ export function TodayView() {
                     const d = diffDays(u.day, today);
                     return (
                       <Link key={`${u.projectId}-${u.kind}`} href={`/projects/${u.projectId}`} className="flex items-center gap-3 px-3 py-2.5 transition-colors hover:bg-hover">
-                        <div className={cn("num w-[78px] shrink-0 text-[12.5px]", d <= 1 ? "text-accent" : "text-muted")}>{relDay(u.day, today)}</div>
+                        <div className={cn("num w-[78px] shrink-0 text-[12.5px]", d <= 1 ? "text-accent" : "text-muted")}>{relWhen(u.day, u.time, today, nowMinInZone())}</div>
                         <ProjectMark p={projects.find((x) => x.id === u.projectId) ?? { name: u.projectName }} size={20} />
                         <div className="min-w-0 flex-1 truncate text-[13.5px]">{u.projectName}</div>
                         <Pill tone={catTone(u.category)}>{u.label}</Pill>
@@ -272,11 +273,14 @@ function TodayKpis({ projects, today }: { projects: Project[]; today: string }) 
   const paidSum = et.claim + legacy.reduce((a, p) => a + p.rewardsReceived, 0);
   const nowSum = et.now + legacy.reduce((a, p) => a + p.rewardsReceived, 0);
   const paidCount = et.byProject.size + legacy.length;
+  const costs = useCosts();
+  const spent = costTotals(costs.data ?? []).spent;
+  const roi = ledgerRoi(spent, et.now);
   const tba = live.filter((p) => p.status !== "done" && !p.keyDates?.tge && !p.deadline);
   const incoming = live.filter((p) => p.status === "claimable" || [p.keyDates?.tge, p.keyDates?.snapshot, p.keyDates?.mint, p.deadline].some((d) => d && diffDays(d, today) >= 0 && diffDays(d, today) <= 30));
   const items = [
     { k: "Projects", v: String(live.length), sub: `${projects.filter((p) => p.status === "active").length} active`, href: "/projects" },
-    { k: "Earned", v: usd(paidSum, { compact: true }), sub: paidCount ? `now ${usd(nowSum, { compact: true })} · ${paidCount} project${paidCount === 1 ? "" : "s"}` : "log claims on a project", href: "/portfolio#earnings" },
+    { k: "Earned", v: usd(paidSum, { compact: true }), sub: roi != null ? `ROI ${pct(roi)} on ${usd(spent, { compact: true })} spent` : paidCount ? `now ${usd(nowSum, { compact: true })} · ${paidCount} project${paidCount === 1 ? "" : "s"}` : "log claims on a project", href: roi != null ? "/portfolio#ledger" : "/portfolio#earnings" },
     { k: "TBA", v: String(tba.length), sub: "no TGE or deadline yet", href: "/projects" },
     { k: "Incoming", v: String(incoming.length), sub: "claimable or due in 30d", href: "/projects" },
   ];

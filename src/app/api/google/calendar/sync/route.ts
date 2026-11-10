@@ -4,6 +4,7 @@ import { db, schema } from "@/db";
 import { KEY_DATES } from "@/lib/constants";
 import { bad, readJson, requireProfile } from "@/lib/server/guard";
 import { GoogleError, deleteEvent, upsertAllDayEvent } from "@/lib/server/google";
+import { getProfileTz } from "@/lib/server/settings";
 
 /** Push a project's deadline + key dates to Google Calendar (idempotent: updates existing events). */
 export async function POST(req: Request) {
@@ -14,13 +15,14 @@ export async function POST(req: Request) {
   const [p] = await db().select().from(schema.projects).where(and(eq(schema.projects.profileId, pid), eq(schema.projects.id, projectId))).limit(1);
   if (!p) return bad("not found", 404);
   const links = await db().select().from(schema.calendarLinks).where(and(eq(schema.calendarLinks.profileId, pid), eq(schema.calendarLinks.projectId, projectId)));
-  const wanted: { kind: string; label: string; day: string }[] = [];
+  const wanted: { kind: string; label: string; day: string; time?: string | null }[] = [];
   if (p.deadline) wanted.push({ kind: "deadline", label: "Deadline", day: p.deadline });
   for (const k of KEY_DATES) {
     const d = p.keyDates?.[k.id as keyof typeof p.keyDates];
-    if (d) wanted.push({ kind: k.id, label: k.label, day: d });
+    if (typeof d === "string" && d) wanted.push({ kind: k.id, label: k.label, day: d, time: p.keyDates?.times?.[k.id as keyof NonNullable<typeof p.keyDates.times>] ?? null });
   }
   const base = process.env.APP_URL ?? new URL(req.url).origin;
+  const tz = await getProfileTz(pid);
   try {
     let created = 0;
     let removed = 0;
@@ -30,6 +32,8 @@ export async function POST(req: Request) {
         summary: `${p.name} · ${w.label}`,
         description: `${p.category.toUpperCase()} · ${p.status}\n${p.summary ?? ""}\n\nOpen in farmOS: ${base}/projects/${p.id}`,
         day: w.day,
+        time: w.time ?? null,
+        tz,
       });
       await db()
         .insert(schema.calendarLinks)

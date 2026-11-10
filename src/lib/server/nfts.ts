@@ -12,8 +12,8 @@ const TTL_MS = 30 * 60_000;
 const CG: Record<string, string> = { ETH: "ethereum", WETH: "ethereum", BNB: "binancecoin", WBNB: "binancecoin", POL: "polygon-ecosystem-token", MATIC: "polygon-ecosystem-token", AVAX: "avalanche-2", APE: "apecoin", SOL: "solana", HYPE: "hyperliquid", SEI: "sei-network", RON: "ronin", FLOW: "flow", BERA: "berachain-bera", MON: "monad" };
 
 type OsNft = { identifier: string; collection: string; name: string | null; image_url: string | null; display_image_url?: string | null; opensea_url: string; is_disabled?: boolean; is_nsfw?: boolean };
-export type NftCollection = { slug: string; name: string; image: string | null; chain: string; count: number; floor: number | null; symbol: string | null; usd: number | null; url: string; wallets: string[]; sample: { name: string | null; image: string | null; url: string }[] };
-export type NftSnapshot = { fetchedAt: string; collections: NftCollection[]; count: number; totalUsd: number | null; totalNative: { symbol: string; amount: number }[]; errors: string[]; configured: boolean };
+export type NftCollection = { slug: string; name: string; image: string | null; chain: string; count: number; floor: number | null; symbol: string | null; usd: number | null; volume?: number; offers?: boolean; url: string; wallets: string[]; sample: { name: string | null; image: string | null; url: string }[] };
+export type NftSnapshot = { fetchedAt: string; collections: NftCollection[]; count: number; totalUsd: number | null; totalNative: { symbol: string; amount: number }[]; errors: string[]; configured: boolean; hidden?: number };
 
 async function os<T>(path: string): Promise<T> {
   const r = await fetch(`${API}${path}`, { headers: { "x-api-key": process.env.OPENSEA_API_KEY!.trim(), accept: "application/json" }, cache: "no-store", signal: AbortSignal.timeout(15_000) });
@@ -65,7 +65,7 @@ export async function scanNfts(pid: string): Promise<NftSnapshot> {
   });
   await pool([...cols.values()], 6, async (c) => {
     const [stats, info] = await Promise.all([
-      os<{ total?: { floor_price?: number; floor_price_symbol?: string } }>(`/collections/${encodeURIComponent(c.slug)}/stats`).catch(() => null),
+      os<{ total?: { floor_price?: number; floor_price_symbol?: string; volume?: number } }>(`/collections/${encodeURIComponent(c.slug)}/stats`).catch(() => null),
       os<{ name?: string; image_url?: string }>(`/collections/${encodeURIComponent(c.slug)}`).catch(() => null),
     ]);
     if (info?.name) c.name = info.name;
@@ -75,7 +75,16 @@ export async function scanNfts(pid: string): Promise<NftSnapshot> {
       c.floor = fp;
       c.symbol = stats?.total?.floor_price_symbol || "ETH";
     }
+    c.volume = typeof stats?.total?.volume === "number" ? stats.total.volume : 0;
+    // No floor and no volume: one more call to see if anyone is bidding before we hide it.
+    if (c.floor == null && !c.volume) {
+      const offers = await os<{ offers?: unknown[] }>(`/offers/collection/${encodeURIComponent(c.slug)}?limit=1`).catch(() => null);
+      c.offers = Boolean(offers?.offers?.length);
+    } else c.offers = true;
   });
+  // Hide dead collections (no floor, no volume, no offers): usually spam airdrops.
+  let hidden = 0;
+  for (const [k, c] of cols) if (c.floor == null && !c.volume && !c.offers) { cols.delete(k); hidden += c.count; }
   const ids = [...new Set([...cols.values()].map((c) => (c.symbol ? CG[c.symbol.toUpperCase()] : undefined)).filter(Boolean) as string[])];
   let px: Record<string, { usd?: number }> = {};
   if (ids.length) px = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${ids.join(",")}&vs_currencies=usd`, { cache: "no-store", signal: AbortSignal.timeout(10_000) }).then((r) => r.json()).catch(() => ({}));
@@ -100,12 +109,13 @@ export async function scanNfts(pid: string): Promise<NftSnapshot> {
     totalNative: [...native].map(([symbol, amount]) => ({ symbol, amount })).sort((a, b) => b.amount - a.amount),
     errors,
     configured: true,
+    hidden,
   };
 }
 
 export async function getNfts(pid: string, force = false): Promise<NftSnapshot & { cached: boolean }> {
   const cached = await getSetting<NftSnapshot & { key?: string }>(pid, "wallet_nfts");
-  const key = (await db().select({ a: schema.wallets.address }).from(schema.wallets).where(eq(schema.wallets.profileId, pid))).map((w) => w.a.toLowerCase()).sort().join();
+  const key = "v2|" + (await db().select({ a: schema.wallets.address }).from(schema.wallets).where(eq(schema.wallets.profileId, pid))).map((w) => w.a.toLowerCase()).sort().join();
   if (!force && cached?.fetchedAt && cached.key === key && Date.now() - +new Date(cached.fetchedAt) < TTL_MS) return { ...cached, cached: true };
   const snap = await scanNfts(pid);
   await setSetting(pid, "wallet_nfts", { ...snap, key });

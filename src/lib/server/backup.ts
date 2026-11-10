@@ -18,6 +18,7 @@ export const TABLES = {
   projects: schema.projects,
   positions: schema.positions,
   earnings: schema.earnings,
+  costs: schema.costs,
   tasks: schema.tasks,
   completions: schema.taskCompletions,
   diary: schema.diaryEntries,
@@ -111,7 +112,7 @@ export async function restoreBackup(pid: string, b: Backup) {
     if (n === "settings") continue;
     stmts.push(d.delete(TABLES[n] as PgTable).where(eq(pidCol(n), pid)));
   }
-  const maps: Record<string, Map<string, string>> = { projects: new Map(), positions: new Map(), earnings: new Map(), watchlist: new Map(), tasks: new Map(), diary: new Map(), wallets: new Map(), threads: new Map(), feed: new Map(), attachments: new Map() };
+  const maps: Record<string, Map<string, string>> = { projects: new Map(), positions: new Map(), earnings: new Map(), costs: new Map(), watchlist: new Map(), tasks: new Map(), diary: new Map(), wallets: new Map(), threads: new Map(), feed: new Map(), attachments: new Map() };
   const fresh = (n: string, old: unknown) => {
     const id = n === "threads" ? randomUUID().replace(/-/g, "") : randomUUID();
     if (typeof old === "string") maps[n].set(old, id);
@@ -125,7 +126,7 @@ export async function restoreBackup(pid: string, b: Backup) {
       const r = revive(n, raw);
       r.profileId = pid;
       if (n in maps) r.id = fresh(n, raw.id);
-      if (n === "positions" || n === "earnings") { r.projectId = ref("projects", raw.projectId); if (!r.projectId) continue; }
+      if (n === "positions" || n === "earnings" || n === "costs") { r.projectId = ref("projects", raw.projectId); if (!r.projectId) continue; }
       if (n === "tasks") r.projectId = raw.projectId ? ref("projects", raw.projectId) : null;
       if (n === "completions") { r.taskId = ref("tasks", raw.taskId); if (!r.taskId) continue; }
       if (n === "diary") r.projectIds = (Array.isArray(raw.projectIds) ? raw.projectIds : []).map((x) => ref("projects", x)).filter(Boolean);

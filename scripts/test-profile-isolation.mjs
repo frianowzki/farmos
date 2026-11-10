@@ -145,6 +145,65 @@ for (const [me, tag, other] of [[a, "default", "P2"], [p, "p2", "DEF"]]) {
   ok(`${tag}: PATCH other watch -> 404`, (await me("PATCH", `/api/watchlist/${o.id}`, { above: 1 })).s === 404);
   ok(`${tag}: DELETE other watch -> 404`, (await me("DELETE", `/api/watchlist/${o.id}`)).s === 404);
 }
+// --- Gas & capital ledger (costs) ------------------------------------------------------------
+const COST = {};
+for (const [tag, c, s] of [["DEF", a, S.def], ["P2", p, S.p2]]) {
+  const r = await c("POST", "/api/costs", { projectId: s.proj.id, type: "gas", symbol: "ETH", coinId: "ethereum", chain: "Base", amount: 0.01, valueAtEntry: 30, spentAt: today, note: `ISO-${tag}` });
+  COST[tag] = r.j?.cost;
+}
+ok("costs created in both profiles", Boolean(COST.DEF && COST.P2 && COST.DEF.profileId === "default" && COST.P2.profileId === "p2"));
+for (const [tag, me, o, oProj] of [["default vs p2", a, COST.P2, S.p2.proj.id], ["p2 vs default", p, COST.DEF, S.def.proj.id]]) {
+  const list = (await me("GET", "/api/costs")).j?.costs ?? [];
+  ok(`${tag}: list costs hides other`, !list.some((x) => x.id === o.id));
+  ok(`${tag}: PATCH other cost -> 404`, (await me("PATCH", `/api/costs/${o.id}`, { note: "HACKED" })).s === 404);
+  ok(`${tag}: DELETE other cost -> 404`, (await me("DELETE", `/api/costs/${o.id}`)).s === 404);
+  ok(`${tag}: cost on other's project -> 404`, (await me("POST", "/api/costs", { projectId: oProj, type: "gas", symbol: "ETH", amount: 1, spentAt: today })).s === 404);
+  const exp = (await me("GET", "/api/export")).j;
+  ok(`${tag}: export excludes other's costs`, !(exp.costs ?? []).some((x) => x.id === o.id));
+}
+// --- Key-date times and custom link names -----------------------------------------------------
+const kd = await a("PATCH", `/api/projects/${S.def.proj.id}`, { keyDates: { mint: today, times: { mint: "21:30" } }, links: { other: "https://example.com/check", "label.other": "Checker" } });
+ok("key-date time + link label saved", kd.s === 200 && kd.j?.project?.keyDates?.times?.mint === "21:30" && kd.j?.project?.links?.["label.other"] === "Checker", String(kd.s));
+ok("bad time rejected", (await a("PATCH", `/api/projects/${S.def.proj.id}`, { keyDates: { mint: today, times: { mint: "25:99" } } })).s === 400);
+// --- Saved wire items -------------------------------------------------------------------------
+const sv = (await p("POST", "/api/feed", { title: "ISO-P2 saved headline", url: "https://example.com/iso-p2", summary: "x", source: "ISO", category: "news" })).j;
+ok("p2 saved a wire item", Boolean(sv?.id));
+ok("default reading list hides p2 saved item", !((await a("GET", "/api/feed")).j?.items ?? []).some((x) => x.id === sv?.id));
+await a("DELETE", `/api/feed?id=${sv?.id}`);
+ok("default can't delete p2 saved item", ((await p("GET", "/api/feed")).j?.items ?? []).some((x) => x.id === sv?.id));
+await p("DELETE", `/api/feed?id=${sv?.id}`);
+// --- Research desk dashboard tools (probe; only with AI_TOOL_PROBE=1 locally) ------------------
+const probe = (c) => (tool, args = {}) => c("POST", "/api/assistant/probe", { tool, args });
+if ((await probe(a)("listProjects")).s === 404) {
+  console.log("SKIP  AI tool probe disabled (set AI_TOOL_PROBE=1 for next start)");
+} else {
+  for (const [tag, me, mine, other] of [["default", a, S.def, S.p2], ["p2", p, S.p2, S.def]]) {
+    const pr = probe(me);
+    const lp = (await pr("listProjects")).j?.out;
+    ok(`tools/${tag}: listProjects has own, hides other`, lp?.projects?.some((x) => x.id === mine.proj.id) && !lp.projects.some((x) => x.id === other.proj.id));
+    const gp = (await pr("getProject", { id: other.proj.id })).j?.out;
+    ok(`tools/${tag}: getProject(other id) not found`, gp?.error === "not found");
+    const gpn = (await pr("getProject", { name: other.proj.name })).j?.out;
+    ok(`tools/${tag}: getProject(other name) not found`, gpn?.error === "not found");
+    const tt = (await pr("todayTasks")).j?.out;
+    ok(`tools/${tag}: todayTasks hides other`, !(tt?.tasks ?? []).some((x) => x.title === other.task.title) && (tt?.tasks ?? []).some((x) => x.title === mine.task.title));
+    const roi = JSON.stringify((await pr("earningsRoi")).j?.out ?? {});
+    ok(`tools/${tag}: earningsRoi hides other`, !roi.includes(other.proj.name) && roi.includes(mine.proj.name));
+    const cl = JSON.stringify((await pr("claimableSoon", { days: 30 })).j?.out ?? {});
+    ok(`tools/${tag}: claimableSoon hides other`, !cl.includes(other.proj.name));
+    const rc = JSON.stringify((await pr("recapCalendar", { days: 3 })).j?.out ?? {});
+    ok(`tools/${tag}: recapCalendar hides other`, !rc.includes(other.proj.name) && !rc.includes(other.diary.title));
+    const rl = JSON.stringify((await pr("readingList")).j?.out ?? {});
+    ok(`tools/${tag}: readingList scoped`, !rl.includes(`ISO-${tag === "default" ? "P2" : "DEF"}`));
+    const ul = JSON.stringify((await pr("untrackedLeads")).j?.out?.trackedNames ?? []);
+    ok(`tools/${tag}: untrackedLeads tracked names scoped`, !ul.includes(other.proj.name.toLowerCase()));
+    const pf = JSON.stringify((await pr("portfolio")).j?.out ?? {});
+    ok(`tools/${tag}: portfolio has no full addresses`, !/0x[0-9a-fA-F]{40}/.test(pf));
+    const all = JSON.stringify([lp, gp, tt, roi, cl, rc, rl, pf]);
+    ok(`tools/${tag}: no secrets in tool output`, !/(apiKey|api_key|access_token|refresh_token|chatId|passcode)/i.test(all));
+  }
+  ok("tools: unknown tool rejected", (await probe(a)("proposeProject")).s === 400);
+}
 const pr = (await a("GET", "/api/profile")).j, pr2 = (await p("GET", "/api/profile")).j;
 ok("default fiat: USD for both", pr.fiat === "usd" && pr2.fiat === "usd", `${pr.fiat}/${pr2.fiat}`);
 const px = (await a("GET", "/api/prices?ids=ethereum,tether")).j?.prices;

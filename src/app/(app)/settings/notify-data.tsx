@@ -1,8 +1,8 @@
 "use client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { alertRunsLabel, dailyRunLabel } from "@/lib/dates";
-import { Archive, Bell, Download, FileText, FileUp, RefreshCw, Send, Unlink } from "lucide-react";
-import { useRef, useState } from "react";
+import { Archive, Bell, ChevronRight, Download, FileText, FileUp, RefreshCw, Send, Unlink } from "lucide-react";
+import { useRef, useState, type ReactNode } from "react";
 import { BrandIcon } from "@/components/brand";
 import { Switch } from "@/components/motion/switch";
 import { Button, Dialog, Pill } from "@/components/ui";
@@ -138,7 +138,7 @@ export function NotifySection() {
   );
 }
 
-const CSV_TABLES = ["projects", "positions", "earnings", "tasks", "completions", "diary", "wallets", "mints", "feed", "attachments", "threads"] as const;
+const CSV_TABLES = ["projects", "positions", "earnings", "costs", "tasks", "completions", "diary", "wallets", "mints", "feed", "attachments", "threads"] as const;
 
 type Backups = { configured: boolean; keep: number; backups: { pathname: string; size: number; uploadedAt: string }[] };
 type DryRun = { dryRun: true; exportedAt: string | null; counts: Record<string, number> };
@@ -171,58 +171,68 @@ export function DataSection() {
   };
 
   return (
-    <Section id="data" title="Data" desc="Everything lives in your Neon Postgres database. Exports never include OAuth tokens or API keys.">
-      <div className="max-w-xl space-y-5">
-        <div>
-          <div className="mb-2 text-[12px] font-medium uppercase tracking-wide text-muted">Export</div>
-          <div className="flex flex-wrap gap-2">
-            <a href="/api/export"><Button><Download className="h-3.5 w-3.5" /> JSON backup</Button></a>
-            <a href="/api/reports?format=csv"><Button><Download className="h-3.5 w-3.5" /> Monthly report CSV</Button></a>
-            <a href="/report"><Button><FileText className="h-3.5 w-3.5" /> Printable report</Button></a>
+    <Section id="data" title="Data" desc="Everything lives in your Neon Postgres database.">
+      <div className="max-w-xl divide-y divide-line overflow-hidden rounded-xl border border-line bg-panel">
+        <div className="p-3.5">
+          <DataLabel title="Export" hint="Never includes OAuth tokens or API keys" />
+          <div className="grid grid-cols-3 gap-2">
+            <DataLink href="/api/export" icon={<Download className="h-3.5 w-3.5" />} label="Backup" sub="JSON" />
+            <DataLink href="/api/reports?format=csv" icon={<Download className="h-3.5 w-3.5" />} label="Report" sub="CSV" />
+            <DataLink href="/report" icon={<FileText className="h-3.5 w-3.5" />} label="Report" sub="Print" />
           </div>
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            {CSV_TABLES.map((t) => (
-              <a key={t} href={`/api/export?format=csv&table=${t}`} className="rounded-md border border-line bg-panel px-2 py-1 text-[12px] text-ink-2 transition-colors hover:bg-hover hover:text-ink">{t}.csv</a>
-            ))}
-          </div>
+          <details className="group mt-2.5">
+            <summary className="flex cursor-pointer list-none items-center gap-1 text-[12px] text-muted hover:text-ink [&::-webkit-details-marker]:hidden">
+              <ChevronRight className="h-3 w-3 transition-transform group-open:rotate-90" /> Single tables (CSV)
+            </summary>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {CSV_TABLES.map((t) => (
+                <a key={t} href={`/api/export?format=csv&table=${t}`} className="rounded-md border border-line px-2 py-1 text-[12px] text-ink-2 transition-colors hover:bg-hover hover:text-ink">{t}</a>
+              ))}
+            </div>
+          </details>
         </div>
 
-        <div>
-          <div className="mb-2 text-[12px] font-medium uppercase tracking-wide text-muted">Restore</div>
+        <div className="flex items-center justify-between gap-3 p-3.5">
+          <div className="min-w-0">
+            <div className="text-[13px] font-medium text-ink">Restore</div>
+            <div className="text-[12px] text-muted">Replaces current data. A safety snapshot is saved first.</div>
+          </div>
           <input ref={fileRef} type="file" accept="application/json,.json" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) pick(f); e.target.value = ""; }} />
-          <Button onClick={() => fileRef.current?.click()}><FileUp className="h-3.5 w-3.5" /> Import JSON backup…</Button>
-          <p className="mt-1.5 text-[12px] text-muted">Replaces all current data. A safety snapshot is saved to Blob first.</p>
+          <Button size="sm" className="shrink-0" onClick={() => fileRef.current?.click()}><FileUp className="h-3.5 w-3.5" /> Import</Button>
         </div>
 
-        <div>
-          <div className="mb-2 flex items-center justify-between">
-            <span className="text-[12px] font-medium uppercase tracking-wide text-muted">Daily snapshots</span>
+        <div className="p-3.5">
+          <div className="mb-2 flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <div className="text-[13px] font-medium text-ink">Daily snapshots</div>
+              {bk?.configured && <div className="text-[12px] text-muted">Every day at {dailyRunLabel()} · newest {bk.keep} kept</div>}
+            </div>
             {bk?.configured && (
-              <Button size="sm" variant="ghost" disabled={busy !== null} onClick={async () => {
+              <Button size="sm" variant="ghost" className="shrink-0" disabled={busy !== null} onClick={async () => {
                 setBusy("snap");
                 try { await api("/api/backups", { method: "POST" }); toast.success("Snapshot saved"); qc.invalidateQueries({ queryKey: ["backups"] }); } catch (e) { toast.error((e as Error).message); }
                 setBusy(null);
               }}>
-                <Archive className="h-3.5 w-3.5" /> {busy === "snap" ? "Saving…" : "Snapshot now"}
+                <Archive className="h-3.5 w-3.5" /> {busy === "snap" ? "Saving…" : "Snapshot"}
               </Button>
             )}
           </div>
           {!bk ? (
-            <div className="h-16 animate-pulse rounded-lg bg-hover" />
+            <div className="h-12 animate-pulse rounded-lg bg-hover" />
           ) : !bk.configured ? (
-            <div className="rounded-lg border border-dashed border-line px-3 py-3 text-[13px] text-muted">Blob storage is not set up.</div>
+            <div className="text-[12.5px] text-muted">Blob storage is not set up.</div>
           ) : bk.backups.length === 0 ? (
-            <div className="rounded-lg border border-dashed border-line px-3 py-3 text-[13px] text-muted">No snapshots yet. One is saved every day at {dailyRunLabel()}, newest {bk.keep} kept.</div>
+            <div className="text-[12.5px] text-muted">No snapshots yet.</div>
           ) : (
-            <div className="divide-y divide-line rounded-lg border border-line bg-panel">
+            <div className="no-scrollbar max-h-[180px] divide-y divide-line overflow-y-auto rounded-lg border border-line">
               {bk.backups.map((b) => (
-                <div key={b.pathname} className="flex items-center justify-between gap-3 px-3 py-2 text-[13px]">
-                  <span className="num truncate text-ink-2">{b.pathname.replace("backups/", "")}</span>
-                  <span className="flex items-center gap-3">
-                    <span className="num text-[12px] text-faint">{(b.size / 1024).toFixed(1)} KB</span>
-                    <a href={`/api/backups?download=${encodeURIComponent(b.pathname)}`} className="rounded p-1 text-faint hover:text-ink" aria-label="Download"><Download className="h-3.5 w-3.5" /></a>
+                <a key={b.pathname} href={`/api/backups?download=${encodeURIComponent(b.pathname)}`} className="flex items-center justify-between gap-3 px-3 py-2 text-[12.5px] transition-colors hover:bg-hover">
+                  <span className="num min-w-0 truncate text-ink-2">{snapName(b.pathname)}</span>
+                  <span className="flex shrink-0 items-center gap-2.5 text-faint">
+                    <span className="num text-[11.5px]">{(b.size / 1024).toFixed(1)} KB</span>
+                    <Download className="h-3.5 w-3.5" aria-label="Download" />
                   </span>
-                </div>
+                </a>
               ))}
             </div>
           )}
@@ -246,4 +256,33 @@ export function DataSection() {
       </Dialog>
     </Section>
   );
+}
+
+function DataLabel({ title, hint }: { title: string; hint?: string }) {
+  return (
+    <div className="mb-2.5 flex items-baseline justify-between gap-3">
+      <span className="text-[13px] font-medium text-ink">{title}</span>
+      {hint && <span className="truncate text-[11.5px] text-faint">{hint}</span>}
+    </div>
+  );
+}
+
+function DataLink({ href, icon, label, sub }: { href: string; icon: ReactNode; label: string; sub: string }) {
+  return (
+    <a href={href} className="flex min-w-0 flex-col items-start gap-1 rounded-lg border border-line px-2.5 py-2 transition-colors hover:border-line-strong hover:bg-hover">
+      <span className="text-muted">{icon}</span>
+      <span className="w-full truncate text-[12.5px] font-medium text-ink">{label}</span>
+      <span className="font-label text-[10.5px] uppercase tracking-[0.1em] text-faint">{sub}</span>
+    </a>
+  );
+}
+
+/** "backups/2026-11-10T00-00-03Z.json" → "Nov 10, 2026 · 07:00" style label; falls back to the file name. */
+function snapName(path: string) {
+  const name = path.replace(/^backups\//, "");
+  const m = name.match(/(\d{4}-\d{2}-\d{2})(?:[T_ ](\d{2})[-:](\d{2}))?/);
+  if (!m) return name;
+  const d = new Date(m[2] ? `${m[1]}T${m[2]}:${m[3]}:00Z` : `${m[1]}T00:00:00Z`);
+  if (Number.isNaN(d.getTime())) return name;
+  return d.toLocaleString([], { month: "short", day: "numeric", year: "numeric", ...(m[2] ? { hour: "numeric", minute: "2-digit" } : {}) });
 }

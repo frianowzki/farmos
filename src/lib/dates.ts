@@ -86,3 +86,9 @@ export function dailyRunLabel(tz = appTimeZone()): string {
 export function today(): string {
   return dayInZone(new Date());
 }
+
+/** Minutes since midnight in the profile's zone (for key-date countdowns with a time). */
+export function nowMinInZone(): number {
+  const c = clockInZone(new Date());
+  return c.h * 60 + c.m;
+}

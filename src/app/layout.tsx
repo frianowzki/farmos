@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Bricolage_Grotesque, EB_Garamond, Google_Sans, Google_Sans_Code, Jost } from "next/font/google";
 import { Providers } from "@/components/providers";
 import { ServiceWorkerRegister } from "@/components/sw-register";
+import { ACCENT_BOOT } from "@/lib/accent";
 import "./globals.css";
 
 // Type system (all SIL OFL 1.1 via Google Fonts, self-hosted by next/font):
@@ -41,6 +42,9 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: ACCENT_BOOT }} />
+      </head>
       <body className={`${sans.variable} ${display.variable} ${label.variable} ${wordmark.variable} ${mono.variable} antialiased`}>
         <Providers>{children}</Providers>
         <ServiceWorkerRegister />

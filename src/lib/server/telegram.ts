@@ -2,6 +2,7 @@ import "server-only";
 import { and, eq, gte, lte } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { addDays, diffDays } from "@/lib/dates";
+import { time12 } from "@/lib/format";
 import { isDue, isSatisfied, taskStreak } from "@/lib/streak";
 import { getSetting, setSetting } from "./settings";
 import { dayIn, timeIn } from "./tz";
@@ -121,7 +122,8 @@ export async function buildDigest(pid: string, n: NotifySettings, now = new Date
     const projects = await d.select({ name: schema.projects.name, keyDates: schema.projects.keyDates, status: schema.projects.status }).from(schema.projects).where(eq(schema.projects.profileId, pid));
     for (const p of projects) {
       const mint = p.keyDates?.mint;
-      if (mint && (mint === today || mint === addDays(today, 1)) && !["done", "dropped"].includes(p.status)) lines.push(`• <b>${esc(p.name)}</b> mint ${mint === today ? "today" : "tomorrow"}`);
+      const at = p.keyDates?.times?.mint ? ` at ${time12(p.keyDates.times.mint)} ${tzLabel(tz)}` : "";
+      if (mint && (mint === today || mint === addDays(today, 1)) && !["done", "dropped"].includes(p.status)) lines.push(`• <b>${esc(p.name)}</b> mint ${mint === today ? "today" : "tomorrow"}${at}`);
     }
     if (lines.length) sections.push({ title: "Mints in the next 24h", lines });
   }
@@ -131,19 +133,21 @@ export async function buildDigest(pid: string, n: NotifySettings, now = new Date
     const lines: string[] = [];
     for (const p of projects) {
       if (["done", "dropped"].includes(p.status)) continue;
-      const dates: [string, string | null | undefined][] = [
-        ["Deadline", p.deadline],
-        ["Campaign ends", p.campaignEnd],
-        ["Snapshot", p.keyDates?.snapshot],
-        ["TGE", p.keyDates?.tge],
-        ["Claim opens", p.keyDates?.claimStart],
-        ["Claim closes", p.keyDates?.claimEnd],
+      const t = p.keyDates?.times ?? {};
+      const dates: [string, string | null | undefined, string | null | undefined][] = [
+        ["Deadline", p.deadline, null],
+        ["Campaign ends", p.campaignEnd, null],
+        ["Snapshot", p.keyDates?.snapshot, t.snapshot],
+        ["TGE", p.keyDates?.tge, t.tge],
+        ["Claim opens", p.keyDates?.claimStart, t.claimStart],
+        ["Claim closes", p.keyDates?.claimEnd, t.claimEnd],
       ];
-      for (const [label, day] of dates) {
+      for (const [label, day, hm] of dates) {
         if (!day) continue;
         const left = diffDays(day, today);
         if (left < 0 || left > 3) continue;
-        lines.push(`• <b>${esc(p.name)}</b>: ${label} ${left === 0 ? "<b>today</b>" : left === 1 ? "tomorrow" : `in ${left} days`} (${day})`);
+        const at = hm ? ` at ${time12(hm)} ${tzLabel(tz)}` : "";
+        lines.push(`• <b>${esc(p.name)}</b>: ${label} ${left === 0 ? "<b>today</b>" : left === 1 ? "tomorrow" : `in ${left} days`}${at} (${day})`);
       }
     }
     if (lines.length) sections.push({ title: "Campaign deadlines (next 3 days)", lines });

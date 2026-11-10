@@ -8,6 +8,7 @@ import { useMemo, useState } from "react";
 import { playUi } from "@/lib/client/sound";
 import { toast } from "@/lib/client/toast";
 import { Button, Input, NativeSelect } from "@/components/ui";
+import { ProjectMark } from "@/components/project-mark";
 import { cn } from "@/lib/cn";
 import { addDays, today as todayFn } from "@/lib/dates";
 import { api, keys, useProjects, useTasks, type Task } from "@/lib/client/api";
@@ -90,7 +91,7 @@ export function TaskRow({ row, showProject = true, onDelete }: { row: ReturnType
         <div className={cn("truncate text-[14px] transition-colors", done && "text-muted line-through decoration-faint")}>{row.task.title}</div>
         <div className="flex items-center gap-2 text-[12px] text-faint">
           {showProject && project && (
-            <Link href={`/projects/${project.id}`} className="truncate hover:text-ink-2">{project.name}</Link>
+            <Link href={`/projects/${project.id}`} className="flex min-w-0 items-center gap-1.5 text-ink-2 hover:text-ink"><ProjectMark p={project} size={14} className="rounded-[4px]" /><span className="truncate">{project.name}</span></Link>
           )}
           <span>{row.task.cadence === "daily" ? "Daily" : row.task.cadence === "weekly" ? (row.task.weekdays.length ? row.task.weekdays.map((d) => WD[d]).join("") : "Weekly") : `Every ${row.task.intervalDays}d`}</span>
           {!row.dueToday && row.satisfied && !done && <span>· done this period</span>}

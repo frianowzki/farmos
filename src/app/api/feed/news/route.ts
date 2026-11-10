@@ -8,11 +8,11 @@ export const maxDuration = 30;
 export async function GET() {
   const denied = await requireSession();
   if (denied) return denied;
-  return NextResponse.json({ ...(await getNews(false)), sources: NEWS_SOURCES.map(({ id, name, site }) => ({ id, name, site })) });
+  return NextResponse.json({ ...(await getNews(false)), sources: NEWS_SOURCES.map(({ id, name, site, kind }) => ({ id, name, site, kind })) });
 }
 
 export async function POST() {
   const denied = await requireSession();
   if (denied) return denied;
-  return NextResponse.json({ ...(await getNews(true)), sources: NEWS_SOURCES.map(({ id, name, site }) => ({ id, name, site })) });
+  return NextResponse.json({ ...(await getNews(true)), sources: NEWS_SOURCES.map(({ id, name, site, kind }) => ({ id, name, site, kind })) });
 }

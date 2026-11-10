@@ -30,6 +30,8 @@ export type KeyDates = {
   mint?: string | null;
   claimStart?: string | null;
   claimEnd?: string | null;
+  /** Optional wall-clock times ("HH:mm", 24h) for the dates above, in the profile's time zone. */
+  times?: Partial<Record<"snapshot" | "tge" | "mint" | "claimStart" | "claimEnd", string | null>>;
 };
 
 /** AI-suggested review of a project's audit/rating (suggestion only; the user accepts it). */
@@ -365,6 +367,33 @@ export const earnings = pgTable(
   },
   (t) => [index("earnings_profile_idx").on(t.profileId), index("earnings_project_idx").on(t.projectId)],
 );
+
+/** Per-project spend ledger: gas fees, capital/deposits and other costs, valued in USD at entry time. */
+export const costs = pgTable(
+  "costs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    /** Which farmOS profile owns the row ("default" = Iya). Always set explicitly; scoped in every query. */
+    profileId: text("profile_id").notNull(),
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    /** gas | capital | other */
+    type: text("type").notNull().default("gas"),
+    symbol: text("symbol").notNull(),
+    /** CoinGecko id for live pricing (optional). */
+    coinId: text("coin_id"),
+    chain: text("chain"),
+    amount: doublePrecision("amount").notNull().default(0),
+    /** Total USD value when the cost was paid. */
+    valueAtEntry: doublePrecision("value_at_entry"),
+    spentAt: date("spent_at").notNull(),
+    note: text("note"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("costs_profile_idx").on(t.profileId), index("costs_project_idx").on(t.projectId)],
+);
+export type Cost = typeof costs.$inferSelect;
 
 /** Tokens the user watches, with optional above/below price alerts (in alert_currency). */
 export const watchlist = pgTable(

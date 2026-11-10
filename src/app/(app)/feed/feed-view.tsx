@@ -1,6 +1,6 @@
 "use client";
 import { useQuery, useQueryClient, type UseQueryResult } from "@tanstack/react-query";
-import { ArrowUpRight, Newspaper, Plus, Radio, RefreshCw, Sparkles, X } from "lucide-react";
+import { ArrowUpRight, Bookmark, BookmarkCheck, Check, CheckCheck, ChevronDown, Circle, Newspaper, Plus, Radio, RefreshCw, Search, Sparkles, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useRouter } from "next/navigation";
 import ReactMarkdown from "react-markdown";
@@ -75,13 +75,11 @@ function useReadSet() {
       return new Set();
     }
   });
-  const mark = (id: string) =>
-    setRead((r) => {
-      const n = new Set(r).add(id);
-      localStorage.setItem(READ_KEY, JSON.stringify([...n].slice(-300)));
-      return n;
-    });
-  return [read, mark] as const;
+  const write = (n: Set<string>) => { localStorage.setItem(READ_KEY, JSON.stringify([...n].slice(-800))); return n; };
+  const mark = (id: string) => setRead((r) => write(new Set(r).add(id)));
+  const unmark = (id: string) => setRead((r) => { const n = new Set(r); n.delete(id); return write(n); });
+  const markMany = (ids: string[]) => setRead((r) => write(new Set([...r, ...ids])));
+  return [read, mark, unmark, markMany] as const;
 }
 
 function Favicon({ url, size = 16 }: { url: string | null; size?: number }) {
@@ -158,6 +156,42 @@ function Brief({ day, category, onClose, from = "list", source }: { day: string;
 }
 
 function Reading() {
+  return (
+    <>
+      <ReadingMain />
+      <SavedList />
+    </>
+  );
+}
+
+function SavedList() {
+  const qc = useQueryClient();
+  const q = useQuery({ queryKey: ["feed"], queryFn: () => api<{ items: FeedItem[] }>("/api/feed") });
+  const items = (q.data?.items ?? []).filter((i) => i.kind === "saved");
+  if (!items.length) return null;
+  const remove = async (id: string) => {
+    try { await api(`/api/feed?id=${id}`, { method: "DELETE" }); qc.invalidateQueries({ queryKey: ["feed"] }); } catch (e) { toast.error((e as Error).message); }
+  };
+  return (
+    <section className="mt-8">
+      <div className="mb-2 flex items-center gap-2 text-[12px] font-medium text-muted"><BookmarkCheck className="h-3.5 w-3.5 text-accent" /> Saved from the wire <span className="num text-faint">{items.length}</span></div>
+      <ul className="divide-y divide-line overflow-hidden rounded-xl border border-line bg-panel">
+        {items.map((i) => (
+          <li key={i.id} className="group flex items-start gap-3 px-4 py-3">
+            <span className="mt-0.5"><Favicon url={i.url} size={16} /></span>
+            <a href={i.url ?? undefined} target="_blank" rel="noreferrer noopener" className="min-w-0 flex-1">
+              <div className="text-[14px] font-medium leading-snug text-ink hover:underline hover:decoration-line-strong hover:underline-offset-4">{i.title}</div>
+              <div className="mt-0.5 truncate text-[12px] text-muted">{i.source ?? host(i.url)}{i.summary ? ` · ${i.summary}` : ""}</div>
+            </a>
+            <button type="button" onClick={() => remove(i.id)} className="rounded p-1 text-faint hover:bg-hover hover:text-ink" aria-label="Remove from saved"><X className="h-3.5 w-3.5" /></button>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function ReadingMain() {
   const qc = useQueryClient();
   const ai = useAiConfig();
   const q = useQuery({ queryKey: ["feed"], queryFn: () => api<{ items: FeedItem[] }>("/api/feed") });
@@ -166,7 +200,7 @@ function Reading() {
   const [brief, setBrief] = useState(false);
   const [read, markRead] = useReadSet();
   const today = todayStr();
-  const items = q.data?.items ?? [];
+  const items = (q.data?.items ?? []).filter((i) => i.kind !== "saved");
   const todays = items.filter((i) => i.day === today);
   const shown = todays.length ? todays : items.filter((i) => i.day === items[0]?.day);
   const generate = async () => {
@@ -182,7 +216,7 @@ function Reading() {
   };
   if (q.isLoading) return <div className="space-y-3"><Skeleton className="h-40" /><Skeleton className="h-16" /><Skeleton className="h-16" /></div>;
   if (!ai.data?.configured)
-    return <EmptyState mark="feed" title="Point the research desk at a model first" body="The reading list is written by your AI endpoint from DefiLlama, CoinGecko, GeckoTerminal and 12 news and airdrop feeds. The News wire tab works without AI." action={<Link href="/settings#ai"><Button>Set up AI</Button></Link>} />;
+    return <EmptyState mark="feed" title="Point the research desk at a model first" body="The reading list is written by your AI endpoint from DefiLlama, CoinGecko, GeckoTerminal and 25+ news, research and ecosystem feeds. The News wire tab works without AI." action={<Link href="/settings#ai"><Button>Set up AI</Button></Link>} />;
   if (!shown.length)
     return <EmptyState mark="feed" title="No list for today yet" body="Generate one: the desk pulls fresh raises, trending tokens and new pools, then keeps only what links to a real source." action={<Button variant="primary" onClick={generate} disabled={busy}>{busy ? <Loader size={13} /> : <Sparkles className="h-3.5 w-3.5" />} Build today&apos;s list</Button>} />;
   const sorted = [...shown].sort((a, b) => b.score - a.score);
@@ -332,8 +366,8 @@ function XTimeline({ q }: { q: UseQueryResult<XFeed> }) {
   );
 }
 
-type WireItem = { id: string; title: string; url: string; source: string; sourceId: string; site: string; publishedAt: string | null; summary: string; image: string | null; category: string };
-type Wire = { fetchedAt: string; items: WireItem[]; failed: string[]; sources: { id: string; name: string; site: string }[] };
+type WireItem = { id: string; title: string; url: string; source: string; sourceId: string; site: string; kind?: string; publishedAt: string | null; summary: string; image: string | null; category: string };
+type Wire = { fetchedAt: string; items: WireItem[]; failed: string[]; sources: { id: string; name: string; site: string; kind?: string }[] };
 
 function ago(iso: string | null) {
   if (!iso) return "";
@@ -396,16 +430,43 @@ function XWatch() {
   );
 }
 
+const KIND_LABEL: Record<string, string> = { newsroom: "Newsrooms", research: "Research", ecosystem: "Ecosystem blogs", airdrop: "Airdrop trackers" };
+const WHY_KEY = "frioos-wire-why";
+function readWhy(): Record<string, string> {
+  try { return JSON.parse(localStorage.getItem(WHY_KEY) ?? "{}") as Record<string, string>; } catch { return {}; }
+}
+
+function useSaved() {
+  const qc = useQueryClient();
+  const q = useQuery({ queryKey: ["feed"], queryFn: () => api<{ items: FeedItem[] }>("/api/feed") });
+  const saved = new Map((q.data?.items ?? []).filter((i) => i.kind === "saved" && i.url).map((i) => [i.url!, i.id]));
+  const toggle = async (i: WireItem) => {
+    const on = saved.has(i.url);
+    try {
+      if (on) await api(`/api/feed?url=${encodeURIComponent(i.url)}`, { method: "DELETE" });
+      else await api("/api/feed", { method: "POST", body: { title: i.title, url: i.url, summary: i.summary.slice(0, 600), source: i.source, category: i.category } });
+      toast.success(on ? "Removed from reading list" : "Saved to reading list");
+      qc.invalidateQueries({ queryKey: ["feed"] });
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
+  };
+  return { saved, toggle };
+}
+
 function NewsWire() {
   const qc = useQueryClient();
   const ai = useAiConfig();
   const q = useQuery({ queryKey: ["news-wire"], queryFn: () => api<Wire>("/api/feed/news"), staleTime: 5 * 60_000 });
   const [cat, setCat] = useState("all");
   const [src, setSrc] = useState("all");
+  const [view, setView] = useState<"all" | "unread" | "saved">("all");
+  const [search, setSearch] = useState("");
   const [brief, setBrief] = useState(false);
   const [limit, setLimit] = useState(30);
   const [busy, setBusy] = useState(false);
-  const [read, markRead] = useReadSet();
+  const [read, markRead, unmarkRead, markMany] = useReadSet();
+  const { saved, toggle } = useSaved();
   const refresh = async () => {
     setBusy(true);
     try {
@@ -419,22 +480,48 @@ function NewsWire() {
   if (q.isLoading) return <div className="space-y-3"><Skeleton className="h-10" /><Skeleton className="h-20" /><Skeleton className="h-20" /><Skeleton className="h-20" /></div>;
   if (q.isError || !q.data) return <EmptyState mark="feed" title="The wire didn't load" body={(q.error as Error | null)?.message} action={<Button onClick={() => q.refetch()}>Try again</Button>} />;
   const all = q.data.items;
-  const bySrc = src === "all" ? all : all.filter((i) => i.sourceId === src);
+  const s = search.trim().toLowerCase();
+  const kindOf = (id: string) => q.data.sources.find((x) => x.id === id)?.kind;
+  const bySrc = all.filter((i) =>
+    (src === "all" || (src.startsWith("kind:") ? (i.kind ?? kindOf(i.sourceId)) === src.slice(5) : i.sourceId === src)) &&
+    (view === "all" || (view === "unread" ? !read.has(i.id) : saved.has(i.url))) &&
+    (!s || `${i.title} ${i.summary} ${i.source}`.toLowerCase().includes(s)),
+  );
   const counts = Object.fromEntries(CATS.map((c) => [c.id, c.id === "all" ? bySrc.length : bySrc.filter((i) => i.category === c.id).length]));
   const list = cat === "all" ? bySrc : bySrc.filter((i) => i.category === cat);
-  const srcOpts = [{ id: "all", label: `All sources (${q.data.sources.length})` }, ...q.data.sources.filter((s) => all.some((i) => i.sourceId === s.id)).map((s) => ({ id: s.id, label: s.name }))];
+  const live = q.data.sources.filter((x) => all.some((i) => i.sourceId === x.id));
+  const kinds = [...new Set(live.map((x) => x.kind).filter(Boolean))] as string[];
+  const srcOpts = [
+    { id: "all", label: `All sources (${live.length})` },
+    ...kinds.map((k) => ({ id: `kind:${k}`, label: KIND_LABEL[k] ?? k })),
+    ...live.map((x) => ({ id: x.id, label: x.name })),
+  ];
+  const unread = all.filter((i) => !read.has(i.id)).length;
   return (
     <MaybePull onRefresh={refresh}>
       <XWatch />
       <div className="mb-3 flex flex-wrap items-center gap-2">
-        <div className="text-[13px] text-muted"><span className="font-medium text-ink">{list.length} headlines</span><span className="mx-1.5 text-faint">·</span>updated {ago(q.data.fetchedAt)} ago</div>
-        <div className="ml-auto flex items-center gap-1">
-          <NativeSelect variant="ghost" value={src} onChange={(v) => { setSrc(v); setLimit(30); }} options={srcOpts} align="end" width={220} ariaLabel="Source" />
-          {ai.data?.configured && <Button size="sm" variant={brief ? "subtle" : "ghost"} onClick={() => setBrief((b) => !b)}><Sparkles className="h-3.5 w-3.5 text-accent" /> AI brief</Button>}
-          <Button size="sm" variant="ghost" onClick={refresh} disabled={busy}>{busy ? <Loader size={12} /> : <RefreshCw className="h-3.5 w-3.5" />} Refresh</Button>
+        <div className="relative min-w-0 flex-1 basis-[200px]">
+          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-faint" />
+          <input value={search} onChange={(e) => { setSearch(e.target.value); setLimit(30); }} placeholder="Search headlines" className="h-8 w-full rounded-md border border-line bg-panel pl-8 pr-7 text-[16px] outline-none placeholder:text-faint focus:ring-2 focus:ring-[var(--ring)] sm:text-[13px]" />
+          {search && <button type="button" onClick={() => setSearch("")} className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-0.5 text-faint hover:text-ink" aria-label="Clear search"><X className="h-3.5 w-3.5" /></button>}
+        </div>
+        <div className="flex items-center gap-1">
+          <NativeSelect variant="ghost" value={src} onChange={(v) => { setSrc(v); setLimit(30); }} options={srcOpts} align="end" width={230} ariaLabel="Source" />
+          {ai.data?.configured && <Button size="sm" variant={brief ? "subtle" : "ghost"} onClick={() => setBrief((b) => !b)}><Sparkles className="h-3.5 w-3.5 text-accent" /> <span className="hidden sm:inline">AI brief</span><span className="sm:hidden">Brief</span></Button>}
+          <Button size="sm" variant="ghost" onClick={refresh} disabled={busy} aria-label="Refresh">{busy ? <Loader size={12} /> : <RefreshCw className="h-3.5 w-3.5" />}<span className="hidden sm:inline">Refresh</span></Button>
         </div>
       </div>
-      <div className="-mx-1 mb-5 flex gap-1 overflow-x-auto px-1 pb-1">
+      <div className="mb-3 flex items-center gap-2 text-[12.5px]">
+        <div className="flex rounded-md border border-line bg-panel p-0.5">
+          {([["all", "All"], ["unread", `Unread ${unread}`], ["saved", `Saved ${saved.size}`]] as const).map(([id, label]) => (
+            <button key={id} type="button" onClick={() => { setView(id); setLimit(30); }} className={cn("h-6 rounded-[5px] px-2.5", view === id ? "bg-active text-ink" : "text-muted hover:text-ink")}>{label}</button>
+          ))}
+        </div>
+        <span className="hidden text-muted sm:inline">updated {ago(q.data.fetchedAt)} ago</span>
+        {unread > 0 && <button type="button" onClick={() => markMany(list.map((i) => i.id))} className="ml-auto inline-flex items-center gap-1 text-muted hover:text-ink"><CheckCheck className="h-3.5 w-3.5" /> Mark shown read</button>}
+      </div>
+      <div className="-mx-1 mb-4 flex gap-1 overflow-x-auto px-1 pb-1">
         {CATS.filter((c) => c.id === "all" || counts[c.id]).map((c) => (
           <button key={c.id} onClick={() => { setCat(c.id); setLimit(30); }} className={cn("relative h-7 shrink-0 rounded-full border px-3 text-[12.5px] leading-[1.35] transition-colors", cat === c.id ? "border-transparent text-ink" : "border-line text-muted hover:text-ink")}>
             {cat === c.id && <motion.span layoutId="wire-cat" className="absolute inset-0 rounded-full bg-active" transition={{ type: "spring", stiffness: 500, damping: 38 }} />}
@@ -446,35 +533,82 @@ function NewsWire() {
           </button>
         ))}
       </div>
-      <AnimatePresence>{brief && <Brief key={`wire-${cat}-${src}`} day="" category={cat} from="wire" source={src} onClose={() => setBrief(false)} />}</AnimatePresence>
+      <AnimatePresence>{brief && <Brief key={`wire-${cat}-${src}`} day="" category={cat} from="wire" source={src.startsWith("kind:") ? "all" : src} onClose={() => setBrief(false)} />}</AnimatePresence>
       {list.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-line py-10 text-center text-[13px] text-muted">No headlines here right now.</div>
+        <div className="rounded-xl border border-dashed border-line py-10 text-center text-[13px] text-muted">{view === "saved" ? "Nothing saved yet. Tap the bookmark on a headline." : s ? "No headlines match your search." : "No headlines here right now."}</div>
       ) : (
         <ul className="divide-y divide-line overflow-hidden rounded-xl border border-line bg-panel">
           {list.slice(0, limit).map((i) => (
-            <li key={i.id}>
-              <a href={i.url} target="_blank" rel="noreferrer" onClick={() => markRead(i.id)} className={cn("group flex items-start gap-3 px-4 py-3 transition-colors hover:bg-hover/60", read.has(i.id) && "opacity-65")}>
-                <div className="min-w-0 flex-1">
-                  <div className="mb-1 flex items-center gap-1.5 text-[11.5px] text-muted">
-                    <Favicon url={i.url} size={14} />
-                    <span className="truncate font-medium text-ink-2">{i.source}</span>
-                    {i.publishedAt && <><span className="text-faint">·</span><span className="num shrink-0">{ago(i.publishedAt)}</span></>}
-                    {i.category !== "news" && <Pill tone={CAT_TONE[i.category] ?? "gray"} className="ml-1 min-h-[18px] text-[11px]">{i.category}</Pill>}
-                  </div>
-                  <div className="text-[14px] font-medium leading-snug text-ink group-hover:underline group-hover:decoration-line-strong group-hover:underline-offset-4">{i.title}</div>
-                  {i.summary && <p className="mt-0.5 line-clamp-2 text-[12.5px] leading-relaxed text-muted">{i.summary}</p>}
-                </div>
-                {i.image && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={i.image} alt="" loading="lazy" className="hidden h-16 w-24 shrink-0 rounded-md border border-line object-cover sm:block" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
-                )}
-                {ai.data?.configured && <AskAi item={i} className="self-center opacity-100 sm:opacity-0 sm:group-hover:opacity-100" />}
-              </a>
-            </li>
+            <WireRow key={i.id} i={i} read={read.has(i.id)} saved={saved.has(i.url)} ai={Boolean(ai.data?.configured)} onOpen={() => markRead(i.id)} onToggleRead={() => (read.has(i.id) ? unmarkRead(i.id) : markRead(i.id))} onToggleSave={() => toggle(i)} />
           ))}
         </ul>
       )}
       {list.length > limit && <div className="mt-3 flex justify-center"><Button size="sm" variant="ghost" onClick={() => setLimit((l) => l + 30)}>Show more ({list.length - limit})</Button></div>}
+      {q.data.failed.length > 0 && <p className="mt-3 text-center text-[11.5px] text-faint">Didn&apos;t answer this round: {q.data.failed.join(", ")}</p>}
     </MaybePull>
+  );
+}
+
+function WireRow({ i, read, saved, ai, onOpen, onToggleRead, onToggleSave }: { i: WireItem; read: boolean; saved: boolean; ai: boolean; onOpen: () => void; onToggleRead: () => void; onToggleSave: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [why, setWhy] = useState<string | null>(null);
+  const [whyBusy, setWhyBusy] = useState(false);
+  const long = i.summary.length > 150;
+  const askWhy = async () => {
+    const cached = readWhy()[i.id];
+    if (cached) return setWhy(cached);
+    setWhyBusy(true);
+    try {
+      const r = await api<{ why: string }>("/api/feed/why", { method: "POST", body: { title: i.title, summary: i.summary, source: i.source } });
+      setWhy(r.why);
+      const all = readWhy();
+      all[i.id] = r.why;
+      localStorage.setItem(WHY_KEY, JSON.stringify(Object.fromEntries(Object.entries(all).slice(-150))));
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setWhyBusy(false);
+    }
+  };
+  const act = "inline-flex h-7 items-center gap-1 rounded-md px-1.5 text-[12px] text-muted transition-colors hover:bg-hover hover:text-ink";
+  return (
+    <li className={cn("group px-4 py-3 transition-colors", read && "[&_.wire-title]:text-ink-2")}>
+      <div className="flex items-start gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="mb-1 flex min-w-0 items-center gap-1.5 text-[11.5px] text-muted">
+            {!read && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-accent" aria-label="Unread" />}
+            <Favicon url={i.url} size={14} />
+            <span className="truncate font-medium text-ink-2">{i.source}</span>
+            {i.publishedAt && <><span className="text-faint">·</span><time className="num shrink-0" dateTime={i.publishedAt} title={new Date(i.publishedAt).toLocaleString()}>{ago(i.publishedAt)} ago</time></>}
+            {i.category !== "news" && <Pill tone={CAT_TONE[i.category] ?? "gray"} className="ml-1 min-h-[18px] shrink-0 text-[11px]">{i.category}</Pill>}
+          </div>
+          <a href={i.url} target="_blank" rel="noreferrer noopener" onClick={onOpen} className="wire-title block text-[14px] font-medium leading-snug text-ink hover:underline hover:decoration-line-strong hover:underline-offset-4">{i.title}</a>
+          {i.summary && (
+            <button type="button" onClick={() => setOpen((o) => !o)} className="mt-0.5 block w-full text-left" aria-expanded={open}>
+              <p className={cn("text-[12.5px] leading-relaxed text-muted", !open && "line-clamp-2")}>{i.summary}</p>
+            </button>
+          )}
+          <AnimatePresence initial={false}>
+            {why && (
+              <motion.p initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="mt-1.5 flex gap-1.5 overflow-hidden rounded-md bg-[color-mix(in_oklab,var(--accent-soft)_55%,transparent)] px-2 py-1.5 text-[12.5px] leading-snug text-ink-2">
+                <Sparkles className="mt-0.5 h-3 w-3 shrink-0 text-accent" /> <span><span className="font-medium text-ink">Why it matters:</span> {why}</span>
+              </motion.p>
+            )}
+          </AnimatePresence>
+        </div>
+        {i.image && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={i.image} alt="" loading="lazy" referrerPolicy="no-referrer" className="hidden h-16 w-24 shrink-0 rounded-md border border-line object-cover sm:block" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
+        )}
+      </div>
+      <div className="-ml-1.5 mt-1 flex flex-wrap items-center gap-0.5">
+        {ai && <button type="button" onClick={why ? () => setWhy(null) : askWhy} disabled={whyBusy} className={act}>{whyBusy ? <Loader size={11} /> : <Sparkles className="h-3.5 w-3.5 text-accent" />} {why ? "Hide" : "Why it matters"}</button>}
+        {long && <button type="button" onClick={() => setOpen((o) => !o)} className={act} aria-expanded={open}><ChevronDown className={cn("h-3.5 w-3.5 transition-transform", open && "rotate-180")} /> {open ? "Less" : "More"}</button>}
+        <button type="button" onClick={onToggleSave} className={cn(act, saved && "text-accent hover:text-accent")} aria-pressed={saved}>{saved ? <BookmarkCheck className="h-3.5 w-3.5" /> : <Bookmark className="h-3.5 w-3.5" />} {saved ? "Saved" : "Save"}</button>
+        <button type="button" onClick={onToggleRead} className={act}>{read ? <Circle className="h-3.5 w-3.5" /> : <Check className="h-3.5 w-3.5" />} {read ? "Unread" : "Read"}</button>
+        <a href={i.url} target="_blank" rel="noreferrer noopener" onClick={onOpen} className={cn(act, "ml-auto")}><span className="hidden sm:inline">{i.site}</span> <ArrowUpRight className="h-3.5 w-3.5" /></a>
+        {ai && <AskAi item={i} />}
+      </div>
+    </li>
   );
 }

@@ -10,6 +10,7 @@ import { Editor } from "@/components/editor";
 import { MailList } from "@/components/mail";
 import { Page } from "@/components/shell";
 import { ChainLabel, ChainLogo } from "@/components/chain-logo";
+import { TimePicker } from "@/components/time-picker";
 import { LinkIcon } from "@/components/icons/brand-glyphs";
 import { AddTask, TaskRow, useTaskModel } from "@/components/tasks";
 import { Button, DateField, Dialog, Empty, InlineText, Pill, Popover, SelectPill, Skeleton, TagInput } from "@/components/ui";
@@ -19,17 +20,18 @@ import { WheelPicker } from "@/components/motion/wheel-picker";
 import { Attachments } from "@/components/panelui/attachment";
 import { AirdropCheckerPanel } from "@/components/airdrop-checker";
 import { ProjectEarnings } from "@/components/earnings";
+import { ProjectCosts } from "@/components/costs";
 import { claimBadge } from "@/lib/claim";
 import { AiReviewPanel } from "@/components/ai-review";
 import type { AiReview } from "@/db/schema";
 import { Questionnaire } from "@/components/panelui/questionnaire";
 import { Rating } from "@/components/panelui/rating";
 import { AUDIT, auditScore, scoreToRating } from "@/lib/audit";
-import { addDays } from "@/lib/dates";
+import { addDays, clockInZone } from "@/lib/dates";
 import { cn } from "@/lib/cn";
 import { CHAIN_SUGGESTIONS, KEY_DATES, LINK_FIELDS } from "@/lib/constants";
 import { today as todayFn } from "@/lib/dates";
-import { pct, relDay, shortAddr, tone, usd } from "@/lib/format";
+import { pct, relDay, relWhen, shortAddr, tone, usd } from "@/lib/format";
 import { api, keys, useGoogleStatus, useProject, useUpdateProject, useWallets, type Position, type Project } from "@/lib/client/api";
 import { CATEGORY_OPTS, ELIGIBILITY_OPTS, PRIORITY_OPTS, RISK_OPTS, STATUS_OPTS, TIER_OPTS } from "@/lib/options";
 import { positionPnl, projectPnl } from "@/lib/pnl";
@@ -42,6 +44,7 @@ const TABS = [
   { id: "mail", label: "Mail" },
   { id: "files", label: "Files" },
   { id: "earnings", label: "Earnings" },
+  { id: "costs", label: "Gas & capital" },
   { id: "claim", label: "Claim" },
 ];
 
@@ -108,6 +111,7 @@ export function ProjectPage({ id }: { id: string }) {
       {tab === "diary" && <ProjectDiary projectId={id} entries={data.diary} />}
       {tab === "mail" && <MailList projectId={id} />}
       {tab === "earnings" && <ProjectEarnings projectId={id} />}
+      {tab === "costs" && <ProjectCosts projectId={id} />}
       {tab === "claim" && <AirdropCheckerPanel projectId={id} checker={p.checker ?? null} wallets={p.wallets} />}
       {tab === "files" && (
         <Attachments
@@ -263,7 +267,13 @@ function Properties({ p, set, today }: { p: Project; set: (patch: Partial<Projec
         </Prop>
         {KEY_DATES.map((k) => (
           <Prop key={k.id} icon={<CalendarDays className={ic} />} label={k.label}>
-            <DateCell value={kd[k.id as keyof typeof kd] ?? null} today={today} onSave={(v) => set({ keyDates: { ...kd, [k.id]: v } })} />
+            <DateCell
+              value={(kd[k.id as keyof typeof kd] as string | null | undefined) ?? null}
+              today={today}
+              time={kd.times?.[k.id as keyof NonNullable<typeof kd.times>] ?? null}
+              onSave={(v) => set({ keyDates: { ...kd, [k.id]: v, ...(v ? {} : { times: { ...kd.times, [k.id]: null } }) } })}
+              onTime={(t) => set({ keyDates: { ...kd, times: { ...kd.times, [k.id]: t } } })}
+            />
           </Prop>
         ))}
         <Prop icon={<CalendarRange className={ic} />} label="Campaign">
@@ -290,11 +300,13 @@ function Properties({ p, set, today }: { p: Project; set: (patch: Partial<Projec
   );
 }
 
-function DateCell({ value, onSave, today }: { value: string | null | undefined; onSave: (v: string | null) => void; today: string }) {
+function DateCell({ value, onSave, today, time, onTime }: { value: string | null | undefined; onSave: (v: string | null) => void; today: string; time?: string | null; onTime?: (v: string | null) => void }) {
+  const c = clockInZone(new Date());
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
       <div className="w-[186px]"><DateField value={value} onSave={onSave} className="text-[13px]" /></div>
-      {value && <span className="text-[12px] text-faint">{relDay(value, today)}</span>}
+      {value && onTime && <TimePicker value={time} onChange={onTime} />}
+      {value && <span className="text-[12px] text-faint">{relWhen(value, time, today, c.h * 60 + c.m)}</span>}
     </div>
   );
 }
@@ -302,36 +314,55 @@ function DateCell({ value, onSave, today }: { value: string | null | undefined; 
 function LinksCell({ links, onSave }: { links: Record<string, string | undefined>; onSave: (l: Record<string, string>) => void }) {
   const [open, setOpen] = useState(false);
   const [btn, setBtn] = useState<HTMLButtonElement | null>(null);
-  const set = Object.entries(links).filter(([, v]) => v);
+  // Custom names live next to the URLs as "label.<field>" keys (e.g. label.other = "Checker").
+  const set = Object.entries(links).filter(([k, v]) => v && !k.startsWith("label."));
+  const nameOf = (k: string) => links[`label.${k}`]?.trim() || LINK_FIELDS.find((f) => f.id === k)?.label || k;
+  const save = (patch: Record<string, string>) => onSave(Object.fromEntries(Object.entries({ ...links, ...patch }).filter(([, x]) => x)) as Record<string, string>);
   return (
     <div className="flex flex-wrap items-center gap-1 py-0.5">
       {set.map(([k, v]) => (
         <a key={k} href={v!.startsWith("http") ? v : `https://${v}`} target="_blank" rel="noreferrer" title={v} className="inline-flex h-[26px] items-center gap-1.5 rounded-md border border-line bg-panel px-2 text-[12.5px] leading-[1.35] text-ink-2 transition-colors hover:border-line-strong hover:text-ink">
           <LinkIcon field={k} className="h-3.5 w-3.5" />
-          {LINK_FIELDS.find((f) => f.id === k)?.label ?? k}
+          {nameOf(k)}
         </a>
       ))}
       <button ref={setBtn} onClick={() => setOpen((o) => !o)} className="inline-flex h-[24px] items-center gap-1 rounded-md px-1.5 text-[12.5px] text-faint hover:bg-hover hover:text-ink-2">
         {set.length ? "Edit" : <><Plus className="h-3 w-3" /> Add links</>}
       </button>
-      <Popover anchor={btn} open={open} onClose={() => setOpen(false)} width={360}>
+      <Popover anchor={btn} open={open} onClose={() => setOpen(false)} width={380}>
         <div className="space-y-1.5 p-1.5">
+          <div className="flex items-center gap-2 px-0.5 font-label text-[10.5px] uppercase tracking-[0.12em] text-faint"><span className="w-[118px]">Name</span><span>Link</span></div>
           {LINK_FIELDS.map((f) => (
-            <label key={f.id} className="flex items-center gap-2">
-              <span className="flex w-[84px] items-center gap-1.5 text-[12px] text-muted"><LinkIcon field={f.id} className="h-3 w-3" />{f.label}</span>
+            <div key={f.id} className="flex items-center gap-2">
+              <span className="flex w-[118px] shrink-0 items-center gap-1.5 rounded-md border border-line bg-panel pl-1.5 focus-within:ring-2 focus-within:ring-[var(--ring)]">
+                <LinkIcon field={f.id} className="h-3 w-3 shrink-0 text-muted" />
+                <input
+                  defaultValue={links[`label.${f.id}`] ?? ""}
+                  aria-label={`${f.label} name`}
+                  maxLength={24}
+                  onBlur={(e) => {
+                    const v = e.target.value.trim();
+                    if (v === (links[`label.${f.id}`] ?? "")) return;
+                    save({ [`label.${f.id}`]: v === f.label ? "" : v });
+                  }}
+                  placeholder={f.label}
+                  className="h-7 w-full min-w-0 bg-transparent pr-1.5 text-[12.5px] text-ink outline-none placeholder:text-muted no-ring"
+                />
+              </span>
               <input
                 defaultValue={links[f.id] ?? ""}
+                aria-label={`${f.label} URL`}
                 onBlur={(e) => {
                   const v = e.target.value.trim();
                   if (v === (links[f.id] ?? "")) return;
-                  const next = Object.fromEntries(Object.entries({ ...links, [f.id]: v }).filter(([, x]) => x)) as Record<string, string>;
-                  onSave(next);
+                  save({ [f.id]: v });
                 }}
                 placeholder="https://"
-                className="h-7 flex-1 rounded-md border border-line bg-panel px-2 text-[12.5px] outline-none focus:ring-2 focus:ring-[var(--ring)]"
+                className="h-7 min-w-0 flex-1 rounded-md border border-line bg-panel px-2 text-[12.5px] outline-none focus:ring-2 focus:ring-[var(--ring)]"
               />
-            </label>
+            </div>
           ))}
+          <p className="px-0.5 pt-0.5 text-[11.5px] text-faint">Rename any link, e.g. Other → Checker. The icon stays.</p>
         </div>
       </Popover>
     </div>

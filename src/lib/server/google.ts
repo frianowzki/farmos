@@ -127,16 +127,25 @@ export async function upcomingEvents(pid: string, days = 14): Promise<CalEvent[]
   }));
 }
 
-export async function upsertAllDayEvent(pid: string, eventId: string | null, ev: { summary: string; description: string; day: string }) {
+/** All-day event, or a 30-minute timed event when `time` ("HH:mm" in `tz`) is set. */
+export async function upsertAllDayEvent(pid: string, eventId: string | null, ev: { summary: string; description: string; day: string; time?: string | null; tz?: string }) {
   const end = new Date(ev.day + "T00:00:00Z");
   end.setUTCDate(end.getUTCDate() + 1);
+  const timed = Boolean(ev.time && /^\d{2}:\d{2}$/.test(ev.time) && ev.tz);
+  let endTime = "";
+  if (timed) {
+    const [h, m] = ev.time!.split(":").map(Number);
+    const t = h * 60 + m + 30;
+    endTime = t >= 1440 ? "23:59" : `${String(Math.floor(t / 60)).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`;
+  }
   const body = {
     summary: ev.summary,
     description: ev.description,
-    start: { date: ev.day },
-    end: { date: end.toISOString().slice(0, 10) },
+    // Switching between all-day and timed needs the other field cleared on PATCH.
+    start: timed ? { dateTime: `${ev.day}T${ev.time}:00`, timeZone: ev.tz, date: null } : { date: ev.day, dateTime: null },
+    end: timed ? { dateTime: `${ev.day}T${endTime}:00`, timeZone: ev.tz, date: null } : { date: end.toISOString().slice(0, 10), dateTime: null },
     transparency: "transparent",
-    reminders: { useDefault: false, overrides: [{ method: "popup", minutes: 24 * 60 }, { method: "popup", minutes: 15 * 60 }] },
+    reminders: { useDefault: false, overrides: timed ? [{ method: "popup", minutes: 60 }, { method: "popup", minutes: 10 }] : [{ method: "popup", minutes: 24 * 60 }, { method: "popup", minutes: 15 * 60 }] },
     source: { title: "farmOS", url: process.env.APP_URL ?? "https://farmos-os.vercel.app" },
   };
   if (eventId) {

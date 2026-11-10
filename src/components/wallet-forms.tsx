@@ -154,7 +154,6 @@ export function WalletBalancesCard() {
                 </div>
               </>
             )}
-            <div className="mt-3 text-[11.5px] text-faint">Updated {new Date(data.fetchedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} · native + main tokens · CoinGecko prices</div>
           </div>
           <div className="divide-y divide-line overflow-hidden rounded-xl border border-line bg-panel">
             {data.wallets.map((w) => (
@@ -363,7 +362,7 @@ export function WalletModal({ view, setView, onConnect, connectLabel = "EVM wall
 }
 
 type NftCol = { slug: string; name: string; image: string | null; chain: string; count: number; floor: number | null; symbol: string | null; usd: number | null; url: string; wallets: string[] };
-type NftSnap = { fetchedAt: string; collections: NftCol[]; count: number; totalUsd: number | null; totalNative: { symbol: string; amount: number }[]; errors: string[]; configured: boolean };
+type NftSnap = { fetchedAt: string; collections: NftCol[]; count: number; totalUsd: number | null; totalNative: { symbol: string; amount: number }[]; errors: string[]; configured: boolean; hidden?: number };
 export const useNfts = (enabled = true) => useQuery({ queryKey: ["wallet-nfts"], queryFn: () => api<NftSnap>("/api/wallets/nfts"), enabled, staleTime: 10 * 60_000, retry: false });
 
 const fmtNative = (n: number) => n.toLocaleString(undefined, { maximumFractionDigits: n < 1 ? 4 : 2 });
@@ -403,7 +402,7 @@ export function NftHoldingsCard() {
         <div className="overflow-hidden rounded-xl border border-line bg-panel">
           <div className="flex flex-wrap items-end justify-between gap-3 border-b border-line px-4 py-3">
             <div>
-              <div className="text-[12px] font-medium text-muted">{data.count.toLocaleString()} NFTs · {cols.length} collections</div>
+              <div className="text-[12px] font-medium text-muted">{data.count.toLocaleString()} NFTs · {cols.length} collections{data.hidden ? <span className="text-faint" title="Collections with no floor, volume or offers"> · {data.hidden} hidden</span> : null}</div>
               <div className="num mt-1 text-[24px] font-medium leading-none tracking-[-0.02em]">{data.totalUsd != null ? usd(data.totalUsd) : "—"}</div>
             </div>
             <div className="num text-right text-[12.5px] text-muted">{data.totalNative.map((t) => <div key={t.symbol}>{fmtNative(t.amount)} {t.symbol} at floor</div>)}</div>

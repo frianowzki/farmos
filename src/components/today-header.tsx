@@ -2,7 +2,7 @@
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useSyncExternalStore } from "react";
 import { ChromaticTextReveal } from "@/components/motion/chromatic-text-reveal";
-import { clockInZone, zoneLabel } from "@/lib/dates";
+import { clockInZone } from "@/lib/dates";
 
 const subscribe = (cb: () => void) => {
   const t = setInterval(cb, 1000);
@@ -48,10 +48,10 @@ export function TodayHeader({ name, line }: { name: string; line: React.ReactNod
   const weekday = c.weekday;
   const date = `${c.month} ${c.day}`;
   const year = c.year;
-  const hh = String(c.h).padStart(2, "0");
+  const h12 = c.h % 12 || 12;
+  const hh = String(h12).padStart(2, "0");
   const mm = String(c.m).padStart(2, "0");
-  const ss = String(c.s).padStart(2, "0");
-  const tz = zoneLabel(undefined, c.tzName);
+  const ampm = c.h < 12 ? "AM" : "PM";
   const dayPct = ((c.h * 3600 + c.m * 60 + c.s) / 86400) * 100;
   const words = `${weekday}, ${date}`.split(" ");
 
@@ -86,20 +86,19 @@ export function TodayHeader({ name, line }: { name: string; line: React.ReactNod
             />
           </motion.p>
         </div>
-        <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="shrink-0 text-left sm:text-right">
-          <div className="num flex items-baseline justify-start text-[30px] sm:justify-end font-medium leading-none tracking-[-0.02em] text-ink sm:text-[34px]" aria-label={`${hh}:${mm}`}>
-            <Digit d={hh[0]} /><Digit d={hh[1]} />
-            <motion.span animate={{ opacity: [1, 0.25, 1] }} transition={{ duration: 1, repeat: Infinity }} className="mx-[0.04em]">:</motion.span>
-            <Digit d={mm[0]} /><Digit d={mm[1]} />
-            <span className="ml-1.5 text-[0.5em] text-faint"><Digit d={ss[0]} /><Digit d={ss[1]} /></span>
-            <span className="ml-2 text-[12px] font-normal tracking-normal text-muted">{tz}</span>
-          </div>
-          <div className="mt-2 flex items-center justify-start gap-2 text-[11.5px] text-muted sm:justify-end">
-            <span>{Math.floor(dayPct)}% of the day</span>
-            <span className="h-1 w-24 overflow-hidden rounded-full bg-hover">
-              <motion.span className="block h-full rounded-full bg-accent" initial={{ width: 0 }} animate={{ width: `${dayPct}%` }} transition={{ duration: 0.8, ease: [0.2, 0.8, 0.2, 1] }} />
+        <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="inline-flex w-[148px] shrink-0 flex-col items-stretch sm:w-[164px]">
+          <div className="num flex items-center justify-center gap-2 leading-none text-ink" aria-label={`${h12}:${mm} ${ampm}`}>
+            <span className="flex items-baseline text-[34px] font-medium tracking-[-0.03em] sm:text-[38px]">
+              <Digit d={hh[0]} /><Digit d={hh[1]} />
+              <motion.span animate={{ opacity: [1, 0.3, 1] }} transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }} className="mx-[0.02em] -translate-y-[0.06em]">:</motion.span>
+              <Digit d={mm[0]} /><Digit d={mm[1]} />
             </span>
+            <span className="font-label text-[11px] font-medium uppercase tracking-[0.14em] text-muted">{ampm}</span>
           </div>
+          <span className="mt-2.5 h-[3px] w-full overflow-hidden rounded-full bg-hover">
+            <motion.span className="block h-full rounded-full bg-accent" initial={{ width: 0 }} animate={{ width: `${dayPct}%` }} transition={{ duration: 0.8, ease: [0.2, 0.8, 0.2, 1] }} />
+          </span>
+          <span className="mt-1.5 text-center text-[11px] tracking-wide text-faint">{Math.floor(dayPct)}% of the day</span>
         </motion.div>
       </div>
       <p className="mt-3 text-[14px] text-muted">{line}</p>

@@ -24,7 +24,7 @@ export const projectInput = z
     referral: z.string().max(500).nullable(),
     deadline: day,
     keyDates: z
-      .object({ snapshot: day, tge: day, mint: day, claimStart: day, claimEnd: day })
+      .object({ snapshot: day, tge: day, mint: day, claimStart: day, claimEnd: day, times: z.partialRecord(z.enum(["snapshot", "tge", "mint", "claimStart", "claimEnd"]), z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).nullable()).optional() })
       .partial()
       .optional(),
     costSpent: money,
@@ -123,6 +123,20 @@ export const earningInput = z
     valueAtClaim: finite.refine((n) => n >= 0, "Value can't be negative").nullable(),
     claimedAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
     wallet: z.string().trim().max(120).nullable(),
+    note: z.string().max(2000).nullable(),
+  })
+  .partial();
+
+export const costInput = z
+  .object({
+    projectId: z.string().uuid(),
+    type: z.enum(["gas", "capital", "other"]),
+    symbol: z.string().trim().min(1).max(20),
+    coinId: coinId.nullable(),
+    chain: z.string().trim().max(40).nullable(),
+    amount: finite.refine((n) => n >= 0, "Amount can't be negative"),
+    valueAtEntry: finite.refine((n) => n >= 0, "Value can't be negative").nullable(),
+    spentAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
     note: z.string().max(2000).nullable(),
   })
   .partial();

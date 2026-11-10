@@ -113,21 +113,23 @@ function pick(c: Cache, ids: string[]) {
 
 export type CoinHit = { id: string; name: string; symbol: string; thumb: string | null; rank: number | null };
 const searchMem = new Map<string, { at: number; hits: CoinHit[] }>();
+/** The converter's default list (in this order). Everything else is reached through search. */
 const POPULAR: CoinHit[] = [
-  ["bitcoin", "Bitcoin", "BTC"], ["ethereum", "Ethereum", "ETH"], ["tether", "Tether", "USDT"], ["binancecoin", "BNB", "BNB"], ["solana", "Solana", "SOL"],
-  ["usd-coin", "USDC", "USDC"], ["ripple", "XRP", "XRP"], ["dogecoin", "Dogecoin", "DOGE"], ["sui", "Sui", "SUI"], ["aptos", "Aptos", "APT"],
-  ["hyperliquid", "Hyperliquid", "HYPE"], ["arbitrum", "Arbitrum", "ARB"], ["optimism", "Optimism", "OP"], ["polygon-ecosystem-token", "POL", "POL"],
-].map(([id, name, symbol], i) => ({ id, name, symbol, thumb: null, rank: i + 1 }));
+  ["bitcoin", "Bitcoin", "BTC"], ["ethereum", "Ethereum", "ETH"], ["tether", "Tether", "USDT"], ["usd-coin", "USDC", "USDC"], ["binancecoin", "BNB", "BNB"],
+  ["solana", "Solana", "SOL"], ["zcash", "Zcash", "ZEC"], ["hyperliquid", "Hyperliquid", "HYPE"], ["monero", "Monero", "XMR"], ["sui", "Sui", "SUI"], ["aptos", "Aptos", "APT"],
+].map(([id, name, symbol]) => ({ id, name, symbol, thumb: null, rank: null }));
 
 let topMem: { at: number; hits: CoinHit[] } | null = null;
-/** Top coins by market cap with logos (cached 10 min); static list without logos if CoinGecko is down. */
+/** The default list with logos and ranks from CoinGecko (cached 10 min); the static list if CoinGecko is down. */
 async function popular(): Promise<CoinHit[]> {
   if (topMem && Date.now() - topMem.at < 10 * 60_000) return topMem.hits;
   try {
-    const j = await getJson<{ id: string; name: string; symbol: string; image?: string; market_cap_rank?: number | null }[]>("https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=20&page=1&sparkline=false");
-    const hits = j.map((c) => ({ id: c.id, name: c.name, symbol: c.symbol.toUpperCase(), thumb: c.image ?? null, rank: c.market_cap_rank ?? null }));
-    if (hits.length) topMem = { at: Date.now(), hits };
-    return hits.length ? hits : POPULAR;
+    const ids = POPULAR.map((c) => c.id).join(",");
+    const j = await getJson<{ id: string; image?: string; market_cap_rank?: number | null }[]>(`https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=${ids}&per_page=50&page=1&sparkline=false`);
+    const by = new Map(j.map((c) => [c.id, c]));
+    const hits = POPULAR.map((c) => ({ ...c, thumb: by.get(c.id)?.image ?? null, rank: by.get(c.id)?.market_cap_rank ?? null }));
+    if (j.length) topMem = { at: Date.now(), hits };
+    return hits;
   } catch {
     return topMem?.hits ?? POPULAR;
   }

@@ -1,5 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
+import { getProfileTz } from "@/lib/server/settings";
+import { dayIn, timeIn } from "@/lib/server/tz";
 import { db, schema } from "@/db";
 import { bad, requireProfile } from "@/lib/server/guard";
 import { getDrop, openseaConfigured } from "@/lib/server/opensea";
@@ -18,6 +20,10 @@ export async function POST(_: Request, ctx: Ctx) {
   const d = await getDrop(slug).catch((e: Error) => e);
   if (d instanceof Error) return bad(d.message, 502);
   const start = d.next_stage?.start_time ?? d.active_stage?.start_time ?? d.stages.map((s) => s.start_time).sort()[0];
+  const tz = await getProfileTz(pid);
+  const startAt = start ? new Date(start) : null;
+  const startDay = startAt && !Number.isNaN(+startAt) ? dayIn(startAt, tz) : null;
+  const startTime = startAt && startDay ? timeIn(startAt, tz).replace(/^24:/, "00:") : null;
   const [p] = await db()
     .insert(schema.projects)
     .values({
@@ -26,8 +32,8 @@ export async function POST(_: Request, ctx: Ctx) {
       status: "research",
       chains: [d.chain],
       links: { site: d.opensea_url },
-      keyDates: { mint: start ? start.slice(0, 10) : null },
-      deadline: start ? start.slice(0, 10) : null,
+      keyDates: { mint: startDay, times: startTime ? { mint: startTime } : {} },
+      deadline: startDay,
       source: "OpenSea drops",
       tags: ["mint"],
       profileId: pid,

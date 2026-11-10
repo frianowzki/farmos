@@ -13,12 +13,13 @@ import { Page, PageHeader } from "@/components/shell";
 import { Checkbox } from "@/components/motion/checkbox";
 import { Switch } from "@/components/motion/switch";
 import { playUi, setSoundEnabled, useSoundEnabled } from "@/lib/client/sound";
-import { Button, Field, Input, Kbd, NativeSelect, Pill } from "@/components/ui";
+import { Button, Field, Input, Kbd, NativeSelect } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import { api, keys, useAiConfig, useGoogleStatus, useProfile, type AiPublic, type ProfileInfo } from "@/lib/client/api";
 import { useMounted } from "@/lib/client/use-mounted";
 import { Section } from "./section";
 import { DataSection, NotifySection } from "./notify-data";
+import { AccentPicker } from "@/components/accent-picker";
 
 export function SettingsView({ appUrl, allowedEmail }: { appUrl: string; allowedEmail: boolean }) {
   const { theme, setTheme } = useTheme();
@@ -45,7 +46,7 @@ export function SettingsView({ appUrl, allowedEmail }: { appUrl: string; allowed
         ))}
       </nav>
       {profile.data ? <ProfileForm key={`${profile.data.name}|${profile.data.tz}|${profile.data.fiat}`} data={profile.data} /> : <Section id="profile" title="Profile"><div className="h-16 animate-pulse rounded-lg bg-hover" /></Section>}
-      <Section id="appearance" title="Appearance" desc="Auto follows your system setting.">
+      <Section id="appearance" title="Appearance" desc="Auto follows your system setting. Accent is saved on this device for this profile.">
         <div className="grid max-w-md grid-cols-3 gap-2">
           {[
             { id: "light", label: "Light", icon: Sun },
@@ -57,6 +58,8 @@ export function SettingsView({ appUrl, allowedEmail }: { appUrl: string; allowed
             </button>
           ))}
         </div>
+        <div className="mt-4 mb-2 text-[12px] font-medium text-muted">Accent</div>
+        <AccentPicker />
       </Section>
       <SoundSection />
       <AiSection />
@@ -198,7 +201,6 @@ function AiForm({ data }: { data: AiPublic }) {
         <div className="flex flex-wrap items-center gap-2 pt-1">
           <Button variant="primary" onClick={save} disabled={busy}>Save</Button>
           <Button onClick={runTest} disabled={!data.configured || !data.hasKey}>Test connection</Button>
-          <span className="text-[12px] text-faint">Source: {data.source === "settings" ? "saved settings" : data.source === "env" ? "server env" : "not configured"}</span>
         </div>
         {test && <p className={cn("text-[12.5px]", test.startsWith("Failed") ? "text-neg" : "text-muted")}>{test}</p>}
       </div>
@@ -322,7 +324,7 @@ function envTag(kind: "saved" | "env" | "none") {
   return kind === "saved" ? <Marker tone="green">Encrypted</Marker> : <Marker tone="blue">Server env</Marker>;
 }
 
-function GoogleSection({ appUrl, allowedEmail }: { appUrl: string; allowedEmail: boolean }) {
+function GoogleSection({ appUrl }: { appUrl: string; allowedEmail?: boolean }) {
   const { data } = useGoogleStatus();
   const qc = useQueryClient();
   const origin = typeof window !== "undefined" ? window.location.origin : appUrl;
@@ -341,11 +343,11 @@ function GoogleSection({ appUrl, allowedEmail }: { appUrl: string; allowedEmail:
       ) : data.connected ? (
         <div className="flex max-w-xl flex-wrap items-center justify-between gap-3 rounded-lg border border-line bg-panel p-4">
           <div>
-            <div className="flex items-center gap-2 text-[14px] font-medium"><Check className="h-4 w-4 text-pos" /> {data.email}</div>
-            <div className="mt-1 flex flex-wrap gap-1">
-              {data.scope?.includes("gmail.readonly") && <Pill tone="green">Gmail read-only</Pill>}
-              {data.scope?.includes("calendar") && <Pill tone="blue">Calendar events</Pill>}
-              {allowedEmail && <Pill tone="stone">Google login enabled</Pill>}
+            <div className="flex min-w-0 items-center gap-2.5 text-[14px] font-medium">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/brands/gmail.webp" alt="Gmail" width={20} height={20} className="h-5 w-5 shrink-0 object-contain" />
+              <span className="truncate">{data.email}</span>
+              <Check className="h-4 w-4 shrink-0 text-pos" />
             </div>
           </div>
           <div className="flex gap-2">

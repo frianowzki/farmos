@@ -30,10 +30,11 @@ export function RecapView() {
     return out;
   }, [from, to]);
 
+  const projMap = useMemo(() => new Map((projects.data?.projects ?? []).map((p) => [p.id, mark(p)])), [projects.data]);
   const data = useMemo(() => {
     const taskById = new Map((tasks.data?.tasks ?? []).map((x) => [x.id, x]));
     const projById = new Map((projects.data?.projects ?? []).map((p) => [p.id, p]));
-    const per = new Map<string, { done: { id: string; title: string; projectId: string | null }[]; diary: { id: string; title: string; text: string; projects: string[] }[]; created: { id: string; name: string; accent: string | null }[] }>();
+    const per = new Map<string, { done: { id: string; title: string; projectId: string | null }[]; diary: { id: string; title: string; text: string; projects: Mark[] }[]; created: Mark[] }>();
     for (const d of days) per.set(d, { done: [], diary: [], created: [] });
     for (const c of tasks.data?.completions ?? []) {
       const slot = per.get(c.day);
@@ -42,11 +43,11 @@ export function RecapView() {
     }
     for (const e of diary.data?.entries ?? []) {
       const slot = per.get(e.day);
-      if (slot) slot.diary.push({ id: e.id, title: e.title || "Untitled", text: plain(e.content).slice(0, 160), projects: e.projectIds.map((id) => projById.get(id)?.name ?? "").filter(Boolean) });
+      if (slot) slot.diary.push({ id: e.id, title: e.title || "Untitled", text: plain(e.content).slice(0, 160), projects: e.projectIds.map((id) => projById.get(id)).filter((x): x is NonNullable<typeof x> => Boolean(x)).map(mark) });
     }
     for (const p of projects.data?.projects ?? []) {
       const d = dayInZone(new Date(p.createdAt));
-      per.get(d)?.created.push({ id: p.id, name: p.name, accent: p.accent ?? null });
+      per.get(d)?.created.push(mark(p));
     }
     return per;
   }, [days, tasks.data, diary.data, projects.data]);
@@ -154,13 +155,13 @@ export function RecapView() {
                           <Link key={p.id} href={`/projects/${p.id}`} className="flex items-center gap-2 text-[13.5px] text-ink hover:underline"><Layers className="h-3.5 w-3.5 text-muted" /> Added <ProjectMark p={p} size={16} /> {p.name}</Link>
                         ))}
                         {v.done.map((x, i) => (
-                          <div key={i} className="flex items-center gap-2 text-[13.5px] text-ink-2"><Check className="h-3.5 w-3.5 text-pos" /> {x.title}</div>
+                          <div key={i} className="flex min-w-0 items-center gap-2 text-[13.5px] text-ink-2"><Check className="h-3.5 w-3.5 shrink-0 text-pos" /> <span className="truncate">{x.title}</span>{(() => { const pr = x.projectId ? projMap.get(x.projectId) : undefined; return pr ? <Link href={`/projects/${pr.id}`} className="ml-auto flex shrink-0 items-center gap-1.5 text-[12px] text-faint hover:text-ink-2"><ProjectMark p={pr} size={14} className="rounded-[4px]" /><span className="max-w-[120px] truncate">{pr.name}</span></Link> : null; })()}</div>
                         ))}
                         {v.diary.map((e) => (
                           <Link key={e.id} href={`/diary?entry=${e.id}`} className="block rounded-lg border border-line bg-panel px-3 py-2 hover:border-line-strong">
                             <div className="flex items-center gap-2 text-[13.5px] font-medium text-ink"><NotebookPen className="h-3.5 w-3.5 text-muted" /> {e.title}</div>
                             {e.text && <p className="mt-0.5 line-clamp-2 text-[12.5px] text-muted">{e.text}</p>}
-                            {e.projects.length > 0 && <div className="mt-1 text-[11.5px] text-faint">{e.projects.join(" · ")}</div>}
+                            {e.projects.length > 0 && <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11.5px] text-faint">{e.projects.map((pr) => <span key={pr.id} className="inline-flex items-center gap-1.5"><ProjectMark p={pr} size={14} className="rounded-[4px]" />{pr.name}</span>)}</div>}
                           </Link>
                         ))}
                       </div>
@@ -175,3 +176,6 @@ export function RecapView() {
     </Page>
   );
 }
+
+type Mark = { id: string; name: string; accent: string | null; links: { x?: string } | null };
+const mark = (p: { id: string; name: string; accent?: string | null; links?: unknown }): Mark => ({ id: p.id, name: p.name, accent: p.accent ?? null, links: (p.links as { x?: string } | null) ?? null });

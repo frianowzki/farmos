@@ -52,16 +52,16 @@ const publicOnly = (e: Eligibility | null) => Boolean(e && e.wallets.length && e
 const bestVerdict = (e: Eligibility | null): Verdict | null => (!e ? null : e.wallets.some((w) => w.verdict === "eligible") ? "eligible" : e.wallets.length && e.wallets.every((w) => w.verdict === "not_eligible") ? "not_eligible" : "unknown");
 
 const KINDS: { id: Kind; label: string; icon: typeof Clock }[] = [
-  { id: "all", label: "All", icon: Layers },
-  { id: "upcoming", label: "Upcoming", icon: Clock },
   { id: "live", label: "Minting", icon: Zap },
+  { id: "upcoming", label: "Upcoming", icon: Clock },
+  { id: "all", label: "All", icon: Layers },
   { id: "featured", label: "Featured", icon: Sparkles },
   { id: "recent", label: "Recently minted", icon: History },
   { id: "watching", label: "Watching", icon: Eye },
 ];
 
 export function MintsView() {
-  const [kind, setKind] = useState<Kind>("all");
+  const [kind, setKind] = useState<Kind>("live");
   const [open, setOpen] = useState<string | null>(null);
   const q = useQuery({ queryKey: ["mints"], queryFn: () => api<ListRes>("/api/mints"), staleTime: 5 * 60_000 });
   const watch = new Map((q.data?.watch ?? []).map((w) => [w.slug, w]));
@@ -83,7 +83,7 @@ export function MintsView() {
         subtitle="Drops from OpenSea. Eligibility is checked against your saved wallets with public and on-chain data only — no signatures, no transactions."
       />
       <Tabs value={kind} onValueChange={(v) => setKind(v as Kind)} variant="underline">
-        <TabsList className="mb-4 overflow-x-auto [scrollbar-width:none]">
+        <TabsList mobileArrows={false} className="mb-4 overflow-x-auto [scrollbar-width:none]">
           {KINDS.map((k) => <TabsTrigger key={k.id} value={k.id} icon={<k.icon className="h-3.5 w-3.5" />}>{k.label}{count(k.id) ? ` · ${count(k.id)}` : ""}</TabsTrigger>)}
         </TabsList>
       </Tabs>
