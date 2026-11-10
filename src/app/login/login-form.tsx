@@ -73,10 +73,9 @@ export function LoginForm({ next, error, googleLogin }: { next: string; error?: 
             ))}
           </ul>
         </div>
-        <div className="num text-[11.5px] text-faint">Read-only by design.</div>
       </aside>
 
-      <footer className="col-span-full flex items-center justify-center border-t border-line px-5 py-5">
+      <footer className="col-span-full flex items-center justify-center px-5 pb-6 pt-2">
         <a
           href="https://github.com/frianowzki"
           target="_blank"
