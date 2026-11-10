@@ -4,6 +4,7 @@ import { Flame, Pause, Play, Trophy } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { useMemo } from "react";
 import { Page, PageHeader } from "@/components/shell";
+import { ProjectMark } from "@/components/project-mark";
 import { AddTask, Heatmap, TaskRow, useTaskModel, weekRate } from "@/components/tasks";
 import { SectionTitle, Skeleton } from "@/components/ui";
 import { cn } from "@/lib/cn";
@@ -26,6 +27,7 @@ export function TasksView() {
     return [...m.entries()].sort((a, b) => (a[0] === "" ? 1 : b[0] === "" ? -1 : 0));
   }, [active]);
   const name = (id: string) => data?.projects.find((p) => p.id === id)?.name ?? "Project";
+  const proj = (id: string) => data?.projects.find((p) => p.id === id);
   const del = async (id: string) => {
     await api(`/api/tasks/${id}`, { method: "DELETE" });
     qc.invalidateQueries({ queryKey: keys.tasks });
@@ -56,11 +58,11 @@ export function TasksView() {
         <div className="space-y-6">
           {groups.map(([pid, rows]) => (
             <section key={pid || "none"}>
-              <SectionTitle>{pid ? name(pid) : "General"}</SectionTitle>
+              <SectionTitle>{pid && proj(pid) ? <span className="inline-flex items-center gap-1.5"><ProjectMark p={proj(pid)!} size={14} className="rounded-[4px]" />{name(pid)}</span> : pid ? name(pid) : "General"}</SectionTitle>
               <div className="rounded-lg border border-line bg-panel p-1">
                 {rows.map((r) => (
                   <div key={r.task.id} className="group/row relative">
-                    <TaskRow row={r} showProject={false} onDelete={() => del(r.task.id)} />
+                    <TaskRow row={r} onDelete={() => del(r.task.id)} />
                     <button onClick={() => setActive(r.task.id, false)} title="Pause" className="absolute right-9 top-1/2 hidden -translate-y-1/2 rounded p-1 text-faint hover:text-ink group-hover/row:block" aria-label="Pause task">
                       <Pause className="h-3.5 w-3.5" />
                     </button>
@@ -78,6 +80,7 @@ export function TasksView() {
             {paused.map((r) => (
               <div key={r.task.id} className="flex items-center gap-3 px-3 py-2 text-[13.5px] text-muted">
                 <span className="flex-1 truncate">{r.task.title}</span>
+                {r.task.projectId && proj(r.task.projectId) && <span className="flex shrink-0 items-center gap-1.5 text-[12px] text-faint"><ProjectMark p={proj(r.task.projectId)!} size={14} className="rounded-[4px]" /><span className="max-w-[120px] truncate">{name(r.task.projectId)}</span></span>}
                 <button onClick={() => setActive(r.task.id, true)} className="flex items-center gap-1 rounded px-2 py-1 text-[12px] hover:bg-hover hover:text-ink"><Play className="h-3 w-3" /> Resume</button>
               </div>
             ))}

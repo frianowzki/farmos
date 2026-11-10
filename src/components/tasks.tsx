@@ -192,7 +192,7 @@ export function AddTask({ projectId, compact, autoFocus }: { projectId?: string 
             </div>
           )}
           {!projectId && (
-            <NativeSelect value={proj} onChange={setProj} options={[{ id: "", label: "No project" }, ...(data?.projects ?? []).filter((p) => p.status !== "done" && p.status !== "dropped").map((p) => ({ id: p.id, label: p.name }))]} className="w-[180px]" />
+            <NativeSelect value={proj} onChange={setProj} options={[{ id: "", label: "No project", media: <span className="h-4 w-4 shrink-0 rounded-[4px] border border-dashed border-line" /> }, ...(data?.projects ?? []).filter((p) => p.status !== "done" && p.status !== "dropped").map((p) => ({ id: p.id, label: p.name, media: <ProjectMark p={p} size={16} className="rounded-[4px]" /> }))]} className="w-[200px]" width={240} />
           )}
           <Input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="Link (optional)" className="min-w-[160px] flex-1" />
         </div>

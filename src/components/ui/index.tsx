@@ -289,7 +289,7 @@ export function Field({ label, children, hint }: { label: string; children: Reac
  * App-wide dropdown, same look as the Projects "Status" filter: a quiet trigger button and a
  * popover of pills with a check on the current one. (Kept the NativeSelect name so callers stay put.)
  */
-export function NativeSelect({ value, onChange, options, className, icon, label, variant = "field", align = "start", width, ariaLabel }: { value: string; onChange: (v: string) => void; options: readonly { id: string; label: string; tone?: string }[]; className?: string; icon?: ReactNode; label?: string; variant?: "field" | "ghost"; align?: "start" | "end"; width?: number; ariaLabel?: string }) {
+export function NativeSelect({ value, onChange, options, className, icon, label, variant = "field", align = "start", width, ariaLabel }: { value: string; onChange: (v: string) => void; options: readonly { id: string; label: string; tone?: string; media?: ReactNode }[]; className?: string; icon?: ReactNode; label?: string; variant?: "field" | "ghost"; align?: "start" | "end"; width?: number; ariaLabel?: string }) {
   const [open, setOpen] = useState(false);
   const [btn, setBtn] = useState<HTMLButtonElement | null>(null);
   const cur = options.find((o) => o.id === value);
@@ -311,7 +311,7 @@ export function NativeSelect({ value, onChange, options, className, icon, label,
         {label && <span className="shrink-0 text-ink-2">{label}</span>}
         {label && cur && <span className="text-faint">·</span>}
         <span className="min-w-0 flex-1 truncate">
-          {cur ? (variant === "field" ? <Pill tone={cur.tone ?? "gray"} dot={Boolean(cur.tone)}>{cur.label}</Pill> : <span className="text-ink">{cur.label}</span>) : <span className="px-1 text-faint">Select…</span>}
+          {cur?.media ? <span className="flex min-w-0 items-center gap-1.5 px-0.5 text-ink">{cur.media}<span className="truncate">{cur.label}</span></span> : cur ? (variant === "field" ? <Pill tone={cur.tone ?? "gray"} dot={Boolean(cur.tone)}>{cur.label}</Pill> : <span className="text-ink">{cur.label}</span>) : <span className="px-1 text-faint">Select…</span>}
         </span>
         <ChevronDown className={cn("h-3.5 w-3.5 shrink-0 text-muted transition-transform", open && "rotate-180")} />
       </button>
@@ -326,7 +326,7 @@ export function NativeSelect({ value, onChange, options, className, icon, label,
               onClick={(e) => { e.stopPropagation(); onChange(o.id); setOpen(false); }}
               className="flex w-full items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left hover:bg-hover"
             >
-              <Pill tone={o.tone ?? "gray"} dot={Boolean(o.tone)}>{o.label}</Pill>
+              {o.media ? <span className="flex min-w-0 items-center gap-2 text-[13px] text-ink">{o.media}<span className="truncate">{o.label}</span></span> : <Pill tone={o.tone ?? "gray"} dot={Boolean(o.tone)}>{o.label}</Pill>}
               {o.id === value && <Check className="h-3.5 w-3.5 shrink-0 text-muted" />}
             </button>
           ))}

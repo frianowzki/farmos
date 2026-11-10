@@ -14,7 +14,7 @@ import { toast } from "@/lib/client/toast";
 
 import { Button, Dialog, NativeSelect, Pill } from "@/components/ui";
 import { cn } from "@/lib/cn";
-import { api, keys, useAiConfig, useCreateProject, useProjects } from "@/lib/client/api";
+import { api, keys, useAiConfig, useCreateProject, useProjects, type Project } from "@/lib/client/api";
 
 const MODES = [
   { id: "chat", label: "Chat", icon: MessageSquarePlus, desc: "Ask anything. Crypto-native, direct, cites sources." },
@@ -191,7 +191,7 @@ function Composer({
   input, setInput, onSend, busy, onStop, mode, setMode, disabled, projectId, setProjectId, projects, autoFocus, big,
 }: {
   input: string; setInput: (v: string) => void; onSend: () => void; busy: boolean; onStop: () => void; mode: string; setMode: (m: string) => void; disabled: boolean;
-  projectId: string; setProjectId: (v: string) => void; projects: { id: string; name: string }[]; autoFocus?: boolean; big?: boolean;
+  projectId: string; setProjectId: (v: string) => void; projects: Project[]; autoFocus?: boolean; big?: boolean;
 }) {
   const ref = useRef<HTMLTextAreaElement>(null);
   useEffect(() => {
@@ -219,7 +219,7 @@ function Composer({
           }
         }}
         rows={big ? 2 : 1}
-        placeholder={mode === "audit" ? "Paste a project, site, or contract address + chain…" : mode === "research" ? "Which project should I research?" : "Ask anything, in English or Bahasa…"}
+        placeholder={mode === "audit" ? "Paste a project, site, or contract address + chain…" : mode === "research" ? "Which project should I research?" : "Ask anything, In English, Bahasa or Tagalog..."}
         className={cn("block w-full resize-none bg-transparent px-4 pt-3.5 text-[15px] leading-[1.5] outline-none placeholder:text-faint", big ? "min-h-[64px]" : "min-h-[44px]")}
       />
       <div className="flex items-center gap-1 px-2 pb-2 pt-1">
@@ -243,9 +243,9 @@ function Composer({
           ariaLabel="Project context"
           value={projectId}
           onChange={setProjectId}
-          options={[{ id: "", label: "No project" }, ...projects.map((p) => ({ id: p.id, label: p.name }))]}
+          options={[{ id: "", label: "No project", media: <span className="h-4 w-4 shrink-0 rounded-[4px] border border-dashed border-line" /> }, ...projects.map((p) => ({ id: p.id, label: p.name, media: <ProjectMark p={p} size={16} className="rounded-[4px]" /> }))]}
           align="end"
-          width={220}
+          width={240}
           className="hidden max-w-[170px] shrink-0 sm:inline-flex [&>button]:h-7 [&>button]:rounded-full [&>button]:text-[12px]"
         />
         {busy ? (
@@ -318,7 +318,7 @@ function Chat({ id, initialMessages, initialMode, initialProject, initialQuery, 
   }, [initialQuery, ai.data, initialMessages.length, sendMessage]);
 
   const m = MODES.find((x) => x.id === mode)!;
-  const projects = (pd?.projects ?? []).map((p) => ({ id: p.id, name: p.name }));
+  const projects = pd?.projects ?? [];
   const composer = (big?: boolean) => (
     <Composer input={input} setInput={setInput} onSend={() => send(input)} busy={busy} onStop={stop} mode={mode} setMode={setMode} disabled={notConfigured} projectId={projectId} setProjectId={setProjectId} projects={projects} autoFocus big={big} />
   );
@@ -341,12 +341,13 @@ function Chat({ id, initialMessages, initialMode, initialProject, initialQuery, 
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35, ease: [0.2, 0.8, 0.2, 1] }} className="w-full max-w-[720px] py-6">
               <div className="flex flex-col items-center text-center">
                 <motion.div
-                  className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl text-accent-ink"
-                  style={{ background: "conic-gradient(from 180deg, var(--accent), color-mix(in oklab, var(--accent) 55%, #f3c08f), var(--accent))" }}
-                  animate={{ rotate: [0, 6, -6, 0] }}
+                  className="mb-4 flex h-14 w-14 items-center justify-center"
+                  animate={{ rotate: [0, 4, -4, 0], y: [0, -2, 0] }}
                   transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
+                  aria-hidden
                 >
-                  <m.icon className="h-5 w-5" />
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/icon.svg" alt="" width={56} height={56} className="h-14 w-14" draggable={false} />
                 </motion.div>
                 <h1 className="font-serif text-[32px] leading-tight tracking-[-0.015em] sm:text-[38px]">
                   {projectName && (mode === "research" || mode === "audit") ? <>{m.label} <span className="italic">{projectName}</span></> : <>What are we digging into<span className="text-accent">?</span></>}

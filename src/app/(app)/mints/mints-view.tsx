@@ -21,7 +21,7 @@ import { ChainLogo } from "@/components/chain-logo";
 import { LinkIcon } from "@/components/icons/brand-glyphs";
 
 type ListRes = { configured: boolean; drops: DropRich[]; watch: MintWatch[]; error?: string };
-type Kind = "all" | "upcoming" | "live" | "featured" | "recent" | "watching";
+type Kind = "upcoming" | "live" | "featured" | "recent" | "watching";
 
 const MANUAL = [
   { id: "unknown", label: "Not checked", tone: "gray" },
@@ -54,7 +54,6 @@ const bestVerdict = (e: Eligibility | null): Verdict | null => (!e ? null : e.wa
 const KINDS: { id: Kind; label: string; icon: typeof Clock }[] = [
   { id: "live", label: "Minting", icon: Zap },
   { id: "upcoming", label: "Upcoming", icon: Clock },
-  { id: "all", label: "All", icon: Layers },
   { id: "featured", label: "Featured", icon: Sparkles },
   { id: "recent", label: "Recently minted", icon: History },
   { id: "watching", label: "Watching", icon: Eye },
@@ -67,8 +66,7 @@ export function MintsView() {
   const watch = new Map((q.data?.watch ?? []).map((w) => [w.slug, w]));
   const drops = q.data?.drops ?? [];
   const shown =
-    kind === "all" ? drops
-    : kind === "upcoming" ? drops.filter((d) => d.kinds.includes("upcoming") && !d.is_minting)
+    kind === "upcoming" ? drops.filter((d) => d.kinds.includes("upcoming") && !d.is_minting)
     : kind === "live" ? drops.filter((d) => d.is_minting)
     : kind === "featured" ? drops.filter((d) => d.kinds.includes("featured"))
     : kind === "recent" ? drops.filter((d) => d.kinds.includes("recently_minted"))
@@ -119,7 +117,7 @@ export function MintsView() {
           </ul>
         )
       ) : sorted.length === 0 ? (
-        <EmptyState mark="spark" title="No drops here right now" body="OpenSea has nothing listed for this filter. Try All, or come back later." />
+        <EmptyState mark="spark" title="No drops here right now" body="OpenSea has nothing listed for this filter. Try another tab, or come back later." />
       ) : (
         <ul className="divide-y divide-line overflow-hidden rounded-xl border border-line bg-panel">
           {sorted.map((d) => <DropRow key={d.collection_slug} d={d} w={watch.get(d.collection_slug)} onOpen={() => setOpen(d.collection_slug)} />)}
