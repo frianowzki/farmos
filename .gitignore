@@ -39,3 +39,15 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# secrets (never commit)
+.env
+.env.*
+!.env.example
+*.key
+*.p12
+*.pfx
+secrets/
+*.secret
+*.sqlite
+*.db
