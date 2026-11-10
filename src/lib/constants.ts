@@ -10,7 +10,7 @@ export const STATUSES = [
   { id: "research", label: "Research", tone: "gray" },
   { id: "active", label: "Active", tone: "blue" },
   { id: "waiting", label: "Waiting", tone: "amber" },
-  { id: "claimable", label: "Claimable", tone: "green" },
+  { id: "claimable", label: "Claimable", tone: "blue" },
   { id: "done", label: "Done", tone: "stone" },
   { id: "dropped", label: "Dropped", tone: "red" },
 ] as const;
@@ -28,6 +28,13 @@ export const TIERS = [
   { id: "A", label: "A · Strong" },
   { id: "B", label: "B · Decent" },
   { id: "C", label: "C · Spec" },
+] as const;
+
+export const ELIGIBILITY = [
+  { id: "unknown", label: "Unknown" },
+  { id: "checking", label: "Checking" },
+  { id: "eligible", label: "Eligible" },
+  { id: "not_eligible", label: "Not eligible" },
 ] as const;
 
 export const RISKS = [

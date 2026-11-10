@@ -136,9 +136,10 @@ export function TodayView() {
 
             <Link href="/portfolio" className="block rounded-xl border border-line bg-panel p-4 transition-colors hover:border-line-strong">
               <div className="flex items-center justify-between text-[12px] font-medium text-muted">Portfolio <ArrowUpRight className="h-3.5 w-3.5" /></div>
-              <div className="mt-1 flex items-baseline gap-2">
-                <span className={cn("num text-[26px] leading-tight", tone(totals.net))}>{usd(totals.net, { sign: true })}</span>
-                <span className={cn("num text-[12.5px]", tone(totals.roi))}>{pct(totals.roi)}</span>
+              <WalletTotal />
+              <div className="mt-2 flex items-baseline gap-2 text-[12px] text-muted">
+                P&amp;L <span className={cn("num text-[13px]", tone(totals.net))}>{usd(totals.net, { sign: true })}</span>
+                <span className={cn("num text-[12px]", tone(totals.roi))}>{pct(totals.roi)}</span>
               </div>
               <div className="mt-3 grid grid-cols-3 gap-2 text-[11.5px] text-muted">
                 <div>Invested<div className="num text-[13px] text-ink-2">{usd(totals.invested, { compact: true })}</div></div>
@@ -278,5 +279,26 @@ function TodayKpis({ projects, today }: { projects: Project[]; today: string }) 
         </GridItem>
       ))}
     </Grid>
+  );
+}
+
+type WalletSnap = { totalUsd: number; wallets: { address: string }[]; fetchedAt: string };
+type NftSnap = { totalUsd: number | null; totalNative: { symbol: string; amount: number }[]; count: number };
+
+/** Aggregated balance of every saved wallet (tokens + NFT floor), same snapshot as Portfolio. */
+function WalletTotal() {
+  const w = useQuery({ queryKey: ["wallet-track"], queryFn: () => api<WalletSnap>("/api/wallets/track"), staleTime: 5 * 60_000 });
+  const n = useQuery({ queryKey: ["wallet-nfts"], queryFn: () => api<NftSnap>("/api/wallets/nfts"), staleTime: 10 * 60_000, retry: false });
+  if (w.isLoading) return <Skeleton className="mt-1.5 h-8 w-32" />;
+  const wallets = w.data?.wallets.length ?? 0;
+  const nftUsd = n.data?.totalUsd ?? 0;
+  const total = (w.data?.totalUsd ?? 0) + nftUsd;
+  return (
+    <div className="mt-1">
+      <div className="num text-[26px] leading-tight text-ink">{wallets ? usd(total) : "—"}</div>
+      <div className="text-[11.5px] text-faint">
+        {wallets ? <>{wallets} wallet{wallets === 1 ? "" : "s"}{n.data?.count ? <> · {n.data.count} NFTs ≈ {usd(nftUsd, { compact: true })} floor</> : null}</> : "Add a wallet to see your balance"}
+      </div>
+    </div>
   );
 }

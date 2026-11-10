@@ -1,4 +1,4 @@
-import { CATEGORIES, PRIORITIES, RISKS, STATUSES, TIERS } from "./constants";
+import { CATEGORIES, ELIGIBILITY, PRIORITIES, RISKS, STATUSES, TIERS } from "./constants";
 
 const CAT_TONE: Record<string, string> = { airdrop: "amber", testnet: "blue", nft: "violet", degen: "red" };
 const PRI_TONE: Record<string, string> = { low: "gray", medium: "blue", high: "amber", urgent: "red" };
@@ -10,6 +10,8 @@ export const STATUS_OPTS = STATUSES.map((s) => ({ id: s.id, label: s.label, tone
 export const PRIORITY_OPTS = PRIORITIES.map((p) => ({ ...p, tone: PRI_TONE[p.id] }));
 export const TIER_OPTS = TIERS.map((t) => ({ id: t.id, label: t.id, long: t.label, tone: TIER_TONE[t.id] }));
 export const RISK_OPTS = RISKS.map((r) => ({ ...r, tone: RISK_TONE[r.id] }));
+const ELIG_TONE: Record<string, string> = { unknown: "gray", checking: "amber", eligible: "green", not_eligible: "red" };
+export const ELIGIBILITY_OPTS = ELIGIBILITY.map((e) => ({ ...e, tone: ELIG_TONE[e.id] }));
 
 export const catTone = (c: string) => CAT_TONE[c] ?? "gray";
 export const statusTone = (s: string) => STATUS_OPTS.find((x) => x.id === s)?.tone ?? "gray";

@@ -1,4 +1,8 @@
-/** Wallet apps farmOS can label a wallet with. Icons are the wallets' official marks as shipped in RainbowKit (/public/wallets). */
+/**
+ * Wallet apps farmOS can label a wallet with. Icons are official marks: RainbowKit's bundled set, the icons
+ * shipped in each wallet's own adapter package (Solflare, Nightly, Slush, Petra, Martian), and the app icons
+ * from the Zashi and YWallet repos (/public/wallets).
+ */
 export const WALLET_BRANDS = [
   { id: "metamask", name: "MetaMask" },
   { id: "rabby", name: "Rabby" },
@@ -12,6 +16,13 @@ export const WALLET_BRANDS = [
   { id: "backpack", name: "Backpack" },
   { id: "zerion", name: "Zerion" },
   { id: "walletconnect", name: "WalletConnect" },
+  { id: "solflare", name: "Solflare" },
+  { id: "petra", name: "Petra" },
+  { id: "martian", name: "Martian" },
+  { id: "nightly", name: "Nightly" },
+  { id: "slush", name: "Slush" },
+  { id: "zashi", name: "Zashi" },
+  { id: "ywallet", name: "YWallet" },
 ] as const;
 export type WalletBrandId = (typeof WALLET_BRANDS)[number]["id"];
 
@@ -32,5 +43,13 @@ export function brandFromConnector(c?: { id?: string; name?: string } | null): W
   if (s.includes("backpack")) return "backpack";
   if (s.includes("zerion")) return "zerion";
   if (s.includes("walletconnect")) return "walletconnect";
+  if (s.includes("solflare")) return "solflare";
+  if (s.includes("petra")) return "petra";
+  if (s.includes("martian")) return "martian";
+  if (s.includes("nightly")) return "nightly";
+  if (s.includes("slush") || s.includes("sui wallet")) return "slush";
   return "";
 }
+
+/** Icon file per brand (most are SVG). */
+export const BRAND_ICON_EXT: Partial<Record<WalletBrandId, "png">> = { petra: "png", martian: "png", zashi: "png", ywallet: "png" };

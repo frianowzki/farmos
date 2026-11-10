@@ -28,3 +28,19 @@ export type Verdict = "eligible" | "not_eligible" | "unknown";
 export type StageCheck = { stage: string; type: string; verdict: Verdict; how: string };
 export type WalletCheck = { address: string; label: string; verdict: Verdict; stages: StageCheck[] };
 export type Eligibility = { checkedAt: string; chainSupported: boolean; merkle: { root: string | null; listUri: string | null; listSize: number | null; rootVerified: boolean | null; note?: string }; wallets: WalletCheck[] };
+
+/** A drop with its detail + collection fields merged in, for the list view. */
+export type DropRich = Drop & {
+  kinds: ("upcoming" | "featured" | "recently_minted")[];
+  max_supply: string | null;
+  total_supply: string | null;
+  stage_count: number;
+  first_start: string | null;
+  last_end: string | null;
+  public_price: string | null;
+  price_currency_address: string | null;
+  description: string | null;
+  banner_image_url: string | null;
+  links: { x: string | null; site: string | null; discord: string | null; telegram: string | null };
+  safelist: string | null;
+};

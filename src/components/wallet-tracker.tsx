@@ -61,7 +61,6 @@ export function WalletTracker({ hasEvm }: { hasEvm: boolean }) {
           <div className="divide-y divide-line rounded-lg border border-line bg-panel">
             {data.wallets.map((w) => <TrackRow key={w.address} w={w} provider={providerOf(w.address)} />)}
           </div>
-          <p className="mt-2 text-[11.5px] text-faint">Prices: {data.priceSource}. Sources: Etherscan V2 where your plan covers the chain, public RPC otherwise.</p>
           {data.positions.length > 0 && <OnchainPositions rows={data.positions} onSynced={refresh} />}
         </>
       )}

@@ -87,6 +87,8 @@ export const projects = pgTable(
     priority: text("priority").notNull().default("medium"),
     tier: text("tier").notNull().default("B"),
     risk: text("risk").notNull().default("medium"),
+    /** Airdrop eligibility: unknown | checking | eligible | not_eligible (set by hand or by the checker). */
+    eligibility: text("eligibility").notNull().default("unknown"),
     source: text("source"),
     referral: text("referral"),
     deadline: date("deadline"),
@@ -184,6 +186,8 @@ export const wallets = pgTable(
     label: text("label").notNull().default(""),
     /** Wallet app it lives in (metamask, rabby, phantom…), for the icon. Empty = unknown. */
     provider: text("provider").notNull().default(""),
+    /** Address family: evm | solana | aptos | sui | zcash. Empty = inferred from the address. */
+    chain: text("chain").notNull().default(""),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [uniqueIndex("wallets_address_idx").on(t.address)],

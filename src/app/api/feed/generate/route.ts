@@ -5,6 +5,7 @@ import { z } from "zod";
 import { db, schema } from "@/db";
 import { aiModel, aiToolsEnabled, buildTools, systemFor } from "@/lib/server/ai";
 import { bad, readJson, requireSession } from "@/lib/server/guard";
+import { getNews } from "@/lib/server/news";
 
 export const maxDuration = 300;
 
@@ -37,10 +38,19 @@ export async function POST(req: Request) {
     return bad((e as Error).message, 412);
   }
   const useTools = await aiToolsEnabled();
+  // Free newsroom + airdrop-tracker RSS headlines count as tool data: the model may pick from them.
+  const news = await getNews(false).catch(() => null);
+  const wire = (news?.items ?? [])
+    .slice(0, 60)
+    .map((n) => `- [${n.category}] ${n.title} | ${n.source} | ${n.url}${n.summary ? ` | ${n.summary.slice(0, 160)}` : ""}`)
+    .join("\n");
+  const prompt = wire
+    ? `${INSTRUCTIONS}\n\nLatest headlines from CoinDesk, The Block, Decrypt, Cointelegraph, The Defiant, Blockworks, Bankless, DL News, Cryptonews, Bitcoin Magazine, Airdrops.io and Airdrop Alert (these count as tool data; use their URLs as-is, mix 2–4 of the most actionable ones in, airdrop/testnet ones first):\n${wire}`
+    : INSTRUCTIONS;
   const result = await generateText({
     model,
     system: systemFor("daily"),
-    prompt: INSTRUCTIONS,
+    prompt,
     ...(useTools ? { tools: buildTools(), stopWhen: isStepCount(8) } : {}),
   });
   const text = result.text.trim().replace(/^```(?:json)?/i, "").replace(/```$/, "").trim();

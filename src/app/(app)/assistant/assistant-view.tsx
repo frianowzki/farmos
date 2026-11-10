@@ -3,7 +3,7 @@ import { ProjectMark } from "@/components/project-mark";
 import { useChat } from "@ai-sdk/react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { DefaultChatTransport, type UIMessage } from "ai";
-import { ArrowUp, Check, ChevronRight, Copy, History, Loader2, MessageSquarePlus, Plus, ScanSearch, Sparkles, Square, Telescope, Trash2, Wrench, Zap } from "lucide-react";
+import { ArrowUp, Check, ChevronRight, Copy, History, Loader2, MessageSquarePlus, PanelRightClose, Plus, ScanSearch, Sparkles, Square, Telescope, Trash2, Wrench, Zap } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -12,7 +12,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { toast } from "@/lib/client/toast";
 
-import { Button, Pill } from "@/components/ui";
+import { Button, NativeSelect, Pill } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import { api, keys, useAiConfig, useCreateProject, useProjects } from "@/lib/client/api";
 
@@ -62,7 +62,6 @@ export function AssistantView() {
   const ready = !threadParam || thread.isFetched;
   return (
     <div className="flex h-[calc(100dvh-48px)] md:h-dvh">
-      <Threads current={threadId} open={historyOpen} onClose={() => setHistoryOpen(false)} onNew={() => start()} />
       <div className="flex min-w-0 flex-1 flex-col">
         {ready ? (
           <Chat
@@ -72,13 +71,16 @@ export function AssistantView() {
             initialMode={thread.data?.thread?.mode ?? sp.get("mode") ?? "chat"}
             initialProject={sp.get("project") ?? ""}
             initialQuery={threadParam ? undefined : sp.get("q") ?? undefined}
-            onHistory={() => setHistoryOpen(true)}
+            onHistory={() => setHistoryOpen((o) => !o)}
+            historyOpen={historyOpen}
             onNew={() => start()}
           />
         ) : (
           <div className="flex flex-1 items-center justify-center text-muted"><Loader2 className="h-4 w-4 animate-spin" /></div>
         )}
       </div>
+      {/* Threads live on the right and stay hidden until toggled; picking one hides them again. */}
+      <Threads current={threadId} open={historyOpen} onClose={() => setHistoryOpen(false)} onNew={() => start()} />
     </div>
   );
 }
@@ -87,15 +89,32 @@ function Threads({ current, open, onClose, onNew }: { current: string; open: boo
   const qc = useQueryClient();
   const { data } = useQuery({ queryKey: keys.threads, queryFn: () => api<{ threads: { id: string; title: string; mode: string; updatedAt: string }[] }>("/api/threads") });
   const list = data?.threads ?? [];
+  useEffect(() => {
+    if (!open) return;
+    const k = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", k);
+    return () => window.removeEventListener("keydown", k);
+  }, [open, onClose]);
   return (
-    <>
-      {open && <div className="fixed inset-0 z-40 bg-black/20 lg:hidden" onClick={onClose} />}
-      <aside className={cn("z-50 w-[260px] shrink-0 flex-col border-r border-line bg-sidebar", open ? "fixed inset-y-0 left-0 flex lg:static" : "hidden lg:flex")}>
-        <div className="flex items-center justify-between px-3 py-3">
+    <AnimatePresence initial={false}>
+      {open && <motion.div key="scrim" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-40 bg-black/20 lg:hidden" onClick={onClose} />}
+      {open && (
+      <motion.aside
+        key="threads"
+        initial={{ width: 0, opacity: 0 }}
+        animate={{ width: 272, opacity: 1 }}
+        exit={{ width: 0, opacity: 0 }}
+        transition={{ type: "spring", stiffness: 420, damping: 40 }}
+        className="fixed inset-y-0 right-0 z-50 flex shrink-0 flex-col overflow-hidden border-l border-line bg-sidebar lg:static lg:z-auto"
+      >
+        <div className="flex w-[272px] items-center justify-between gap-1 px-3 py-3">
           <span className="text-[12px] font-medium text-muted">Threads</span>
-          <Button size="sm" variant="ghost" onClick={() => { onNew(); onClose(); }}><Plus className="h-3.5 w-3.5" /> New</Button>
+          <div className="flex items-center gap-0.5">
+            <Button size="sm" variant="ghost" onClick={() => { onNew(); onClose(); }}><Plus className="h-3.5 w-3.5" /> New</Button>
+            <button type="button" onClick={onClose} className="rounded-md p-1.5 text-faint hover:bg-hover hover:text-ink" aria-label="Hide threads"><PanelRightClose className="h-4 w-4" /></button>
+          </div>
         </div>
-        <div className="flex-1 overflow-y-auto px-2 pb-3">
+        <div className="w-[272px] flex-1 overflow-y-auto px-2 pb-3">
           {list.length === 0 && <div className="px-2 py-4 text-[12.5px] text-faint">Saved conversations appear here.</div>}
           {list.map((t) => (
             <div key={t.id} className={cn("group flex items-center rounded-md hover:bg-hover", t.id === current && "bg-active")}>
@@ -113,8 +132,9 @@ function Threads({ current, open, onClose, onNew }: { current: string; open: boo
             </div>
           ))}
         </div>
-      </aside>
-    </>
+      </motion.aside>
+      )}
+    </AnimatePresence>
   );
 }
 
@@ -171,15 +191,16 @@ function Composer({
             </button>
           ))}
         </div>
-        <select
+        <NativeSelect
+          variant="ghost"
+          ariaLabel="Project context"
           value={projectId}
-          onChange={(e) => setProjectId(e.target.value)}
-          aria-label="Project context"
-          className="hidden h-7 max-w-[160px] shrink-0 truncate rounded-full border border-line bg-panel px-2.5 text-[12px] text-muted outline-none hover:text-ink sm:block"
-        >
-          <option value="">No project</option>
-          {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-        </select>
+          onChange={setProjectId}
+          options={[{ id: "", label: "No project" }, ...projects.map((p) => ({ id: p.id, label: p.name }))]}
+          align="end"
+          width={220}
+          className="hidden max-w-[170px] shrink-0 sm:inline-flex [&>button]:h-7 [&>button]:rounded-full [&>button]:text-[12px]"
+        />
         {busy ? (
           <button type="button" onClick={onStop} aria-label="Stop" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-ink text-bg transition-transform active:scale-95"><Square className="h-3 w-3 fill-current" /></button>
         ) : (
@@ -199,7 +220,7 @@ function DeskAvatar({ pulse }: { pulse?: boolean }) {
   );
 }
 
-function Chat({ id, initialMessages, initialMode, initialProject, initialQuery, onHistory, onNew }: { id: string; initialMessages: UIMessage[]; initialMode: string; initialProject: string; initialQuery?: string; onHistory: () => void; onNew: () => void }) {
+function Chat({ id, initialMessages, initialMode, initialProject, initialQuery, onHistory, historyOpen, onNew }: { id: string; initialMessages: UIMessage[]; initialMode: string; initialProject: string; initialQuery?: string; onHistory: () => void; historyOpen: boolean; onNew: () => void }) {
   const qc = useQueryClient();
   const ai = useAiConfig();
   const { data: pd } = useProjects();
@@ -261,58 +282,66 @@ function Chat({ id, initialMessages, initialMode, initialProject, initialQuery, 
   return (
     <>
       <div className="flex h-12 items-center gap-2 px-3 sm:px-5">
-        <button onClick={onHistory} className="rounded-md p-1.5 text-muted hover:bg-hover lg:hidden" aria-label="Threads"><History className="h-4 w-4" /></button>
         <div className="min-w-0 flex-1 truncate text-[13.5px] font-medium text-ink-2">{empty ? "" : title}</div>
         {projectName && <Pill tone="stone"><ProjectMark p={pd!.projects.find((p) => p.id === projectId)!} size={14} /> {projectName}</Pill>}
         <Button size="sm" variant="ghost" onClick={onNew}><Plus className="h-3.5 w-3.5" /> New chat</Button>
+        <Button size="sm" variant={historyOpen ? "subtle" : "ghost"} onClick={onHistory} aria-label={historyOpen ? "Hide threads" : "Show threads"} aria-expanded={historyOpen}><History className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Threads</span></Button>
       </div>
 
       {empty ? (
-        <div className="flex flex-1 flex-col items-center justify-center overflow-y-auto px-4 pb-[8vh]">
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35, ease: [0.2, 0.8, 0.2, 1] }} className="w-full max-w-[720px]">
-            <div className="mb-6 flex flex-col items-center text-center">
-              <motion.div
-                className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl text-accent-ink"
-                style={{ background: "conic-gradient(from 180deg, var(--accent), color-mix(in oklab, var(--accent) 55%, #f3c08f), var(--accent))" }}
-                animate={{ rotate: [0, 6, -6, 0] }}
-                transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
-              >
-                <m.icon className="h-5 w-5" />
-              </motion.div>
-              <h1 className="font-serif text-[32px] leading-tight tracking-[-0.015em] sm:text-[38px]">
-                {projectName && (mode === "research" || mode === "audit") ? <>{m.label} <span className="italic">{projectName}</span></> : <>What are we digging into<span className="text-accent">?</span></>}
-              </h1>
-              <AnimatePresence mode="wait">
-                <motion.p key={mode} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={{ duration: 0.18 }} className="mt-2 max-w-md text-[14px] text-muted">{m.desc}</motion.p>
-              </AnimatePresence>
-            </div>
-            {notConfigured && (
-              <div className="mb-3 rounded-xl border border-line bg-panel p-3 text-[13px] text-ink-2">
-                Connect your model first: <Link href="/settings#ai" className="text-accent underline underline-offset-2">Settings → AI</Link>. Any OpenAI-compatible endpoint works (DeepSeek included).
+        <>
+          <div className="flex min-h-0 flex-1 flex-col items-center justify-center overflow-y-auto px-4">
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35, ease: [0.2, 0.8, 0.2, 1] }} className="w-full max-w-[720px] py-6">
+              <div className="flex flex-col items-center text-center">
+                <motion.div
+                  className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl text-accent-ink"
+                  style={{ background: "conic-gradient(from 180deg, var(--accent), color-mix(in oklab, var(--accent) 55%, #f3c08f), var(--accent))" }}
+                  animate={{ rotate: [0, 6, -6, 0] }}
+                  transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
+                >
+                  <m.icon className="h-5 w-5" />
+                </motion.div>
+                <h1 className="font-serif text-[32px] leading-tight tracking-[-0.015em] sm:text-[38px]">
+                  {projectName && (mode === "research" || mode === "audit") ? <>{m.label} <span className="italic">{projectName}</span></> : <>What are we digging into<span className="text-accent">?</span></>}
+                </h1>
+                <AnimatePresence mode="wait">
+                  <motion.p key={mode} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={{ duration: 0.18 }} className="mt-2 max-w-md text-[14px] text-muted">{m.desc}</motion.p>
+                </AnimatePresence>
               </div>
-            )}
-            {composer(true)}
-            <div className="mt-4 grid gap-2 sm:grid-cols-2">
-              {SUGGEST[mode](projectName).map((sug, i) => {
-                const Icon = MODE_SUGGEST_ICON[mode] ?? Sparkles;
-                return (
-                  <motion.button
-                    key={sug}
-                    initial={{ opacity: 0, y: 6 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.05 * i }}
-                    onClick={() => send(sug)}
-                    disabled={notConfigured}
-                    className="group flex items-start gap-2.5 rounded-xl border border-line bg-panel/60 px-3.5 py-3 text-left text-[13px] leading-snug text-ink-2 transition-colors hover:border-line-strong hover:bg-panel hover:text-ink disabled:opacity-50"
-                  >
-                    <Icon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-faint transition-colors group-hover:text-accent" />
-                    <span>{sug}</span>
-                  </motion.button>
-                );
-              })}
+              {notConfigured && (
+                <div className="mt-5 rounded-xl border border-line bg-panel p-3 text-[13px] text-ink-2">
+                  Connect your model first: <Link href="/settings#ai" className="text-accent underline underline-offset-2">Settings → AI</Link>. Any OpenAI-compatible endpoint works (DeepSeek included).
+                </div>
+              )}
+            </motion.div>
+          </div>
+          {/* Suggestions sit right above the composer, which is pinned to the bottom like a chat app. */}
+          <div className="px-3 pb-3 pt-1 sm:px-6">
+            <div className="mx-auto max-w-[760px]">
+              <div className="-mx-1 mb-2.5 flex gap-2 overflow-x-auto px-1 pb-0.5 [scrollbar-width:none] sm:grid sm:grid-cols-2 sm:overflow-visible">
+                {SUGGEST[mode](projectName).map((sug, i) => {
+                  const Icon = MODE_SUGGEST_ICON[mode] ?? Sparkles;
+                  return (
+                    <motion.button
+                      key={sug}
+                      initial={{ opacity: 0, y: 6 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.05 * i }}
+                      onClick={() => send(sug)}
+                      disabled={notConfigured}
+                      className="group flex w-[240px] shrink-0 items-start gap-2.5 rounded-xl border border-line bg-panel/60 px-3.5 py-2.5 text-left text-[13px] leading-snug text-ink-2 transition-colors hover:border-line-strong hover:bg-panel hover:text-ink disabled:opacity-50 sm:w-auto"
+                    >
+                      <Icon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-faint transition-colors group-hover:text-accent" />
+                      <span className="line-clamp-2">{sug}</span>
+                    </motion.button>
+                  );
+                })}
+              </div>
+              {composer(true)}
+              <p className="mt-1.5 text-center text-[11px] text-faint">Research only. Never shares keys, never sends transactions. Verify before you ape.</p>
             </div>
-          </motion.div>
-        </div>
+          </div>
+        </>
       ) : (
         <>
           <div ref={scroller} className="flex-1 overflow-y-auto">

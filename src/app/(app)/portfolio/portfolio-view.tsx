@@ -1,6 +1,6 @@
 "use client";
 import { ProjectMark } from "@/components/project-mark";
-import { WalletBalancesCard } from "@/components/wallet-forms";
+import { NftHoldingsCard, WalletBalancesCard } from "@/components/wallet-forms";
 import { useQueryClient } from "@tanstack/react-query";
 import { RefreshCw } from "lucide-react";
 import Link from "next/link";
@@ -45,6 +45,7 @@ export function PortfolioView() {
     <Page wide>
       <PageHeader title="Portfolio" subtitle="Wallet balances, capital, gas, rewards and positions across every project." right={<Button size="sm" variant="ghost" onClick={refresh} disabled={busy}><RefreshCw className={cn("h-3.5 w-3.5", busy && "animate-spin")} /> Refresh prices</Button>} />
       <WalletBalancesCard />
+      <NftHoldingsCard />
       {isLoading ? (
         <Skeleton className="h-40" />
       ) : rows.length === 0 ? (

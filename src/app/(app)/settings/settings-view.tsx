@@ -1,6 +1,6 @@
 "use client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, ExternalLink, KeyRound, Monitor, Moon, RefreshCw, ShieldAlert, Sun, Trash2 } from "lucide-react";
+import { Check, ChevronRight, ExternalLink, KeyRound, Monitor, Moon, RefreshCw, ShieldAlert, Sun, Trash2 } from "lucide-react";
 import { signIn } from "next-auth/react";
 import { useTheme } from "next-themes";
 import { useCallback, useEffect, useState } from "react";
@@ -161,6 +161,7 @@ function ApiKeysSection() {
   const ai = useAiConfig();
   const q = useQuery({ queryKey: ["integrations"], queryFn: () => api<{ items: KeyItem[] }>("/api/integrations") });
   const [editing, setEditing] = useState(false);
+  const [open, setOpen] = useState(false);
   const [val, setVal] = useState("");
   const [busy, setBusy] = useState(false);
   const putKey = async (apiKey: string | null) => {
@@ -183,13 +184,18 @@ function ApiKeysSection() {
   return (
     <Section id="keys" title="API keys" desc="Secrets farmOS uses server-side. Values are encrypted or kept in the server environment and only shown masked.">
       <div className="max-w-3xl overflow-hidden rounded-xl border border-line bg-panel">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-4 py-3">
-          <div>
-            <div className="text-[14px] font-medium text-ink">Keys</div>
-            <div className="text-[12.5px] text-muted">{set + (d?.hasKey ? 1 : 0)} of {total} set</div>
-          </div>
-          <Button size="sm" variant="primary" onClick={() => setEditing(true)}><KeyRound className="h-3.5 w-3.5" /> {d?.keyFromSettings ? "Replace AI key" : "Add AI key"}</Button>
+        <div className={cn("flex flex-wrap items-center justify-between gap-3 px-4 py-3", open && "border-b border-line")}>
+          <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} aria-controls="api-keys-body" className="-m-1 flex min-w-0 flex-1 items-center gap-2 rounded-md p-1 text-left hover:bg-hover/60">
+            <ChevronRight className={cn("h-4 w-4 shrink-0 text-muted transition-transform", open && "rotate-90")} />
+            <div>
+              <div className="text-[14px] font-medium text-ink">Keys</div>
+              <div className="text-[12.5px] text-muted">{set + (d?.hasKey ? 1 : 0)} of {total} set · {open ? "Hide" : "Show"}</div>
+            </div>
+          </button>
+          <Button size="sm" variant="primary" onClick={() => { setOpen(true); setEditing(true); }}><KeyRound className="h-3.5 w-3.5" /> {d?.keyFromSettings ? "Replace AI key" : "Add AI key"}</Button>
         </div>
+        {open && (
+        <div id="api-keys-body">
         <div className="flex gap-2.5 border-b border-line bg-accent-soft/40 px-4 py-2.5 text-[12.5px] text-ink-2">
           <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-accent" />
           <span><span className="font-medium text-ink">Keep secret keys secure.</span> They never reach the browser; only a masked preview is shown here. Rotate a leaked key at the provider, then replace it.</span>
@@ -243,6 +249,8 @@ function ApiKeysSection() {
             </tbody>
           </table>
         </div>
+      </div>
+        )}
       </div>
     </Section>
   );

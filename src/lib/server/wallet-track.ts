@@ -4,6 +4,7 @@ import { createPublicClient, erc20Abi, formatUnits, getAddress, http, isAddress,
 import { db, schema } from "@/db";
 import { EVM_CHAINS, findChain, rpcFor } from "@/lib/chains";
 import { getSetting, setSetting } from "./settings";
+import { isZcashShielded, walletFamily } from "@/lib/wallet-chains";
 
 /** Main tokens tracked per chain (besides native). Decimals are read on-chain. */
 const TOKENS: Record<string, { symbol: string; address: Address; cg?: string }[]> = {
@@ -103,24 +104,80 @@ async function prices(ids: string[]): Promise<Record<string, number>> {
   }
 }
 
-const SOL_RE = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
 const SOL_RPC = "https://solana-rpc.publicnode.com";
+const SOL_STABLES: Record<string, string> = { EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v: "USDC", Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB: "USDT" };
+const post = (url: string, body: unknown) =>
+  fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body), cache: "no-store", signal: AbortSignal.timeout(12_000) }).then((r) => r.json());
 
-/** Native SOL balances over public RPC (lamports → SOL). */
-async function solanaBalances(addrs: string[]): Promise<Map<string, number>> {
-  const out = new Map<string, number>();
-  if (!addrs.length) return out;
-  const body = addrs.map((a, i) => ({ jsonrpc: "2.0", id: i, method: "getBalance", params: [a, { commitment: "confirmed" }] }));
-  const r = await fetch(SOL_RPC, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body), cache: "no-store", signal: AbortSignal.timeout(12_000) });
-  const j = (await r.json()) as { id: number; result?: { value: number } }[];
-  for (const x of Array.isArray(j) ? j : []) if (typeof x.result?.value === "number") out.set(addrs[x.id], x.result.value / 1e9);
+type Bal = { symbol: string; amount: number; cg?: string; stable?: boolean; token?: string | null };
+
+/** SOL + USDC/USDT (SPL) over public RPC. */
+async function solanaBalances(addr: string): Promise<Bal[]> {
+  // SPL lookups are "indexed" calls publicnode refuses without a token; Solana's public RPC serves them.
+  const [n, ...toks] = await Promise.all([
+    post(SOL_RPC, { jsonrpc: "2.0", id: 1, method: "getBalance", params: [addr, { commitment: "confirmed" }] }),
+    ...Object.keys(SOL_STABLES).map((mint) =>
+      post("https://api.mainnet-beta.solana.com", { jsonrpc: "2.0", id: 2, method: "getTokenAccountsByOwner", params: [addr, { mint }, { encoding: "jsonParsed", commitment: "confirmed" }] }).catch(() => null),
+    ),
+  ]);
+  if (typeof n?.result?.value !== "number") throw new Error(n?.error?.message ?? "RPC error");
+  const out: Bal[] = [{ symbol: "SOL", amount: n.result.value / 1e9, cg: "solana" }];
+  for (const t of toks)
+    for (const acc of t?.result?.value ?? []) {
+      const info = acc?.account?.data?.parsed?.info;
+      const sym = SOL_STABLES[info?.mint];
+      const amt = Number(info?.tokenAmount?.uiAmount ?? 0);
+      if (sym && amt > 0) out.push({ symbol: sym, amount: amt, stable: true, token: info.mint });
+    }
   return out;
 }
+
+/** APT over the Aptos Labs fullnode (works for coin and fungible-asset balances). */
+async function aptosBalances(addr: string): Promise<Bal[]> {
+  const r = await fetch(`https://api.mainnet.aptoslabs.com/v1/accounts/${addr}/balance/0x1::aptos_coin::AptosCoin`, { cache: "no-store", signal: AbortSignal.timeout(12_000) });
+  if (r.status === 404) return [];
+  if (!r.ok) throw new Error(`fullnode ${r.status}`);
+  return [{ symbol: "APT", amount: Number(await r.text()) / 1e8, cg: "aptos" }];
+}
+
+const SUI_COINS: Record<string, { symbol: string; dec: number; cg?: string; stable?: boolean }> = {
+  "0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI": { symbol: "SUI", dec: 9, cg: "sui" },
+  "0xdba34672e30cb065b1f93e3ab55318768fd6fef66c15942c9f7cb846e2f900e7::usdc::USDC": { symbol: "USDC", dec: 6, stable: true },
+};
+/** SUI + native USDC over Sui's public GraphQL (JSON-RPC on public fullnodes is retired). */
+async function suiBalances(addr: string): Promise<Bal[]> {
+  const j = await post("https://graphql.mainnet.sui.io/graphql", { query: `{ address(address: "${addr}") { balances(first: 50) { nodes { coinType { repr } totalBalance } } } }` });
+  if (j?.errors?.length) throw new Error(j.errors[0].message);
+  const out: Bal[] = [];
+  for (const b of j?.data?.address?.balances?.nodes ?? []) {
+    const c = SUI_COINS[b.coinType?.repr];
+    const amt = c ? Number(b.totalBalance) / 10 ** c.dec : 0;
+    if (c && amt > 0) out.push({ symbol: c.symbol, amount: amt, cg: c.cg, stable: c.stable, token: c.symbol === "SUI" ? null : b.coinType.repr });
+  }
+  return out;
+}
+
+/** Transparent ZEC via public explorers (3xpl, then Blockchair). Shielded addresses can't be read without a viewing key. */
+async function zcashBalances(addr: string): Promise<Bal[]> {
+  if (isZcashShielded(addr)) throw new Error("shielded address: balance is private (needs a viewing key)");
+  const x = await fetch(`https://sandbox-api.3xpl.com/zcash/address/${addr}?data=balances&from=all`, { cache: "no-store", signal: AbortSignal.timeout(12_000) }).then((r) => r.json()).catch(() => null);
+  let zat: number | null = x?.data?.balances?.["zcash-main"]?.zcash?.balance != null ? Number(x.data.balances["zcash-main"].zcash.balance) : x?.context?.code === 200 ? 0 : null;
+  if (zat == null) {
+    const b = await fetch(`https://api.blockchair.com/zcash/dashboards/address/${addr}`, { cache: "no-store", signal: AbortSignal.timeout(12_000) }).then((r) => r.json()).catch(() => null);
+    const v = b?.data?.[addr]?.address?.balance;
+    zat = typeof v === "number" ? v : null;
+  }
+  if (zat == null) throw new Error("explorer unavailable");
+  return [{ symbol: "ZEC", amount: zat / 1e8, cg: "zcash" }];
+}
+
+const NON_EVM: Record<string, (a: string) => Promise<Bal[]>> = { solana: solanaBalances, aptos: aptosBalances, sui: suiBalances, zcash: zcashBalances };
+const FAMILY_NAME: Record<string, string> = { solana: "Solana", aptos: "Aptos", sui: "Sui", zcash: "Zcash" };
 
 export async function trackWallets(): Promise<TrackSnapshot> {
   const d = db();
   const all = await d.select().from(schema.wallets);
-  const sol = all.filter((w) => !isAddress(w.address) && SOL_RE.test(w.address));
+  const other = all.map((w) => ({ w, fam: walletFamily(w) })).filter((x) => x.fam && x.fam !== "evm") as { w: (typeof all)[number]; fam: string }[];
   const wallets = all.filter((w) => isAddress(w.address));
   const addrs = wallets.map((w) => getAddress(w.address));
   const res = new Map<string, WalletTrack>(wallets.map((w) => [w.address.toLowerCase(), { address: w.address, label: w.label, holdings: [], totalUsd: 0, errors: [] }]));
@@ -171,19 +228,17 @@ export async function trackWallets(): Promise<TrackSnapshot> {
     }),
   );
 
-  for (const w of sol) res.set(w.address, { address: w.address, label: w.label, holdings: [], totalUsd: 0, errors: [] });
-  if (sol.length) {
-    try {
-      const bals = await solanaBalances(sol.map((w) => w.address));
-      for (const w of sol) {
-        const v = bals.get(w.address) ?? 0;
-        if (v > 0) raw.push({ addr: w.address, chain: "solana", symbol: "SOL", token: null, amount: v, cg: "solana" });
+  for (const { w } of other) res.set(w.address, { address: w.address, label: w.label, holdings: [], totalUsd: 0, errors: [] });
+  await Promise.all(
+    other.map(async ({ w, fam }) => {
+      try {
+        for (const b of await NON_EVM[fam](w.address)) if (b.amount > 0) raw.push({ addr: w.address, chain: fam, symbol: b.symbol, token: b.token ?? null, amount: b.amount, cg: b.cg, stable: b.stable });
+        sources[fam] = "rpc";
+      } catch (e) {
+        res.get(w.address)!.errors.push(`${FAMILY_NAME[fam]}: ${(e as Error).message.slice(0, 80)}`);
       }
-      sources.solana = "rpc";
-    } catch (e) {
-      for (const w of sol) res.get(w.address)!.errors.push(`Solana: ${(e as Error).message.slice(0, 60)}`);
-    }
-  }
+    }),
+  );
 
   const px = await prices(raw.map((r) => r.cg).filter(Boolean) as string[]);
   for (const r of raw) {
@@ -240,7 +295,7 @@ export async function getTrack(force = false): Promise<TrackSnapshot & { cached:
   const cached = await getSetting<TrackSnapshot>("wallet_track");
   if (!force && cached && Date.now() - +new Date(cached.fetchedAt) < TTL_MS) {
     // invalidate when the set of linked wallets changed
-    const now = (await db().select({ a: schema.wallets.address }).from(schema.wallets)).map((w) => w.a).filter((a) => isAddress(a) || SOL_RE.test(a)).map((a) => (isAddress(a) ? a.toLowerCase() : a)).sort().join();
+    const now = (await db().select().from(schema.wallets)).filter((w) => walletFamily(w)).map((w) => (isAddress(w.address) ? w.address.toLowerCase() : w.address)).sort().join();
     const was = cached.wallets.map((w) => (isAddress(w.address) ? w.address.toLowerCase() : w.address)).sort().join();
     if (now === was) return { ...cached, cached: true };
   }

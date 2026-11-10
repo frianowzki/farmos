@@ -7,8 +7,8 @@ import { safeFetch } from "./ai";
 const API = "https://api.opensea.io/api/v2";
 export const openseaConfigured = () => Boolean(process.env.OPENSEA_API_KEY?.trim());
 
-import type { Drop, DropDetail, DropStage, Eligibility, StageCheck, Verdict, WalletCheck } from "./opensea-types";
-export type { Drop, DropDetail, DropStage, Eligibility, StageCheck, Verdict, WalletCheck };
+import type { Drop, DropDetail, DropRich, DropStage, Eligibility, StageCheck, Verdict, WalletCheck } from "./opensea-types";
+export type { Drop, DropDetail, DropRich, DropStage, Eligibility, StageCheck, Verdict, WalletCheck };
 
 async function os<T>(path: string, revalidate = 600): Promise<T> {
   const key = process.env.OPENSEA_API_KEY?.trim();
@@ -18,9 +18,74 @@ async function os<T>(path: string, revalidate = 600): Promise<T> {
   return (await res.json()) as T;
 }
 
-export async function listDrops(type: "upcoming" | "featured" | "recently_minted" = "upcoming", limit = 50) {
-  const r = await os<{ drops: Drop[] }>(`/drops?type=${type}&limit=${limit}`);
-  return r.drops ?? [];
+export async function listDrops(type: "upcoming" | "featured" | "recently_minted" = "upcoming", limit = 50, pages = 4) {
+  const out: Drop[] = [];
+  let next: string | null = null;
+  for (let i = 0; i < pages; i++) {
+    const r: { drops: Drop[]; next?: string | null } = await os(`/drops?type=${type}&limit=${limit}${next ? `&next=${encodeURIComponent(next)}` : ""}`);
+    out.push(...(r.drops ?? []));
+    next = r.next ?? null;
+    if (!next) break;
+  }
+  return out;
+}
+
+type Collection = { description?: string; banner_image_url?: string; project_url?: string; discord_url?: string; telegram_url?: string; twitter_username?: string | null; safelist_status?: string };
+
+async function pool<T, R>(items: T[], n: number, fn: (t: T) => Promise<R>): Promise<R[]> {
+  const out: R[] = new Array(items.length);
+  let i = 0;
+  await Promise.all(Array.from({ length: Math.min(n, items.length) }, async () => {
+    while (i < items.length) {
+      const k = i++;
+      out[k] = await fn(items[k]);
+    }
+  }));
+  return out;
+}
+
+/**
+ * Every drop OpenSea lists (upcoming, featured, recently minted; all pages), each merged with its
+ * drop detail (supply, every stage) and collection profile (description, banner, links).
+ */
+export async function listDropsRich(max = 80): Promise<DropRich[]> {
+  const kinds = ["upcoming", "featured", "recently_minted"] as const;
+  const lists = await Promise.all(kinds.map((k) => listDrops(k).catch(() => [] as Drop[])));
+  const bySlug = new Map<string, { d: Drop; kinds: DropRich["kinds"] }>();
+  lists.forEach((l, i) => l.forEach((d) => {
+    const e = bySlug.get(d.collection_slug);
+    if (e) e.kinds.push(kinds[i]);
+    else bySlug.set(d.collection_slug, { d, kinds: [kinds[i]] });
+  }));
+  const items = [...bySlug.values()].slice(0, max);
+  return pool(items, 6, async ({ d, kinds: k }) => {
+    const [det, col] = await Promise.all([
+      os<DropDetail>(`/drops/${encodeURIComponent(d.collection_slug)}`, 600).catch(() => null),
+      os<Collection>(`/collections/${encodeURIComponent(d.collection_slug)}`, 3600).catch(() => null),
+    ]);
+    const stages = [...(det?.stages ?? [])].sort((a, b) => a.start_time.localeCompare(b.start_time));
+    const pub = stages.find((s) => /public/i.test(s.stage_type)) ?? null;
+    return {
+      ...d,
+      kinds: k,
+      max_supply: det?.max_supply ?? null,
+      total_supply: det?.total_supply ?? null,
+      stage_count: stages.length,
+      first_start: stages[0]?.start_time ?? null,
+      last_end: stages.at(-1)?.end_time ?? null,
+      public_price: pub?.price ?? null,
+      price_currency_address: pub?.price_currency_address ?? null,
+      description: col?.description?.trim() || null,
+      banner_image_url: col?.banner_image_url || null,
+      links: {
+        x: col?.twitter_username ? `https://x.com/${col.twitter_username}` : null,
+        site: col?.project_url || null,
+        discord: col?.discord_url || null,
+        telegram: col?.telegram_url || null,
+      },
+      safelist: col?.safelist_status ?? null,
+    };
+  });
 }
 
 export const getDrop = (slug: string) => os<DropDetail>(`/drops/${encodeURIComponent(slug)}`, 300);

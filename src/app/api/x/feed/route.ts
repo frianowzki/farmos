@@ -34,13 +34,17 @@ export async function GET(req: Request) {
     "media.fields": "type,url,preview_image_url,width,height",
   });
   const res = await fetch(`https://api.x.com/2/${path}?${qs}`, { headers: { authorization: `Bearer ${token}` }, cache: "no-store" });
+  if (res.status === 403 || res.status === 402) {
+    // Plan without timeline reads: remember for an hour so the Feed simply hides the X tab.
+    const body = { state: "plan", posts: [] };
+    cache = { at: Date.now() + 55 * 60_000, key, body };
+    return NextResponse.json(body);
+  }
   if (!res.ok) {
     const msg =
       res.status === 429
         ? "X rate limit reached. Try again in a few minutes."
-        : res.status === 403 || res.status === 402
-          ? "Your X API plan doesn't include timeline reads. Free tier apps can sign in but can't read timelines; Basic or pay-per-use is needed."
-          : `X returned ${res.status}.`;
+        : `X returned ${res.status}.`;
     return NextResponse.json({ state: "error", posts: [], message: msg });
   }
   const j = (await res.json()) as { data?: XTweet[]; includes?: { users?: XUser[]; media?: XMedia[] } };

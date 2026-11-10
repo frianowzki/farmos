@@ -19,6 +19,7 @@ export const projectInput = z
     priority: z.enum(["low", "medium", "high", "urgent"]),
     tier: z.enum(["S", "A", "B", "C"]),
     risk: z.enum(["low", "medium", "high", "extreme"]),
+    eligibility: z.enum(["unknown", "checking", "eligible", "not_eligible"]),
     source: z.string().max(500).nullable(),
     referral: z.string().max(500).nullable(),
     deadline: day,

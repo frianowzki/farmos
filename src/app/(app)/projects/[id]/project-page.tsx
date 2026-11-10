@@ -1,10 +1,7 @@
 "use client";
 import { ProjectMark } from "@/components/project-mark";
 import { useQueryClient } from "@tanstack/react-query";
-import {
-  AtSign, Banknote, CalendarRange, Palette, Star, CalendarDays, CalendarPlus, ChevronRight, CircleDot, Coins, Flag, Gauge, Layers, Link2, Mail, MoreHorizontal,
-  Pin, PinOff, Plus, RefreshCw, ShieldAlert, Sparkles, Tag, Telescope, Trash2, Wallet as WalletIcon, Waypoints, ScanSearch,
-} from "lucide-react";
+import { AtSign, BadgeCheck, Banknote, CalendarDays, CalendarPlus, CalendarRange, ChevronRight, CircleDot, Coins, Flag, Gauge, Layers, Link2, Mail, MoreHorizontal, Palette, Pin, PinOff, Plus, RefreshCw, ScanSearch, ShieldAlert, Sparkles, Star, Tag, Telescope, Trash2, Wallet as WalletIcon, Waypoints } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, type ReactNode } from "react";
@@ -31,7 +28,7 @@ import { CHAIN_SUGGESTIONS, KEY_DATES, LINK_FIELDS } from "@/lib/constants";
 import { today as todayFn } from "@/lib/dates";
 import { pct, relDay, shortAddr, tone, usd } from "@/lib/format";
 import { api, keys, useGoogleStatus, useProject, useUpdateProject, useWallets, type Position, type Project } from "@/lib/client/api";
-import { CATEGORY_OPTS, PRIORITY_OPTS, RISK_OPTS, STATUS_OPTS, TIER_OPTS } from "@/lib/options";
+import { CATEGORY_OPTS, ELIGIBILITY_OPTS, PRIORITY_OPTS, RISK_OPTS, STATUS_OPTS, TIER_OPTS } from "@/lib/options";
 import { positionPnl, projectPnl } from "@/lib/pnl";
 
 const TABS = [
@@ -226,6 +223,7 @@ function Properties({ p, set, today }: { p: Project; set: (patch: Partial<Projec
         <Prop icon={<Flag className={ic} />} label="Priority"><SelectPill value={p.priority} options={PRIORITY_OPTS} onChange={(v) => set({ priority: v })} dot={false} /></Prop>
         <Prop icon={<Gauge className={ic} />} label="Tier / potential"><SelectPill value={p.tier} options={TIER_OPTS.map((t) => ({ ...t, label: t.long }))} onChange={(v) => set({ tier: v })} dot={false} /></Prop>
         <Prop icon={<ShieldAlert className={ic} />} label="Risk"><SelectPill value={p.risk} options={RISK_OPTS} onChange={(v) => set({ risk: v })} /></Prop>
+        <Prop icon={<BadgeCheck className={ic} />} label="Eligibility"><SelectPill value={p.eligibility} options={ELIGIBILITY_OPTS} onChange={(v) => set({ eligibility: v })} /></Prop>
         <Prop icon={<Star className={ic} />} label="Rating">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1 py-1">
             <Rating value={p.rating} onChange={(v) => set({ rating: v })} />

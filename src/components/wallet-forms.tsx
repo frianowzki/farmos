@@ -3,9 +3,14 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, ChevronDown, Plus, RefreshCw } from "lucide-react";
 import { motion } from "motion/react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { ChainLogo, ChainStack } from "@/components/chain-logo";
+import type { Wallet } from "@wallet-standard/base";
 import { MorphingModal } from "@/components/motion/morphing-modal";
+import { Tabs, TabsList, TabsTrigger } from "@/components/motion/tabs";
+import { KNOWN_WALLETS, brandOf, connectAddress, connectLegacyAptos, hasLegacyAptos, useStandardWallets, walletFamilies, type MultiFamily } from "@/lib/client/multichain-wallets";
+import { FAMILY_CHAIN, FAMILY_LABEL, familiesFor, isZcashShielded, type WalletFamily } from "@/lib/wallet-chains";
 import { WalletIcon } from "@/components/wallet-icon";
 import { Button, Input, Popover, SectionTitle, Skeleton } from "@/components/ui";
 import { api, keys, useWallets } from "@/lib/client/api";
@@ -81,8 +86,11 @@ export function WalletBalancesCard() {
   const { data: wl, isLoading: wLoading } = useWallets();
   const linked = wl?.wallets ?? [];
   const [adding, setAdding] = useState(false);
+  const [modalView, setModalView] = useState<WalletModalView | null>(null);
+  const router = useRouter();
   const [refreshing, setRefreshing] = useState(false);
   const { data, isLoading, error } = useQuery({ queryKey: ["wallet-track"], queryFn: () => api<Snapshot>("/api/wallets/track"), enabled: linked.length > 0, staleTime: 5 * 60_000 });
+  const nfts = useNfts(linked.length > 0);
   const refresh = async () => {
     setRefreshing(true);
     try {
@@ -110,12 +118,7 @@ export function WalletBalancesCard() {
       >
         Wallet balances
       </SectionTitle>
-      {adding && (
-        <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} className="mb-3 rounded-xl border border-line bg-panel p-3">
-          <AddWalletForm />
-          <p className="mt-2 text-[11.5px] text-faint">Read-only. Or <Link href="/wallets" className="text-accent underline underline-offset-2">connect a browser wallet</Link> and link it.</p>
-        </motion.div>
-      )}
+      <WalletModal view={adding ? (modalView ?? "menu") : null} setView={(v) => { setModalView(v); setAdding(v !== null); }} onConnect={() => router.push("/wallets")} />
       {wLoading ? (
         <Skeleton className="h-28" />
       ) : linked.length === 0 ? (
@@ -131,7 +134,8 @@ export function WalletBalancesCard() {
         <div className="grid gap-3 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
           <div className="rounded-xl border border-line bg-panel p-4">
             <div className="text-[12px] font-medium text-muted">Across {data.wallets.length} wallet{data.wallets.length === 1 ? "" : "s"}</div>
-            <div className="num mt-1 text-[30px] font-medium leading-none tracking-[-0.02em]">{usd(total)}</div>
+            <div className="num mt-1 text-[30px] font-medium leading-none tracking-[-0.02em]">{usd(total + (nfts.data?.totalUsd ?? 0))}</div>
+            {Boolean(nfts.data?.totalUsd) && <div className="mt-1 text-[12px] text-muted">Tokens <span className="num text-ink-2">{usd(total)}</span> · NFTs at floor <span className="num text-ink-2">{usd(nfts.data!.totalUsd!)}</span></div>}
             {chains.length > 0 && (
               <>
                 <div className="mt-4 flex h-2 overflow-hidden rounded-full bg-hover">
@@ -171,69 +175,171 @@ export function WalletBalancesCard() {
   );
 }
 
-export type WalletModalView = "menu" | "watch";
+export type WalletModalView = "menu" | "multichain" | "watch";
+
+const FAMILY_TABS: { id: MultiFamily; label: string }[] = [
+  { id: "solana", label: "Solana" },
+  { id: "aptos", label: "Aptos" },
+  { id: "sui", label: "Sui" },
+];
 
 /**
- * Add-wallet modal (beUI MorphingModal): pick "connect a wallet app" (hands off to
- * RainbowKit) or "watch an address", and the panel morphs between the two views.
+ * Add-wallet modal (beUI MorphingModal): EVM wallet apps (RainbowKit), Solana / Aptos / Sui wallets
+ * (Wallet Standard, address only), or watch any address including Zcash. The panel morphs between views.
  */
-export function WalletModal({ view, setView, onConnect, connectLabel = "Connect a wallet app" }: { view: WalletModalView | null; setView: (v: WalletModalView | null) => void; onConnect: () => void; connectLabel?: string }) {
+export function WalletModal({ view, setView, onConnect, connectLabel = "EVM wallet" }: { view: WalletModalView | null; setView: (v: WalletModalView | null) => void; onConnect: () => void; connectLabel?: string }) {
   const qc = useQueryClient();
   const [addr, setAddr] = useState("");
   const [label, setLabel] = useState("");
   const [provider, setProvider] = useState("");
-  const [busy, setBusy] = useState(false);
+  const [chain, setChain] = useState<WalletFamily | "">("");
+  const [family, setFamily] = useState<MultiFamily>("solana");
+  const [busy, setBusy] = useState<string | null>(null);
+  const installed = useStandardWallets();
   const close = () => setView(null);
+  const save = async (body: { address: string; label: string; provider: string; chain?: string }) => {
+    await api("/api/wallets", { method: "POST", body });
+    qc.invalidateQueries({ queryKey: keys.wallets });
+    qc.invalidateQueries({ queryKey: ["wallet-track"] });
+    qc.invalidateQueries({ queryKey: ["wallet-nfts"] });
+  };
   const submit = async () => {
     if (!addr.trim()) return;
-    setBusy(true);
+    setBusy("watch");
     try {
-      await api("/api/wallets", { method: "POST", body: { address: addr.trim(), label: label.trim(), provider } });
-      qc.invalidateQueries({ queryKey: keys.wallets });
-      qc.invalidateQueries({ queryKey: ["wallet-track"] });
+      await save({ address: addr.trim(), label: label.trim(), provider, chain: chain || undefined });
       setAddr("");
       setLabel("");
       setProvider("");
+      setChain("");
       toast.success("Wallet added");
       close();
     } catch (e) {
       toast.error((e as Error).message);
     } finally {
-      setBusy(false);
+      setBusy(null);
     }
   };
+  const families = familiesFor(addr);
+  const ambiguous = families.length > 1;
+  const shielded = isZcashShielded(addr.trim());
+
+  // One row per wallet for the chosen chain: installed Wallet Standard wallets first, then known ones to install.
+  const rows = (() => {
+    const list: { key: string; name: string; brand: string; icon?: string; wallet?: Wallet; url?: string; legacy?: boolean }[] = [];
+    for (const w of installed) if (walletFamilies(w).includes(family)) list.push({ key: w.name, name: w.name, brand: brandOf(w.name), icon: w.icon, wallet: w });
+    for (const k of KNOWN_WALLETS) {
+      if (!k.families.includes(family) || list.some((r) => r.brand === k.brand)) continue;
+      const legacy = family === "aptos" && (k.brand === "petra" || k.brand === "martian") && hasLegacyAptos(k.brand);
+      list.push({ key: k.brand, name: k.name, brand: k.brand, url: legacy ? undefined : k.url, legacy });
+    }
+    return list;
+  })();
+  const connectRow = async (r: (typeof rows)[number]) => {
+    setBusy(r.key);
+    try {
+      const address = r.wallet ? await connectAddress(r.wallet, family) : await connectLegacyAptos(r.brand as "petra" | "martian");
+      if (!address) throw new Error(`${r.name} isn't available in this browser`);
+      await save({ address, label: r.name, provider: r.brand, chain: family });
+      toast.success(`${r.name} · ${shortAddr(address)} added`);
+      close();
+    } catch (e) {
+      toast.error((e as Error).message || "Connection cancelled");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const tile = "flex w-full items-center gap-3 rounded-xl border border-line px-3 py-3 text-left outline-none hover:bg-hover focus-visible:ring-2 focus-visible:ring-[var(--ring)]";
   return (
     <MorphingModal viewId={view} onClose={close} placement="center" className="max-w-[480px] rounded-2xl border-line bg-panel">
       {view === "menu" && (
         <div>
           <h2 className="font-serif text-[22px] leading-tight text-ink">Add a wallet</h2>
-          <p className="mt-1 text-[13px] text-muted">Read-only. farmOS never asks for signatures.</p>
           <div className="mt-4 space-y-1.5">
-            <button type="button" onClick={() => { close(); setTimeout(onConnect, 180); }} className="flex w-full items-center gap-3 rounded-xl border border-line px-3 py-3 text-left outline-none hover:bg-hover focus-visible:ring-2 focus-visible:ring-[var(--ring)]">
-              <span className="flex items-center -space-x-2">
-                {(["metamask", "rabby", "phantom"] as const).map((b) => <span key={b} className="rounded-[28%] ring-2 ring-panel"><WalletIcon provider={b} size={26} /></span>)}
+            <button type="button" onClick={() => { close(); setTimeout(onConnect, 180); }} className={tile}>
+              <span className="flex w-[62px] items-center -space-x-2">
+                {(["metamask", "rabby", "coinbase"] as const).map((b) => <span key={b} className="rounded-[28%] ring-2 ring-panel"><WalletIcon provider={b} size={26} /></span>)}
               </span>
               <span className="min-w-0 flex-1">
                 <span className="block text-[14px] font-medium text-ink">{connectLabel}</span>
                 <span className="block text-[12.5px] text-muted">MetaMask, Rabby, Coinbase, WalletConnect…</span>
               </span>
             </button>
-            <button type="button" onClick={() => setView("watch")} className="flex w-full items-center gap-3 rounded-xl border border-line px-3 py-3 text-left outline-none hover:bg-hover focus-visible:ring-2 focus-visible:ring-[var(--ring)]">
-              <span className="flex h-[26px] w-[54px] items-center justify-center"><ChainStack chains={["ethereum", "base", "solana"]} size={22} /></span>
+            <button type="button" onClick={() => setView("multichain")} className={tile}>
+              <span className="flex w-[62px] items-center -space-x-2">
+                {(["phantom", "petra", "slush"] as const).map((b) => <span key={b} className="rounded-[28%] ring-2 ring-panel"><WalletIcon provider={b} size={26} /></span>)}
+              </span>
               <span className="min-w-0 flex-1">
-                <span className="block text-[14px] font-medium text-ink">Watch an address</span>
-                <span className="block text-[12.5px] text-muted">Paste any EVM or Solana address. No connection needed.</span>
+                <span className="block text-[14px] font-medium text-ink">Solana, Aptos or Sui wallet</span>
+                <span className="block text-[12.5px] text-muted">Phantom, Solflare, OKX, Petra, Martian, Nightly, Slush</span>
               </span>
             </button>
+            <button type="button" onClick={() => setView("watch")} className={tile}>
+              <span className="flex w-[62px] items-center"><ChainStack chains={["ethereum", "solana", "zcash"]} size={22} /></span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-[14px] font-medium text-ink">Watch an address</span>
+                <span className="block text-[12.5px] text-muted">Any EVM, Solana, Aptos, Sui or Zcash address</span>
+              </span>
+            </button>
+          </div>
+        </div>
+      )}
+      {view === "multichain" && (
+        <div>
+          <h2 className="font-serif text-[22px] leading-tight text-ink">Connect a wallet</h2>
+          <p className="mt-1 text-[13px] text-muted">farmOS reads the address, then disconnects.</p>
+          <Tabs value={family} onValueChange={(v) => setFamily(v as MultiFamily)} variant="segment" className="mt-4">
+            <TabsList className="grid w-full grid-cols-3">
+              {FAMILY_TABS.map((t) => <TabsTrigger key={t.id} value={t.id} icon={<ChainLogo chain={t.id} size={14} />}>{t.label}</TabsTrigger>)}
+            </TabsList>
+          </Tabs>
+          <ul className="mt-3 space-y-1">
+            {rows.map((r) => (
+              <li key={r.key}>
+                {r.url ? (
+                  <a href={r.url} target="_blank" rel="noreferrer" className="flex items-center gap-3 rounded-xl px-2.5 py-2 hover:bg-hover">
+                    <WalletIcon provider={r.brand} size={30} />
+                    <span className="flex-1 text-[14px] text-ink-2">{r.name}</span>
+                    <span className="text-[12px] text-faint">Not installed · Get</span>
+                  </a>
+                ) : (
+                  <button type="button" disabled={busy !== null} onClick={() => connectRow(r)} className="flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-left hover:bg-hover disabled:opacity-60">
+                    {r.brand ? <WalletIcon provider={r.brand} size={30} /> : r.icon ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={r.icon} alt="" className="h-[30px] w-[30px] rounded-[28%]" />
+                    ) : <WalletIcon size={30} />}
+                    <span className="flex-1 text-[14px] font-medium text-ink">{r.name}</span>
+                    <span className="text-[12px] text-accent">{busy === r.key ? "Check your wallet…" : "Connect"}</span>
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
+          <div className="mt-4 flex items-center justify-between">
+            <Button type="button" variant="ghost" onClick={() => setView("menu")}>Back</Button>
+            <button type="button" onClick={() => { setChain(family); setView("watch"); }} className="text-[12.5px] text-muted hover:text-ink">On mobile? Paste the address instead</button>
           </div>
         </div>
       )}
       {view === "watch" && (
         <form onSubmit={(e) => { e.preventDefault(); submit(); }}>
           <h2 className="font-serif text-[22px] leading-tight text-ink">Watch an address</h2>
-          <p className="mt-1 text-[13px] text-muted">EVM (0x…) or Solana. Balances show on Portfolio.</p>
+          <p className="mt-1 text-[13px] text-muted">EVM, Solana, Aptos, Sui or Zcash. Balances show on Portfolio.</p>
           <div className="mt-4 space-y-2.5">
-            <Input autoFocus value={addr} onChange={(e) => setAddr(e.target.value)} placeholder="0x… or Solana address" className="num w-full" />
+            <Input autoFocus value={addr} onChange={(e) => setAddr(e.target.value)} placeholder="0x…, Solana, or t1… address" className="num w-full" />
+            {ambiguous && (
+              <div className="flex items-center gap-2 text-[12.5px] text-muted">
+                This could be
+                {(["aptos", "sui"] as const).map((f) => (
+                  <button key={f} type="button" onClick={() => setChain(f)} aria-pressed={chain === f} className={cn("inline-flex h-7 items-center gap-1.5 rounded-lg border px-2 text-[12.5px] leading-[1.35]", chain === f ? "border-accent bg-accent/10 text-ink" : "border-line text-ink-2 hover:bg-hover")}>
+                    <ChainLogo chain={f} size={14} /> {FAMILY_LABEL[f]}
+                  </button>
+                ))}
+              </div>
+            )}
+            {!ambiguous && families[0] && <div className="flex items-center gap-1.5 text-[12px] text-muted"><ChainLogo chain={FAMILY_CHAIN[families[0]]} size={14} /> {FAMILY_LABEL[families[0]]} address</div>}
+            {shielded && <p className="text-[12px] text-faint">Shielded Zcash balances are private. farmOS can save this address but can only read balances of transparent (t1/t3) addresses.</p>}
             <Input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Label, e.g. Farm 03" className="w-full" />
             <div>
               <div className="mb-1.5 text-[12px] text-muted">Wallet app</div>
@@ -248,10 +354,83 @@ export function WalletModal({ view, setView, onConnect, connectLabel = "Connect 
           </div>
           <div className="mt-5 flex items-center justify-between">
             <Button type="button" variant="ghost" onClick={() => setView("menu")}>Back</Button>
-            <Button type="submit" variant="primary" disabled={!addr.trim() || busy}><Plus className="h-3.5 w-3.5" /> Add wallet</Button>
+            <Button type="submit" variant="primary" disabled={!addr.trim() || busy !== null || (ambiguous && !chain && !["petra", "martian", "slush"].includes(provider))}><Plus className="h-3.5 w-3.5" /> Add wallet</Button>
           </div>
         </form>
       )}
     </MorphingModal>
+  );
+}
+
+type NftCol = { slug: string; name: string; image: string | null; chain: string; count: number; floor: number | null; symbol: string | null; usd: number | null; url: string; wallets: string[] };
+type NftSnap = { fetchedAt: string; collections: NftCol[]; count: number; totalUsd: number | null; totalNative: { symbol: string; amount: number }[]; errors: string[]; configured: boolean };
+export const useNfts = (enabled = true) => useQuery({ queryKey: ["wallet-nfts"], queryFn: () => api<NftSnap>("/api/wallets/nfts"), enabled, staleTime: 10 * 60_000, retry: false });
+
+const fmtNative = (n: number) => n.toLocaleString(undefined, { maximumFractionDigits: n < 1 ? 4 : 2 });
+
+/** Portfolio card: NFTs held across saved wallets (OpenSea), each collection valued at its floor. */
+export function NftHoldingsCard() {
+  const qc = useQueryClient();
+  const { data: wl } = useWallets();
+  const linked = wl?.wallets.length ?? 0;
+  const { data, isLoading, error } = useNfts(linked > 0);
+  const [busy, setBusy] = useState(false);
+  const [all, setAll] = useState(false);
+  if (!linked) return null;
+  const refresh = async () => {
+    setBusy(true);
+    try {
+      qc.setQueryData(["wallet-nfts"], await api<NftSnap>("/api/wallets/nfts", { method: "POST" }));
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
+    setBusy(false);
+  };
+  const cols = data?.collections ?? [];
+  const shown = all ? cols : cols.slice(0, 8);
+  return (
+    <section className="mb-8">
+      <SectionTitle right={<Button size="sm" variant="ghost" onClick={refresh} disabled={busy || isLoading}><RefreshCw className={cn("h-3.5 w-3.5", busy && "animate-spin")} /> Refresh</Button>}>NFTs</SectionTitle>
+      {isLoading ? (
+        <Skeleton className="h-28" />
+      ) : error || !data ? (
+        <div className="rounded-xl border border-dashed border-line px-4 py-5 text-center text-[13px] text-muted">Couldn&apos;t load NFTs. {(error as Error)?.message}</div>
+      ) : !data.configured ? (
+        <div className="rounded-xl border border-dashed border-line px-4 py-5 text-center text-[13px] text-muted">Add <code className="num">OPENSEA_API_KEY</code> to read NFTs held by your wallets.</div>
+      ) : cols.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-line px-4 py-5 text-center text-[13px] text-muted">No NFTs found in your saved wallets.</div>
+      ) : (
+        <div className="overflow-hidden rounded-xl border border-line bg-panel">
+          <div className="flex flex-wrap items-end justify-between gap-3 border-b border-line px-4 py-3">
+            <div>
+              <div className="text-[12px] font-medium text-muted">{data.count.toLocaleString()} NFTs · {cols.length} collections</div>
+              <div className="num mt-1 text-[24px] font-medium leading-none tracking-[-0.02em]">{data.totalUsd != null ? usd(data.totalUsd) : "—"}</div>
+            </div>
+            <div className="num text-right text-[12.5px] text-muted">{data.totalNative.map((t) => <div key={t.symbol}>{fmtNative(t.amount)} {t.symbol} at floor</div>)}</div>
+          </div>
+          <ul className="divide-y divide-line">
+            {shown.map((c) => (
+              <li key={c.slug}>
+                <a href={c.url} target="_blank" rel="noreferrer" className="flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-hover/60">
+                  {c.image ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={c.image} alt="" className="h-9 w-9 shrink-0 rounded-lg border border-line object-cover" loading="lazy" />
+                  ) : <span className="h-9 w-9 shrink-0 rounded-lg border border-line bg-hover" />}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5 truncate text-[13.5px] text-ink">{c.name}</div>
+                    <div className="flex items-center gap-1.5 text-[11.5px] text-muted"><ChainLogo chain={c.chain} size={12} /><span className="capitalize">{c.chain.replace(/_/g, " ")}</span> · {c.count} held</div>
+                  </div>
+                  <div className="text-right">
+                    <div className="num text-[13px] text-ink-2">{c.floor != null ? `${fmtNative(c.floor)} ${c.symbol}` : <span className="text-faint">No floor</span>}</div>
+                    {c.usd != null && <div className="num text-[11.5px] text-muted">{usd(c.usd)}</div>}
+                  </div>
+                </a>
+              </li>
+            ))}
+          </ul>
+          {cols.length > 8 && <button type="button" onClick={() => setAll((a) => !a)} className="w-full border-t border-line px-4 py-2 text-[12.5px] text-muted hover:bg-hover hover:text-ink">{all ? "Show less" : `Show all ${cols.length} collections`}</button>}
+        </div>
+      )}
+    </section>
   );
 }

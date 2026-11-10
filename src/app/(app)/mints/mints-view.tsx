@@ -1,6 +1,6 @@
 "use client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowUpRight, Check, CircleDashed, Clock, Eye, EyeOff, Layers, ShieldCheck, X as XIcon } from "lucide-react";
+import { ArrowUpRight, BadgeCheck, Check, CircleDashed, Clock, Eye, EyeOff, History, Layers, ShieldCheck, Sparkles, X as XIcon, Zap } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -16,17 +16,19 @@ import { Marker } from "@/components/panelui/marker";
 import { api, useWallets } from "@/lib/client/api";
 import { toast } from "@/lib/client/toast";
 import { cn } from "@/lib/cn";
-import type { Drop, DropDetail, DropStage, Eligibility, Verdict } from "@/lib/server/opensea-types";
+import type { DropDetail, DropRich, DropStage, Eligibility, Verdict } from "@/lib/server/opensea-types";
+import { ChainLogo } from "@/components/chain-logo";
+import { LinkIcon } from "@/components/icons/brand-glyphs";
 
-type ListRes = { configured: boolean; drops: Drop[]; watch: MintWatch[]; error?: string };
-type Kind = "upcoming" | "featured" | "watching";
+type ListRes = { configured: boolean; drops: DropRich[]; watch: MintWatch[]; error?: string };
+type Kind = "all" | "upcoming" | "live" | "featured" | "recent" | "watching";
 
 const MANUAL = [
-  { id: "unknown", label: "Not checked" },
-  { id: "eligible", label: "Eligible" },
-  { id: "not_eligible", label: "Not eligible" },
-  { id: "applied", label: "Applied" },
-  { id: "pending", label: "Pending" },
+  { id: "unknown", label: "Not checked", tone: "gray" },
+  { id: "eligible", label: "Eligible", tone: "green" },
+  { id: "not_eligible", label: "Not eligible", tone: "red" },
+  { id: "applied", label: "Applied", tone: "blue" },
+  { id: "pending", label: "Pending", tone: "amber" },
 ] as const;
 
 const VERDICT: Record<Verdict, { tone: string; label: string }> = {
@@ -36,25 +38,43 @@ const VERDICT: Record<Verdict, { tone: string; label: string }> = {
 };
 
 const stageName = (s: DropStage) => s.label || s.stage_type.replace(/_/g, " ");
-function price(s?: DropStage | null) {
-  if (!s || s.price == null) return "—";
-  if (s.price === "0") return "Free";
-  const native = /^0x0{40}$/i.test(s.price_currency_address);
-  return `${Number(formatEther(BigInt(s.price))).toLocaleString(undefined, { maximumFractionDigits: 5 })} ${native ? "ETH" : "token"}`;
+const NATIVE: Record<string, string> = { ethereum: "ETH", base: "ETH", arbitrum: "ETH", optimism: "ETH", zora: "ETH", blast: "ETH", ink: "ETH", shape: "ETH", abstract: "ETH", unichain: "ETH", polygon: "POL", matic: "POL", avalanche: "AVAX", bsc: "BNB", ape_chain: "APE", apechain: "APE", sei: "SEI", flow: "FLOW", ronin: "RON", hyperevm: "HYPE", monad: "MON", berachain: "BERA", soneium: "ETH", b3: "ETH", gunzilla: "GUN", somnia: "SOMI", animechain: "ANIME" };
+function priceOf(raw: string | null | undefined, currency: string | null | undefined, chain = "ethereum") {
+  if (raw == null) return "—";
+  if (raw === "0") return "Free";
+  const native = !currency || /^0x0{40}$/i.test(currency);
+  return `${Number(formatEther(BigInt(raw))).toLocaleString(undefined, { maximumFractionDigits: 5 })} ${native ? NATIVE[chain] ?? "ETH" : "token"}`;
 }
+const price = (s?: DropStage | null, chain?: string) => (s ? priceOf(s.price, s.price_currency_address, chain) : "—");
+const when = (iso: string) => new Date(iso).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
 const autoOf = (w?: MintWatch) => (w?.auto as unknown as Eligibility | null) ?? null;
 const publicOnly = (e: Eligibility | null) => Boolean(e && e.wallets.length && e.wallets.every((w) => w.verdict === "not_eligible" && w.stages.some((x) => /public/i.test(x.type))));
 const bestVerdict = (e: Eligibility | null): Verdict | null => (!e ? null : e.wallets.some((w) => w.verdict === "eligible") ? "eligible" : e.wallets.length && e.wallets.every((w) => w.verdict === "not_eligible") ? "not_eligible" : "unknown");
 
+const KINDS: { id: Kind; label: string; icon: typeof Clock }[] = [
+  { id: "all", label: "All", icon: Layers },
+  { id: "upcoming", label: "Upcoming", icon: Clock },
+  { id: "live", label: "Minting", icon: Zap },
+  { id: "featured", label: "Featured", icon: Sparkles },
+  { id: "recent", label: "Recently minted", icon: History },
+  { id: "watching", label: "Watching", icon: Eye },
+];
+
 export function MintsView() {
-  const [kind, setKind] = useState<Kind>("upcoming");
+  const [kind, setKind] = useState<Kind>("all");
   const [open, setOpen] = useState<string | null>(null);
-  const q = useQuery({ queryKey: ["mints", kind === "watching" ? "upcoming" : kind], queryFn: () => api<ListRes>(`/api/mints?type=${kind === "watching" ? "upcoming" : kind}`) });
+  const q = useQuery({ queryKey: ["mints"], queryFn: () => api<ListRes>("/api/mints"), staleTime: 5 * 60_000 });
   const watch = new Map((q.data?.watch ?? []).map((w) => [w.slug, w]));
-  const rows: { slug: string; name: string; chain: string; image: string | null; stage: DropStage | null; live: boolean }[] =
-    kind === "watching"
-      ? (q.data?.watch ?? []).map((w) => ({ slug: w.slug, name: w.name ?? w.slug, chain: w.chain ?? "", image: null, stage: null, live: false }))
-      : (q.data?.drops ?? []).map((d) => ({ slug: d.collection_slug, name: d.collection_name ?? d.collection_slug, chain: d.chain, image: d.image_url, stage: d.active_stage ?? d.next_stage, live: d.is_minting }));
+  const drops = q.data?.drops ?? [];
+  const shown =
+    kind === "all" ? drops
+    : kind === "upcoming" ? drops.filter((d) => d.kinds.includes("upcoming") && !d.is_minting)
+    : kind === "live" ? drops.filter((d) => d.is_minting)
+    : kind === "featured" ? drops.filter((d) => d.kinds.includes("featured"))
+    : kind === "recent" ? drops.filter((d) => d.kinds.includes("recently_minted"))
+    : [];
+  const count = (k: Kind) => (k === "watching" ? q.data?.watch.length ?? 0 : null);
+  const sorted = [...shown].sort((a, b) => Number(b.is_minting) - Number(a.is_minting) || (a.active_stage ?? a.next_stage)?.start_time.localeCompare((b.active_stage ?? b.next_stage)?.start_time ?? "9") || 0);
 
   return (
     <Page>
@@ -63,15 +83,13 @@ export function MintsView() {
         subtitle="Drops from OpenSea. Eligibility is checked against your saved wallets with public and on-chain data only — no signatures, no transactions."
       />
       <Tabs value={kind} onValueChange={(v) => setKind(v as Kind)} variant="underline">
-        <TabsList className="mb-4">
-          <TabsTrigger value="upcoming" icon={<Clock className="h-3.5 w-3.5" />}>Upcoming</TabsTrigger>
-          <TabsTrigger value="featured" icon={<Layers className="h-3.5 w-3.5" />}>Featured</TabsTrigger>
-          <TabsTrigger value="watching" icon={<Eye className="h-3.5 w-3.5" />}>Watching{q.data?.watch.length ? ` · ${q.data.watch.length}` : ""}</TabsTrigger>
+        <TabsList className="mb-4 overflow-x-auto [scrollbar-width:none]">
+          {KINDS.map((k) => <TabsTrigger key={k.id} value={k.id} icon={<k.icon className="h-3.5 w-3.5" />}>{k.label}{count(k.id) ? ` · ${count(k.id)}` : ""}</TabsTrigger>)}
         </TabsList>
       </Tabs>
 
       {q.isLoading ? (
-        <div className="space-y-2">{[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-14" />)}</div>
+        <div className="space-y-2">{[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-20" />)}</div>
       ) : q.data && !q.data.configured ? (
         <EmptyState
           mark="spark"
@@ -81,54 +99,84 @@ export function MintsView() {
         />
       ) : q.data?.error ? (
         <EmptyState mark="spark" title="OpenSea didn't answer" body={q.data.error} action={<Button onClick={() => q.refetch()}>Try again</Button>} />
-      ) : rows.length === 0 ? (
-        <EmptyState
-          mark="spark"
-          title={kind === "watching" ? "Nothing watched yet" : "No drops on the calendar"}
-          body={kind === "watching" ? "Open a drop and press Watch to keep its WL status here." : "OpenSea has no drops of this kind right now. Check Featured, or come back later."}
-        />
+      ) : kind === "watching" ? (
+        (q.data?.watch ?? []).length === 0 ? (
+          <EmptyState mark="spark" title="Nothing watched yet" body="Open a drop and press Watch to keep its WL status here." />
+        ) : (
+          <ul className="divide-y divide-line overflow-hidden rounded-xl border border-line bg-panel">
+            {(q.data?.watch ?? []).map((w) => {
+              const d = drops.find((x) => x.collection_slug === w.slug);
+              return d ? <DropRow key={w.slug} d={d} w={w} onOpen={() => setOpen(w.slug)} /> : (
+                <li key={w.slug}>
+                  <button onClick={() => setOpen(w.slug)} className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-hover">
+                    <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border border-line bg-hover text-muted"><Layers className="h-4 w-4" /></span>
+                    <span className="min-w-0 flex-1 truncate text-[14px] font-medium text-ink">{w.name ?? w.slug}</span>
+                    {w.startTime ? <Countdown to={new Date(w.startTime)} compact /> : <span className="text-[12.5px] text-faint">TBA</span>}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        )
+      ) : sorted.length === 0 ? (
+        <EmptyState mark="spark" title="No drops here right now" body="OpenSea has nothing listed for this filter. Try All, or come back later." />
       ) : (
         <ul className="divide-y divide-line overflow-hidden rounded-xl border border-line bg-panel">
-          {rows.map((r) => {
-            const w = watch.get(r.slug);
-            const v = bestVerdict(autoOf(w));
-            const manual = w && w.manualStatus !== "unknown" ? MANUAL.find((m) => m.id === w.manualStatus)?.label : null;
-            return (
-              <li key={r.slug}>
-                <button onClick={() => setOpen(r.slug)} className="flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-hover sm:px-4">
-                  {r.image ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={r.image} alt="" className="h-10 w-10 shrink-0 rounded-md border border-line object-cover" loading="lazy" />
-                  ) : (
-                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-line bg-hover text-muted"><Layers className="h-4 w-4" /></span>
-                  )}
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="truncate text-[14px] font-medium text-ink">{r.name}</span>
-                      {w && <Eye className="h-3.5 w-3.5 shrink-0 text-faint" aria-label="Watching" />}
-                    </div>
-                    <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-muted">
-                      <span className="capitalize">{r.chain}</span>
-                      {r.stage && <span>{stageName(r.stage)}</span>}
-                      {r.stage && <span className="num">{price(r.stage)}</span>}
-                    </div>
-                  </div>
-                  <div className="hidden shrink-0 items-center gap-3 sm:flex">
-                    {v && (publicOnly(autoOf(w)) ? <Marker tone="gray">Public only</Marker> : <Marker tone={VERDICT[v].tone}>{VERDICT[v].label}</Marker>)}
-                    {manual && <Pill tone="gray">{manual}</Pill>}
-                  </div>
-                  <div className="w-[118px] shrink-0 text-right text-[12.5px]">
-                    {r.live ? <Marker tone="green" live>Minting</Marker> : r.stage ? <Countdown to={r.stage.start_time} compact /> : w?.startTime ? <Countdown to={new Date(w.startTime)} compact /> : <span className="text-faint">TBA</span>}
-                  </div>
-                </button>
-              </li>
-            );
-          })}
+          {sorted.map((d) => <DropRow key={d.collection_slug} d={d} w={watch.get(d.collection_slug)} onOpen={() => setOpen(d.collection_slug)} />)}
         </ul>
       )}
-      <p className="mt-3 text-[12px] text-faint">Source: OpenSea Drops API. Times shown in your local time zone.</p>
       {open && <DropDialog slug={open} onClose={() => setOpen(null)} />}
     </Page>
+  );
+}
+
+function DropRow({ d, w, onOpen }: { d: DropRich; w?: MintWatch; onOpen: () => void }) {
+  const v = bestVerdict(autoOf(w));
+  const manual = w && w.manualStatus !== "unknown" ? MANUAL.find((m) => m.id === w.manualStatus)?.label : null;
+  const stage = d.active_stage ?? d.next_stage;
+  const minted = Number(d.total_supply ?? 0);
+  const max = Number(d.max_supply ?? 0);
+  const links = (["x", "site", "discord"] as const).filter((k) => d.links[k]);
+  return (
+    <li className="group relative">
+      <button onClick={onOpen} className="flex w-full items-start gap-3 px-3 py-3 text-left transition-colors hover:bg-hover sm:px-4">
+        {d.image_url ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={d.image_url} alt="" className="h-12 w-12 shrink-0 rounded-lg border border-line object-cover" loading="lazy" />
+        ) : (
+          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border border-line bg-hover text-muted"><Layers className="h-4 w-4" /></span>
+        )}
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1.5">
+            <span className="truncate text-[14px] font-medium text-ink">{d.collection_name ?? d.collection_slug}</span>
+            {d.safelist === "verified" && <BadgeCheck className="h-3.5 w-3.5 shrink-0 text-accent" aria-label="Verified on OpenSea" />}
+            {w && <Eye className="h-3.5 w-3.5 shrink-0 text-faint" aria-label="Watching" />}
+          </div>
+          {d.description && <p className="mt-0.5 line-clamp-1 text-[12.5px] text-muted">{d.description}</p>}
+          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-muted">
+            <span className="inline-flex items-center gap-1 capitalize"><ChainLogo chain={d.chain} size={13} />{d.chain.replace(/_/g, " ")}</span>
+            {stage && <span className="capitalize">{stageName(stage)}</span>}
+            <span className="num text-ink-2">{stage ? price(stage, d.chain) : priceOf(d.public_price, d.price_currency_address, d.chain)}</span>
+            {max > 0 && <span className="num">{minted.toLocaleString()} / {max.toLocaleString()}</span>}
+            {d.stage_count > 1 && <span>{d.stage_count} stages</span>}
+            {stage && <span className="num">{when(stage.start_time)}</span>}
+          </div>
+          {max > 0 && minted > 0 && <div className="mt-1.5 h-1 w-full max-w-[220px] overflow-hidden rounded-full bg-hover"><div className="h-full rounded-full bg-accent" style={{ width: `${Math.min(100, (minted / max) * 100)}%` }} /></div>}
+        </div>
+        <div className="flex shrink-0 flex-col items-end gap-1.5 text-[12.5px]">
+          {d.is_minting ? <Marker tone="green" live>Minting</Marker> : stage ? <Countdown to={stage.start_time} compact /> : <span className="text-faint">TBA</span>}
+          <div className="hidden items-center gap-2 sm:flex">
+            {v && (publicOnly(autoOf(w)) ? <Marker tone="gray">Public only</Marker> : <Marker tone={VERDICT[v].tone}>{VERDICT[v].label}</Marker>)}
+            {manual && <Pill tone="gray">{manual}</Pill>}
+          </div>
+        </div>
+      </button>
+      {links.length > 0 && (
+        <div className="absolute bottom-3 right-4 hidden items-center gap-1 group-hover:flex">
+          {links.map((k) => <a key={k} href={d.links[k]!} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className="rounded p-1 text-faint hover:bg-panel hover:text-ink" aria-label={k}><LinkIcon field={k} className="h-3.5 w-3.5" /></a>)}
+        </div>
+      )}
+    </li>
   );
 }
 
@@ -141,6 +189,7 @@ function DropDialog({ slug, onClose }: { slug: string; onClose: () => void }) {
   const [checking, setChecking] = useState(false);
   const d = q.data?.drop;
   const w = q.data?.watch ?? undefined;
+  const rich = (qc.getQueryData<ListRes>(["mints"])?.drops ?? []).find((x) => x.collection_slug === slug);
   const auto = autoOf(w);
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ["mint", slug] });
@@ -192,10 +241,18 @@ function DropDialog({ slug, onClose }: { slug: string; onClose: () => void }) {
       ) : (
         <div className="space-y-5">
           <div className="flex flex-wrap items-center gap-2 text-[12.5px] text-muted">
-            <Pill tone="gray"><span className="capitalize">{d.chain}</span></Pill>
+            <Pill tone="gray"><span className="inline-flex items-center gap-1 capitalize"><ChainLogo chain={d.chain} size={12} />{d.chain.replace(/_/g, " ")}</span></Pill>
             <span className="num">{d.total_supply ?? "0"} / {d.max_supply ?? "∞"} minted</span>
             <a href={d.opensea_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-0.5 text-accent hover:underline">OpenSea <ArrowUpRight className="h-3 w-3" /></a>
+            {rich && (["x", "site", "discord", "telegram"] as const).filter((k) => rich.links[k]).map((k) => (
+              <a key={k} href={rich.links[k]!} target="_blank" rel="noreferrer" className="rounded p-1 text-muted hover:bg-hover hover:text-ink" aria-label={k}><LinkIcon field={k} /></a>
+            ))}
           </div>
+          {rich?.banner_image_url && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={rich.banner_image_url} alt="" className="h-28 w-full rounded-lg border border-line object-cover" loading="lazy" />
+          )}
+          {rich?.description && <p className="line-clamp-4 text-[13px] leading-relaxed text-ink-2">{rich.description}</p>}
 
           <section>
             <h3 className="mb-2 font-label text-[11px] font-medium uppercase tracking-[0.14em] text-muted">Stages</h3>
@@ -207,7 +264,7 @@ function DropDialog({ slug, onClose }: { slug: string; onClose: () => void }) {
                     <span className={cn("absolute -left-[21px] top-1.5 h-2.5 w-2.5 rounded-full border-2 border-panel", live ? "bg-pos" : "bg-line-strong")} />
                     <div className="flex flex-wrap items-baseline justify-between gap-2">
                       <span className="text-[13.5px] font-medium capitalize text-ink">{stageName(s)}</span>
-                      <span className="num text-[12.5px] text-ink-2">{price(s)} · max {s.max_per_wallet}/wallet</span>
+                      <span className="num text-[12.5px] text-ink-2">{price(s, d.chain)} · max {s.max_per_wallet}/wallet</span>
                     </div>
                     <div className="mt-0.5 flex flex-wrap items-center gap-3 text-[12px] text-muted">
                       <span className="num">{new Date(s.start_time).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}</span>

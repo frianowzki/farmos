@@ -344,11 +344,11 @@ export function buildTools() {
       },
     }),
     listProjects: tool({
-      description: "List projects in the user's farmOS database (name, category, status, tier, risk, chains, deadline). Use to avoid duplicates and to prioritise.",
+      description: "List projects in the user's farmOS database (name, category, status, tier, risk, eligibility, chains, deadline). Use to avoid duplicates and to prioritise.",
       inputSchema: z.object({ category: z.enum(["airdrop", "testnet", "nft", "degen"]).optional(), status: z.string().optional(), query: z.string().optional() }),
       execute: async ({ category, status, query }) => {
         let rows = await db()
-          .select({ id: schema.projects.id, name: schema.projects.name, category: schema.projects.category, status: schema.projects.status, tier: schema.projects.tier, risk: schema.projects.risk, chains: schema.projects.chains, deadline: schema.projects.deadline, keyDates: schema.projects.keyDates, tags: schema.projects.tags })
+          .select({ id: schema.projects.id, name: schema.projects.name, category: schema.projects.category, status: schema.projects.status, tier: schema.projects.tier, risk: schema.projects.risk, eligibility: schema.projects.eligibility, chains: schema.projects.chains, deadline: schema.projects.deadline, keyDates: schema.projects.keyDates, tags: schema.projects.tags })
           .from(schema.projects)
           .where(query ? ilike(schema.projects.name, `%${query}%`) : undefined)
           .orderBy(desc(schema.projects.updatedAt))

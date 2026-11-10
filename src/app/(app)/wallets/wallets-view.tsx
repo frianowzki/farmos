@@ -8,6 +8,7 @@ import { ChainLogo, ChainStack } from "@/components/chain-logo";
 import { WalletIcon } from "@/components/wallet-icon";
 import { ProviderPicker, WalletModal, type WalletModalView } from "@/components/wallet-forms";
 import { brandFromConnector } from "@/lib/wallet-brands";
+import { FAMILY_CHAIN, walletFamily } from "@/lib/wallet-chains";
 import Link from "next/link";
 import { useState } from "react";
 import { toast } from "@/lib/client/toast";
@@ -61,7 +62,7 @@ function Inner() {
 
   return (
     <Page>
-      <PageHeader title="Wallets" subtitle="Read-only. farmOS never asks for signatures or sends transactions." />
+      <PageHeader title="Wallets" />
 
       <div className="mb-8 rounded-xl border border-line bg-panel p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -104,14 +105,14 @@ function Inner() {
           {linked.map((w) => <WalletRow key={w.id} w={w} />)}
         </div>
       )}
-      <WalletModal view={modal} setView={setModal} onConnect={() => (isConnected ? connectAnother() : openConnectModal?.())} connectLabel={isConnected ? "Connect another wallet app" : "Connect a wallet app"} />
+      <WalletModal view={modal} setView={setModal} onConnect={() => (isConnected ? connectAnother() : openConnectModal?.())} connectLabel={isConnected ? "Another EVM wallet" : "EVM wallet"} />
     </Page>
   );
 }
 
 type TrackSnap = { wallets: { address: string; holdings: { chain: string }[] }[] };
 
-function WalletRow({ w }: { w: { id: string; address: string; label: string; provider: string } }) {
+function WalletRow({ w }: { w: { id: string; address: string; label: string; provider: string; chain?: string } }) {
   const [open, setOpen] = useState(false);
   const qc = useQueryClient();
   const track = useQuery({ queryKey: ["wallet-track"], queryFn: () => api<TrackSnap>("/api/wallets/track"), staleTime: 5 * 60_000 });
@@ -119,6 +120,7 @@ function WalletRow({ w }: { w: { id: string; address: string; label: string; pro
   const { data } = useProjects();
   const used = (data?.projects ?? []).filter((p) => p.wallets.some((x) => x.toLowerCase() === w.address.toLowerCase()));
   const evm = isAddress(w.address);
+  const fam = walletFamily(w);
   return (
     <div>
       <div className="group flex items-center gap-3 px-3 py-2">
@@ -130,7 +132,7 @@ function WalletRow({ w }: { w: { id: string; address: string; label: string; pro
           <InlineText value={w.label} placeholder="Add label" onSave={async (v) => { await api(`/api/wallets/${w.id}`, { method: "PATCH", body: { label: v } }); qc.invalidateQueries({ queryKey: keys.wallets }); }} />
         </div>
         <span className="num min-w-0 flex-1 truncate text-[12.5px] text-ink-2">{w.address}</span>
-        {held.length > 0 && <span className="hidden md:inline-flex"><ChainStack chains={held} size={16} max={5} /></span>}
+        {held.length > 0 ? <span className="hidden md:inline-flex"><ChainStack chains={held} size={16} max={5} /></span> : !evm && fam && <span className="hidden md:inline-flex"><ChainLogo chain={FAMILY_CHAIN[fam]} size={16} /></span>}
         <div className="hidden items-center gap-1 sm:flex">{used.slice(0, 3).map((p) => <Link key={p.id} href={`/projects/${p.id}`} title={p.name}><ProjectMark p={p} size={18} /></Link>)}{used.length > 3 && <span className="text-[11.5px] text-faint">+{used.length - 3}</span>}</div>
         <button onClick={() => { navigator.clipboard.writeText(w.address); toast.success("Copied"); }} className="rounded p-1 text-faint hover:text-ink" aria-label="Copy"><Copy className="h-3.5 w-3.5" /></button>
         {evm && <a href={`https://debank.com/profile/${w.address}`} target="_blank" rel="noreferrer" className="rounded p-1 text-faint hover:text-ink" aria-label="Open in DeBank"><ExternalLink className="h-3.5 w-3.5" /></a>}

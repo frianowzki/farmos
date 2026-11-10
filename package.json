@@ -28,6 +28,8 @@
     "@tiptap/react": "^3.33.0",
     "@tiptap/starter-kit": "^3.33.0",
     "@vercel/blob": "^2.9.0",
+    "@wallet-standard/app": "^1.1.1",
+    "@wallet-standard/base": "^1.1.1",
     "ai": "^7.0.166",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

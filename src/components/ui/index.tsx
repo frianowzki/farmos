@@ -265,15 +265,53 @@ export function Field({ label, children, hint }: { label: string; children: Reac
   );
 }
 
-export function NativeSelect({ value, onChange, options, className }: { value: string; onChange: (v: string) => void; options: readonly { id: string; label: string }[]; className?: string }) {
+/**
+ * App-wide dropdown, same look as the Projects "Status" filter: a quiet trigger button and a
+ * popover of pills with a check on the current one. (Kept the NativeSelect name so callers stay put.)
+ */
+export function NativeSelect({ value, onChange, options, className, icon, label, variant = "field", align = "start", width, ariaLabel }: { value: string; onChange: (v: string) => void; options: readonly { id: string; label: string; tone?: string }[]; className?: string; icon?: ReactNode; label?: string; variant?: "field" | "ghost"; align?: "start" | "end"; width?: number; ariaLabel?: string }) {
+  const [open, setOpen] = useState(false);
+  const [btn, setBtn] = useState<HTMLButtonElement | null>(null);
+  const cur = options.find((o) => o.id === value);
   return (
-    <div className={cn("relative", className)}>
-      <select value={value} onChange={(e) => onChange(e.target.value)} className="h-8 w-full appearance-none rounded-md border border-line bg-panel pl-2.5 pr-7 text-[13.5px] text-ink focus:outline-none focus:ring-2 focus:ring-[var(--ring)]">
-        {options.map((o) => (
-          <option key={o.id} value={o.id}>{o.label}</option>
-        ))}
-      </select>
-      <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted" />
+    <div className={cn("relative", variant === "field" ? "" : "inline-flex", className)}>
+      <button
+        ref={setBtn}
+        type="button"
+        aria-label={ariaLabel ?? label}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        onClick={(e) => { e.stopPropagation(); setOpen((o) => !o); }}
+        className={cn(
+          "inline-flex h-8 min-w-0 items-center gap-1.5 rounded-md text-left text-[13px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
+          variant === "field" ? "w-full border border-line bg-panel pl-1.5 pr-2 hover:bg-hover" : cn("px-2.5 text-ink-2 hover:bg-hover hover:text-ink", open && "bg-hover text-ink"),
+        )}
+      >
+        {icon && <span className="shrink-0 text-muted [&_svg]:h-3.5 [&_svg]:w-3.5">{icon}</span>}
+        {label && <span className="shrink-0 text-ink-2">{label}</span>}
+        {label && cur && <span className="text-faint">·</span>}
+        <span className="min-w-0 flex-1 truncate">
+          {cur ? (variant === "field" ? <Pill tone={cur.tone ?? "gray"} dot={Boolean(cur.tone)}>{cur.label}</Pill> : <span className="text-ink">{cur.label}</span>) : <span className="px-1 text-faint">Select…</span>}
+        </span>
+        <ChevronDown className={cn("h-3.5 w-3.5 shrink-0 text-muted transition-transform", open && "rotate-180")} />
+      </button>
+      <Popover anchor={btn} open={open} onClose={() => setOpen(false)} align={align} width={width}>
+        <div role="listbox">
+          {options.map((o) => (
+            <button
+              key={o.id}
+              type="button"
+              role="option"
+              aria-selected={o.id === value}
+              onClick={(e) => { e.stopPropagation(); onChange(o.id); setOpen(false); }}
+              className="flex w-full items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left hover:bg-hover"
+            >
+              <Pill tone={o.tone ?? "gray"} dot={Boolean(o.tone)}>{o.label}</Pill>
+              {o.id === value && <Check className="h-3.5 w-3.5 shrink-0 text-muted" />}
+            </button>
+          ))}
+        </div>
+      </Popover>
     </div>
   );
 }

@@ -1,9 +1,9 @@
 import { asc } from "drizzle-orm";
 import { NextResponse } from "next/server";
-import { isAddress } from "viem";
 import { db, schema } from "@/db";
 import { bad, readJson, requireSession } from "@/lib/server/guard";
 import { isWalletBrand } from "@/lib/wallet-brands";
+import { familiesFor, normalizeAddress, walletFamily, type WalletFamily } from "@/lib/wallet-chains";
 
 export async function GET() {
   const denied = await requireSession();
@@ -15,14 +15,20 @@ export async function GET() {
 export async function POST(req: Request) {
   const denied = await requireSession();
   if (denied) return denied;
-  const { address, label, provider } = await readJson<{ address?: string; label?: string; provider?: string }>(req);
+  const { address, label, provider, chain } = await readJson<{ address?: string; label?: string; provider?: string; chain?: string }>(req);
   const prov = provider && isWalletBrand(provider) ? provider : "";
-  const a = (address ?? "").trim();
-  if (!isAddress(a) && !/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(a)) return bad("Enter a valid EVM or Solana address");
+  const raw = (address ?? "").trim();
+  const opts = familiesFor(raw);
+  if (!opts.length) return bad("Enter a valid EVM, Solana, Aptos, Sui or Zcash address");
+  if (chain && !opts.includes(chain as WalletFamily)) return bad(`That doesn't look like a ${chain} address`);
+  const fam = walletFamily({ address: raw, chain, provider: prov });
+  if (opts.length > 1 && !chain && !prov) return bad("Pick Aptos or Sui for this address");
+  const a = normalizeAddress(raw, fam);
+  const lbl = (label ?? "").trim().slice(0, 60);
   const [row] = await db()
     .insert(schema.wallets)
-    .values({ address: a, label: (label ?? "").trim().slice(0, 60), provider: prov })
-    .onConflictDoUpdate({ target: schema.wallets.address, set: { label: (label ?? "").trim().slice(0, 60), ...(prov ? { provider: prov } : {}) } })
+    .values({ address: a, label: lbl, provider: prov, chain: fam ?? "" })
+    .onConflictDoUpdate({ target: schema.wallets.address, set: { label: lbl, chain: fam ?? "", ...(prov ? { provider: prov } : {}) } })
     .returning();
   return NextResponse.json({ wallet: row }, { status: 201 });
 }

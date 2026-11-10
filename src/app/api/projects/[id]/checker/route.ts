@@ -59,6 +59,9 @@ export async function POST(_: Request, ctx: Ctx) {
   if (!wallets.length) return bad("Link an EVM wallet first", 412);
   const results = await runChecker(p.checker, wallets);
   const checker: AirdropChecker = { ...p.checker, lastRun: { at: new Date().toISOString(), results } };
-  await db().update(schema.projects).set({ checker }).where(eq(schema.projects.id, id));
+  // The checker's verdict also fills the project's Eligibility field (any wallet eligible wins).
+  const ok = results.filter((r) => r.status !== "error");
+  const eligibility = ok.some((r) => r.status === "eligible") ? "eligible" : ok.length && ok.length === results.length ? "not_eligible" : p.eligibility;
+  await db().update(schema.projects).set({ checker, eligibility }).where(eq(schema.projects.id, id));
   return NextResponse.json({ checker });
 }
