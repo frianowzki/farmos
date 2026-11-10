@@ -157,6 +157,9 @@
 html {
   color-scheme: light;
   -webkit-text-size-adjust: 100%;
+  /* No double-tap zoom; taps fire immediately. */
+  touch-action: manipulation;
+  overflow-x: clip;
 }
 html.dark {
   color-scheme: dark;
@@ -169,6 +172,23 @@ body {
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   font-feature-settings: "ss01", "cv11";
+  overflow-x: clip;
+  max-width: 100vw;
+}
+button, a, input, textarea, select, label, [role="button"] {
+  touch-action: manipulation;
+}
+/* Mobile: iOS zooms on focus when a field's text is under 16px. Keep every editable at 16px. */
+@media (max-width: 767px), (pointer: coarse) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  textarea,
+  select,
+  [contenteditable="true"] {
+    font-size: 16px !important;
+  }
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
 }
 ::selection {
   background: var(--accent-soft);

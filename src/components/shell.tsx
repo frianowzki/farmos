@@ -18,7 +18,6 @@ import {
   AnimatedSidebarInset, AnimatedSidebarMenu, AnimatedSidebarMenuButton, AnimatedSidebarMenuItem, AnimatedSidebarProvider, AnimatedSidebarTrigger,
   useAnimatedSidebar,
 } from "@/components/motion/animated-sidebar";
-import { Dock, DockItem } from "@/components/motion/dock";
 import { MorphingModal } from "@/components/motion/morphing-modal";
 import { Tabs, TabsList, TabsTrigger } from "@/components/motion/tabs";
 import { Fab } from "@/components/panelui/fab";
@@ -245,40 +244,6 @@ function SidebarBody() {
   );
 }
 
-function MobileDock({ onAdd }: { onAdd: () => void }) {
-  const pathname = usePathname();
-  const items = [
-    { href: "/", label: "Today", icon: SunMedium },
-    { href: "/projects", label: "Projects", icon: Layers },
-    { href: "/tasks", label: "Tasks", icon: ListChecks },
-    { href: "/assistant", label: "Research", icon: Telescope },
-  ];
-  const active = (h: string) => (h === "/" ? pathname === "/" : pathname.startsWith(h));
-  return (
-    <nav aria-label="Quick navigation" className="fixed inset-x-0 bottom-0 z-50 flex justify-center pb-[max(0.6rem,env(safe-area-inset-bottom))] md:hidden">
-      <Dock size={46} className="items-center">
-        {items.slice(0, 2).map((i) => (
-          <DockItem key={i.href} active={active(i.href)}>
-            <Link href={i.href} aria-label={i.label} aria-current={active(i.href) ? "page" : undefined} className={cn("flex h-full w-full items-center justify-center rounded-full", active(i.href) ? "text-ink" : "text-muted")}>
-              <i.icon className="h-[19px] w-[19px]" strokeWidth={1.75} />
-            </Link>
-          </DockItem>
-        ))}
-        <DockItem onClick={onAdd} aria-label="Quick add">
-          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-accent text-accent-ink"><Plus className="h-[18px] w-[18px]" strokeWidth={2.2} /></span>
-        </DockItem>
-        {items.slice(2).map((i) => (
-          <DockItem key={i.href} active={active(i.href)}>
-            <Link href={i.href} aria-label={i.label} aria-current={active(i.href) ? "page" : undefined} className={cn("flex h-full w-full items-center justify-center rounded-full", active(i.href) ? "text-ink" : "text-muted")}>
-              <i.icon className="h-[19px] w-[19px]" strokeWidth={1.75} />
-            </Link>
-          </DockItem>
-        ))}
-      </Dock>
-    </nav>
-  );
-}
-
 function NewProjectForm({ initialCategory, onDone }: { initialCategory?: string; onDone: () => void }) {
   const router = useRouter();
   const create = useCreateProject();
@@ -490,21 +455,26 @@ export function AppShell({ children }: { children: ReactNode }) {
           </Suspense>
         </AnimatedSidebar>
         <AnimatedSidebarInset className="bg-bg">
-          <header className="sticky top-0 z-40 flex h-12 items-center justify-between border-b border-line bg-bg px-3 md:hidden">
-            <AnimatedSidebarTrigger className="rounded-md p-1.5 text-ink-2 hover:bg-hover" aria-label="Open menu">
-              <Menu className="h-5 w-5" />
-            </AnimatedSidebarTrigger>
-            <Link href="/"><Logo /></Link>
-            <button onClick={openPalette} className="rounded-md p-1.5 text-ink-2 hover:bg-hover" aria-label="Search">
-              <Search className="h-[18px] w-[18px]" />
-            </button>
+          {/* Mobile: no dock. The menu button opens the sidebar as a drawer, so every page stays reachable. */}
+          <header className="sticky top-0 z-40 border-b border-line bg-bg/90 pt-[env(safe-area-inset-top)] backdrop-blur-md md:hidden">
+            <div className="grid h-12 grid-cols-[auto_1fr_auto] items-center gap-2 pl-[max(0.5rem,env(safe-area-inset-left))] pr-[max(0.5rem,env(safe-area-inset-right))]">
+              <AnimatedSidebarTrigger className="flex h-10 w-10 items-center justify-center rounded-lg text-ink-2 hover:bg-hover" aria-label="Open menu">
+                <Menu className="h-5 w-5" />
+              </AnimatedSidebarTrigger>
+              <Link href="/" className="justify-self-center"><Logo /></Link>
+              <div className="flex items-center">
+                <button onClick={openPalette} className="flex h-10 w-10 items-center justify-center rounded-lg text-ink-2 hover:bg-hover" aria-label="Search">
+                  <Search className="h-[18px] w-[18px]" />
+                </button>
+                <button onClick={openQuick} className="flex h-10 w-10 items-center justify-center rounded-lg text-ink-2 hover:bg-hover" aria-label="Quick add">
+                  <span className="flex h-7 w-7 items-center justify-center rounded-full bg-accent text-accent-ink"><Plus className="h-4 w-4" strokeWidth={2.2} /></span>
+                </button>
+              </div>
+            </div>
           </header>
-          <div className="min-w-0 flex-1 pb-20 md:pb-0">{children}</div>
+          <div className="min-w-0 max-w-full flex-1 overflow-x-clip">{children}</div>
         </AnimatedSidebarInset>
       </AnimatedSidebarProvider>
-      <Suspense fallback={null}>
-        <MobileDock onAdd={openQuick} />
-      </Suspense>
       <Fab
         className="bottom-6 right-6 hidden md:flex"
         label="Create"
@@ -538,7 +508,7 @@ export function Page({ children, wide }: { children: ReactNode; wide?: boolean }
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.28, ease: [0.2, 0.8, 0.2, 1] }}
-      className={cn("mx-auto w-full px-4 pb-24 pt-6 sm:px-8 md:pt-10", wide ? "max-w-[1280px]" : "max-w-[980px]")}
+      className={cn("mx-auto w-full min-w-0 px-4 pb-[calc(2.5rem+env(safe-area-inset-bottom))] pt-5 sm:px-8 md:pb-24 md:pt-10", wide ? "max-w-[1280px]" : "max-w-[980px]")}
     >
       {children}
     </motion.div>

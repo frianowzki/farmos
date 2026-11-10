@@ -195,12 +195,12 @@ function ApiKeysSection() {
           <span><span className="font-medium text-ink">Keep secret keys secure.</span> They never reach the browser; only a masked preview is shown here. Rotate a leaked key at the provider, then replace it.</span>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[620px] text-left text-[13px]">
+          <table className="w-full min-w-[680px] text-left text-[13px]">
             <thead>
               <tr className="border-b border-line text-[11.5px] uppercase tracking-[0.08em] text-faint">
-                <th className="px-4 py-2 font-medium">Name</th>
+                <th className="w-[40%] px-4 py-2 font-medium">Name</th>
                 <th className="px-4 py-2 font-medium">Token</th>
-                <th className="px-4 py-2 font-medium">Stored in</th>
+                <th className="whitespace-nowrap px-4 py-2 font-medium">Stored in</th>
                 <th className="px-4 py-2 text-right font-medium">Actions</th>
               </tr>
             </thead>
@@ -253,8 +253,12 @@ function MaskedToken({ mask }: { mask: string }) {
 }
 
 function EnvTag({ kind }: { kind: "saved" | "env" | "none" }) {
+  return <span className="whitespace-nowrap">{envTag(kind)}</span>;
+}
+
+function envTag(kind: "saved" | "env" | "none") {
   if (kind === "none") return <Marker tone="gray">Not set</Marker>;
-  return kind === "saved" ? <Marker tone="green">Encrypted · settings</Marker> : <Marker tone="blue">Server env</Marker>;
+  return kind === "saved" ? <Marker tone="green">Encrypted</Marker> : <Marker tone="blue">Server env</Marker>;
 }
 
 function GoogleSection({ appUrl, allowedEmail }: { appUrl: string; allowedEmail: boolean }) {

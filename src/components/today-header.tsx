@@ -74,7 +74,7 @@ export function TodayHeader({ name, line }: { name: string; line: React.ReactNod
               prefix={`${greeting(now.getHours())},`}
               words={[`${name}.`, "stay early.", "farm smart.", "ship daily."]}
               colors={["#a3e635", "#34d399", "#22d3ee", "#818cf8", "#f472b6"]}
-              foregroundColor="currentColor"
+              foregroundColor="var(--ink-2)"
               duration={1.1}
               delay={0.35}
               pauseDuration={2.6}
@@ -83,15 +83,15 @@ export function TodayHeader({ name, line }: { name: string; line: React.ReactNod
             />
           </motion.p>
         </div>
-        <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="shrink-0 text-right">
-          <div className="num flex items-baseline justify-end text-[30px] font-medium leading-none tracking-[-0.02em] text-ink sm:text-[34px]" aria-label={`${hh}:${mm}`}>
+        <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="shrink-0 text-left sm:text-right">
+          <div className="num flex items-baseline justify-start text-[30px] sm:justify-end font-medium leading-none tracking-[-0.02em] text-ink sm:text-[34px]" aria-label={`${hh}:${mm}`}>
             <Digit d={hh[0]} /><Digit d={hh[1]} />
             <motion.span animate={{ opacity: [1, 0.25, 1] }} transition={{ duration: 1, repeat: Infinity }} className="mx-[0.04em]">:</motion.span>
             <Digit d={mm[0]} /><Digit d={mm[1]} />
             <span className="ml-1.5 text-[0.5em] text-faint"><Digit d={ss[0]} /><Digit d={ss[1]} /></span>
             <span className="ml-2 text-[12px] font-normal tracking-normal text-muted">{tz}</span>
           </div>
-          <div className="mt-2 flex items-center justify-end gap-2 text-[11.5px] text-muted">
+          <div className="mt-2 flex items-center justify-start gap-2 text-[11.5px] text-muted sm:justify-end">
             <span>{Math.floor(dayPct)}% of the day</span>
             <span className="h-1 w-24 overflow-hidden rounded-full bg-hover">
               <motion.span className="block h-full rounded-full bg-accent" initial={{ width: 0 }} animate={{ width: `${dayPct}%` }} transition={{ duration: 0.8, ease: [0.2, 0.8, 0.2, 1] }} />

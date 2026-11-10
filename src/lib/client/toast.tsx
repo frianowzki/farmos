@@ -81,7 +81,7 @@ export function Toaster() {
       position="bottom-right"
       fixed
       maxVisible={4}
-      className="bottom-20 right-4 md:bottom-5 md:right-5"
+      className="bottom-[calc(1rem+env(safe-area-inset-bottom))] right-4 md:bottom-5 md:right-5"
       classNames={{ surface: "border-line bg-panel shadow-pop", title: "text-[13.5px] text-ink", description: "text-[12.5px] text-muted" }}
     />
   );

@@ -156,7 +156,7 @@ function Composer({
         className={cn("block w-full resize-none bg-transparent px-4 pt-3.5 text-[15px] leading-[1.5] outline-none placeholder:text-faint", big ? "min-h-[64px]" : "min-h-[44px]")}
       />
       <div className="flex items-center gap-1 px-2 pb-2 pt-1">
-        <div className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto">
+        <div className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto pr-6 [scrollbar-width:none] [mask-image:linear-gradient(to_right,black_80%,transparent)] sm:[mask-image:none]">
           {MODES.map((x) => (
             <button
               key={x.id}
