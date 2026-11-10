@@ -2,6 +2,7 @@ import "server-only";
 import { eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { decrypt, encrypt } from "./crypto";
+import { maskSecret } from "./mask";
 
 type StoredAi = { baseUrl?: string; model?: string; apiKeyEnc?: string; tools?: boolean };
 
@@ -37,6 +38,7 @@ export async function getAiConfigPublic() {
     model: c.model,
     hasKey: Boolean(c.apiKey),
     keyFromSettings: Boolean(s.apiKeyEnc),
+    keyMask: maskSecret(c.apiKey),
     source: c.source,
     configured: Boolean(c.baseUrl && c.model),
     tools: s.tools !== false,

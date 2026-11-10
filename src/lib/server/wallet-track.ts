@@ -28,27 +28,24 @@ const TOKENS: Record<string, { symbol: string; address: Address; cg?: string }[]
     { symbol: "WETH", address: "0x4200000000000000000000000000000000000006", cg: "ethereum" },
     { symbol: "OP", address: "0x4200000000000000000000000000000000000042", cg: "optimism" },
   ],
-  bnb: [
+  bsc: [
     { symbol: "USDT", address: "0x55d398326f99059fF775485246999027B3197955" },
     { symbol: "USDC", address: "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d" },
   ],
-  polygon: [
-    { symbol: "USDC", address: "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359" },
-    { symbol: "USDT", address: "0xc2132D05D31c914a87C6611C10748AEb04B58e8F" },
-    { symbol: "WETH", address: "0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619", cg: "ethereum" },
-  ],
-  linea: [
-    { symbol: "USDC", address: "0x176211869cA2b568f2A7D4EE941E073a821EE1ff" },
-    { symbol: "WETH", address: "0xe5D7C2a44FfDDf6b295A15c148167daaAf5Cf34f", cg: "ethereum" },
+  avalanche: [
+    { symbol: "USDC", address: "0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E" },
+    { symbol: "USDT", address: "0x9702230A8Ea53601f5cD2dc00fDBc13d4dF4A8c7" },
   ],
   ink: [{ symbol: "WETH", address: "0x4200000000000000000000000000000000000006", cg: "ethereum" }],
   hyperevm: [],
+  robinhood: [],
+  elysium: [],
 };
 
 /** CoinGecko ids for native gas tokens. */
 const NATIVE_CG: Record<string, string> = {
-  ethereum: "ethereum", base: "ethereum", arbitrum: "ethereum", optimism: "ethereum", linea: "ethereum", ink: "ethereum",
-  bnb: "binancecoin", polygon: "polygon-ecosystem-token", hyperevm: "hyperliquid",
+  ethereum: "ethereum", base: "ethereum", arbitrum: "ethereum", optimism: "ethereum", ink: "ethereum", robinhood: "ethereum",
+  bsc: "binancecoin", avalanche: "avalanche-2", hyperevm: "hyperliquid", elysium: "hyperliquid",
 };
 const STABLES = new Set(["USDC", "USDT"]);
 export const TRACK_CHAINS = Object.keys(TOKENS);
@@ -106,9 +103,25 @@ async function prices(ids: string[]): Promise<Record<string, number>> {
   }
 }
 
+const SOL_RE = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
+const SOL_RPC = "https://solana-rpc.publicnode.com";
+
+/** Native SOL balances over public RPC (lamports → SOL). */
+async function solanaBalances(addrs: string[]): Promise<Map<string, number>> {
+  const out = new Map<string, number>();
+  if (!addrs.length) return out;
+  const body = addrs.map((a, i) => ({ jsonrpc: "2.0", id: i, method: "getBalance", params: [a, { commitment: "confirmed" }] }));
+  const r = await fetch(SOL_RPC, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body), cache: "no-store", signal: AbortSignal.timeout(12_000) });
+  const j = (await r.json()) as { id: number; result?: { value: number } }[];
+  for (const x of Array.isArray(j) ? j : []) if (typeof x.result?.value === "number") out.set(addrs[x.id], x.result.value / 1e9);
+  return out;
+}
+
 export async function trackWallets(): Promise<TrackSnapshot> {
   const d = db();
-  const wallets = (await d.select().from(schema.wallets)).filter((w) => isAddress(w.address));
+  const all = await d.select().from(schema.wallets);
+  const sol = all.filter((w) => !isAddress(w.address) && SOL_RE.test(w.address));
+  const wallets = all.filter((w) => isAddress(w.address));
   const addrs = wallets.map((w) => getAddress(w.address));
   const res = new Map<string, WalletTrack>(wallets.map((w) => [w.address.toLowerCase(), { address: w.address, label: w.label, holdings: [], totalUsd: 0, errors: [] }]));
   const sources: TrackSnapshot["sources"] = {};
@@ -157,6 +170,20 @@ export async function trackWallets(): Promise<TrackSnapshot> {
       }
     }),
   );
+
+  for (const w of sol) res.set(w.address, { address: w.address, label: w.label, holdings: [], totalUsd: 0, errors: [] });
+  if (sol.length) {
+    try {
+      const bals = await solanaBalances(sol.map((w) => w.address));
+      for (const w of sol) {
+        const v = bals.get(w.address) ?? 0;
+        if (v > 0) raw.push({ addr: w.address, chain: "solana", symbol: "SOL", token: null, amount: v, cg: "solana" });
+      }
+      sources.solana = "rpc";
+    } catch (e) {
+      for (const w of sol) res.get(w.address)!.errors.push(`Solana: ${(e as Error).message.slice(0, 60)}`);
+    }
+  }
 
   const px = await prices(raw.map((r) => r.cg).filter(Boolean) as string[]);
   for (const r of raw) {
@@ -213,8 +240,8 @@ export async function getTrack(force = false): Promise<TrackSnapshot & { cached:
   const cached = await getSetting<TrackSnapshot>("wallet_track");
   if (!force && cached && Date.now() - +new Date(cached.fetchedAt) < TTL_MS) {
     // invalidate when the set of linked wallets changed
-    const now = (await db().select({ a: schema.wallets.address }).from(schema.wallets)).map((w) => w.a.toLowerCase()).filter((a) => isAddress(a)).sort().join();
-    const was = cached.wallets.map((w) => w.address.toLowerCase()).sort().join();
+    const now = (await db().select({ a: schema.wallets.address }).from(schema.wallets)).map((w) => w.a).filter((a) => isAddress(a) || SOL_RE.test(a)).map((a) => (isAddress(a) ? a.toLowerCase() : a)).sort().join();
+    const was = cached.wallets.map((w) => (isAddress(w.address) ? w.address.toLowerCase() : w.address)).sort().join();
     if (now === was) return { ...cached, cached: true };
   }
   const snap = await trackWallets();

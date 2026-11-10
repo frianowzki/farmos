@@ -1,5 +1,6 @@
 import "server-only";
 import { z } from "zod";
+import { splitChains } from "@/lib/chain-meta";
 
 const day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional();
 const money = z.coerce.number().finite().optional();
@@ -10,7 +11,8 @@ export const projectInput = z
     name: z.string().trim().min(1).max(200),
     category: z.enum(["airdrop", "testnet", "nft", "degen"]),
     status: z.enum(["research", "active", "waiting", "claimable", "done", "dropped"]),
-    chains: strList,
+    // Only supported chains are stored; aliases (bnb, eth, hyperliquid…) map to the canonical name.
+    chains: strList.transform((l) => (l ? splitChains(l).keep : l)),
     links: z.record(z.string(), z.string().trim().max(500)).optional(),
     wallets: strList,
     tags: strList,
@@ -41,6 +43,22 @@ export const projectInput = z
         answers: z.record(z.string().max(40), z.array(z.string().max(40)).max(12)),
         score: z.number().min(0).max(100),
         updatedAt: z.string().max(40),
+        ai: z
+          .object({
+            rating: z.number().int().min(1).max(5),
+            score: z.number().min(0).max(100),
+            tier: z.enum(["S", "A", "B", "C"]).nullable().optional(),
+            risk: z.enum(["low", "medium", "high", "extreme"]).nullable().optional(),
+            verdict: z.string().max(40),
+            summary: z.string().max(1200),
+            reasons: z.array(z.object({ kind: z.enum(["pro", "con", "unknown"]), text: z.string().max(400) })).max(12),
+            sources: z.array(z.object({ title: z.string().max(160), url: z.string().max(500) })).max(10),
+            answers: z.record(z.string().max(40), z.array(z.string().max(40)).max(12)),
+            model: z.string().max(120).optional(),
+            at: z.string().max(40),
+          })
+          .nullable()
+          .optional(),
       })
       .nullable(),
     sortOrder: z.coerce.number().int(),

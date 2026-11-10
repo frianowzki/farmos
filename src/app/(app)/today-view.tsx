@@ -4,8 +4,9 @@ import { ArrowUpRight, CalendarDays, Check, Flame, ListChecks, NotebookPen, Plus
 import Link from "next/link";
 import { LayoutGroup, motion } from "motion/react";
 import { useMemo } from "react";
-import { useMounted } from "@/lib/client/use-mounted";
-import { Monogram, Page, useShell } from "@/components/shell";
+import { Page, useShell } from "@/components/shell";
+import { ProjectMark } from "@/components/project-mark";
+import { TodayHeader } from "@/components/today-header";
 import { Heatmap, TaskRow, useTaskModel, weekRate } from "@/components/tasks";
 import { Button, Pill, SectionTitle, Skeleton } from "@/components/ui";
 import { cn } from "@/lib/cn";
@@ -18,19 +19,10 @@ import { catTone } from "@/lib/options";
 import { sumPnl } from "@/lib/pnl";
 import { pnlFor, projectDates } from "@/lib/project-utils";
 
-function greeting(h: number) {
-  if (h < 5) return "Up late";
-  if (h < 12) return "Good morning";
-  if (h < 18) return "Good afternoon";
-  return "Good evening";
-}
-
 export function TodayView() {
   const { data, isLoading } = useProjects();
   const model = useTaskModel();
   const { newProject } = useShell();
-  const mounted = useMounted();
-  const now = mounted ? new Date() : null;
   const today = model.today;
 
   const projects = useMemo(() => data?.projects ?? [], [data]);
@@ -54,21 +46,16 @@ export function TodayView() {
 
   return (
     <Page wide>
-      <div className="mb-8">
-        <div className="num text-[12px] text-muted">{now ? now.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" }) : "\u00a0"}</div>
-        <h1 className="mt-1 font-serif text-[34px] leading-[1.1] tracking-[-0.015em] sm:text-[40px]">
-          {now ? greeting(now.getHours()) : "\u00a0"}<span className="text-faint">,</span> <span className="italic">Iya</span>
-        </h1>
-        <p className="mt-2 text-[14px] text-muted">
-          {isLoading ? "\u00a0" : fresh ? "A clean desk. Let's set it up." : (
-            <>
-              {open.length ? `${open.length} task${open.length > 1 ? "s" : ""} left today` : model.rows.length ? "All of today's tasks are done" : "No recurring tasks yet"}
-              {upcoming.length > 0 && ` · ${upcoming.filter((u) => diffDays(u.day, today) <= 7 && diffDays(u.day, today) >= 0).length} dates this week`}
-              {claimable.length > 0 && ` · ${claimable.length} claimable`}
-            </>
-          )}
-        </p>
-      </div>
+      <TodayHeader
+        name="Iya"
+        line={isLoading ? "\u00a0" : fresh ? "A clean desk. Let's set it up." : (
+          <>
+            {open.length ? `${open.length} task${open.length > 1 ? "s" : ""} left today` : model.rows.length ? "All of today's tasks are done" : "No recurring tasks yet"}
+            {upcoming.length > 0 && ` · ${upcoming.filter((u) => diffDays(u.day, today) <= 7 && diffDays(u.day, today) >= 0).length} dates this week`}
+            {claimable.length > 0 && ` · ${claimable.length} claimable`}
+          </>
+        )}
+      />
 
       {!fresh && !isLoading && <TodayKpis projects={projects} today={today} />}
       {fresh ? (
@@ -118,7 +105,7 @@ export function TodayView() {
                     return (
                       <Link key={`${u.projectId}-${u.kind}`} href={`/projects/${u.projectId}`} className="flex items-center gap-3 px-3 py-2.5 transition-colors hover:bg-hover">
                         <div className={cn("num w-[78px] shrink-0 text-[12.5px]", d <= 1 ? "text-accent" : "text-muted")}>{relDay(u.day, today)}</div>
-                        <Monogram name={u.projectName} size={20} />
+                        <ProjectMark p={projects.find((x) => x.id === u.projectId) ?? { name: u.projectName }} size={20} />
                         <div className="min-w-0 flex-1 truncate text-[13.5px]">{u.projectName}</div>
                         <Pill tone={catTone(u.category)}>{u.label}</Pill>
                       </Link>

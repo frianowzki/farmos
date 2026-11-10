@@ -1,6 +1,6 @@
 # farmOS setup
 
-Production: https://farmos-os.vercel.app and https://frioos-iota.vercel.app (Vercel project `frioos`, team frianowzkis-projects).
+Production: **https://farmos-os.vercel.app** (canonical, `APP_URL`). The old alias https://frioos-iota.vercel.app redirects there (pages and `/api/auth/*`, see `src/proxy.ts`), so every OAuth provider only needs the farmos-os URLs. Vercel project `frioos`, team frianowzkis-projects.
 
 ## 0. Unlock
 - The app is behind a passcode gate (`APP_PASSCODE`, kept in an httpOnly signed cookie for 30 days).
@@ -20,11 +20,12 @@ Until these env vars exist, the Mail and Calendar sections show a setup card. No
    - User type: External.
    - App name: farmOS, with your email as support/developer contact.
    - Scopes: add `.../auth/gmail.readonly` and `.../auth/calendar.events` (plus openid, email, profile).
-   - Publishing status: leave it in **Testing** and add your own Gmail under **Test users**. Testing mode means no Google verification is needed. Refresh tokens in Testing mode expire after 7 days, so if mail stops loading, reconnect in Settings.
+   - Publishing status: leave it in **Testing** and add your own Gmail under **Audience → Test users**. Testing mode means no Google verification is needed. Refresh tokens in Testing mode expire after 7 days, so if mail stops loading, reconnect in Settings.
+   - "Access blocked: … has not completed the Google verification process" means the Google account you signed in with is **not on the Test users list** (or the app was switched to *In production*, where `gmail.readonly` needs verification). Add the account as a test user and keep the app in Testing.
 4. Under APIs & Services → Credentials → Create credentials → OAuth client ID:
    - Type: **Web application**.
-   - Authorized JavaScript origin: `https://frioos-iota.vercel.app`.
-   - Authorized redirect URI: `https://frioos-iota.vercel.app/api/auth/callback/google`.
+   - Authorized JavaScript origin: `https://farmos-os.vercel.app`.
+   - Authorized redirect URI: `https://farmos-os.vercel.app/api/auth/callback/google`.
    - For local dev, also add `http://localhost:3000` and `http://localhost:3000/api/auth/callback/google`.
 5. In Vercel → frioos → Settings → Environment Variables (Production + Preview), add:
    - `GOOGLE_CLIENT_ID`
@@ -69,27 +70,27 @@ Tools are public read-only data: DefiLlama, DexScreener, GeckoTerminal, CoinGeck
 ## 5. Connected accounts (Settings → Connected accounts)
 Every provider is optional. When its keys are missing, Settings shows "Not set up" with the exact env var names and callback URL, and nothing else breaks. Tokens are AES-GCM encrypted with `AUTH_SECRET` in the `connected_accounts` table and never reach the browser. Connecting needs an unlocked session first; these logins do **not** unlock farmOS (only the passcode or `ALLOWED_EMAIL` Google can).
 
-Callback URL pattern: `https://frioos-iota.vercel.app/api/auth/callback/<provider>`. Add the localhost one too if you develop locally.
+Callback URL pattern: `https://farmos-os.vercel.app/api/auth/callback/<provider>`. Add the localhost one too if you develop locally.
 
 **X** (Feed → X timeline, read-only)
 1. https://developer.x.com → Projects & Apps → your app → User authentication settings → OAuth 2.0, type **Web App**, permissions **Read**.
-2. Callback URL: `https://frioos-iota.vercel.app/api/auth/callback/x`. Website URL: `https://frioos-iota.vercel.app`.
+2. Callback URL: `https://farmos-os.vercel.app/api/auth/callback/x`. Website URL: `https://farmos-os.vercel.app`. "You weren't able to give access to the App" means the callback doesn't match exactly or OAuth 2.0 isn't enabled as a Web App (confidential client).
 3. Copy the OAuth 2.0 Client ID and Secret into `X_CLIENT_ID` and `X_CLIENT_SECRET`.
 4. Scopes requested: `users.read tweet.read follows.read offline.access`. The home timeline needs a paid X API tier (Basic or higher). On Free, the Feed shows X's plan message instead of posts. On 429 it shows the rate-limit message.
 
 **Discord** (identity on your profile)
 1. https://discord.com/developers/applications → New Application → OAuth2.
-2. Redirect: `https://frioos-iota.vercel.app/api/auth/callback/discord`.
+2. Redirect: `https://farmos-os.vercel.app/api/auth/callback/discord`.
 3. `DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET`. Scope: `identify` only.
 
 **GitHub** (identity, public profile)
 1. https://github.com/settings/developers → New OAuth App.
-2. Homepage `https://frioos-iota.vercel.app`, callback `https://frioos-iota.vercel.app/api/auth/callback/github`.
+2. Homepage `https://farmos-os.vercel.app`, callback `https://farmos-os.vercel.app/api/auth/callback/github`.
 3. `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`. Scope: `read:user`.
 
 **Telegram** (official Login Widget)
 1. In Telegram, message @BotFather → `/newbot` → copy the token into `TELEGRAM_BOT_TOKEN` (server-only).
-2. Send `/setdomain` to @BotFather, choose the bot, and enter `frioos-iota.vercel.app`.
+2. Send `/setdomain` to @BotFather, choose the bot, and enter `farmos-os.vercel.app`.
 3. Set `NEXT_PUBLIC_TELEGRAM_BOT_USERNAME` to the bot username without `@` (public by design).
 4. farmOS checks the widget payload's HMAC with the bot token and rejects payloads older than 24 h.
 
@@ -127,8 +128,8 @@ Uses the existing bot `@friofarmOS_bot` (`TELEGRAM_BOT_TOKEN`). The bot only sen
 The digest runs from Vercel Cron `/api/cron/daily` at `0 0 * * *` UTC = **07:00 WIB** (Hobby allows daily crons; Vercel may fire anywhere within that hour). The route is public in the proxy but requires `Authorization: Bearer $CRON_SECRET`, which Vercel adds automatically. Days are computed in `APP_TZ` (default `Asia/Jakarta`).
 
 ## 9. Wallet auto-track (Wallets page)
-For every saved EVM wallet, the server reads native balances plus main tokens (USDC, USDT, WETH, ARB, OP) on Ethereum, Base, Arbitrum, Optimism, BNB, Polygon, Linea, Ink and HyperEVM. Read-only, no signatures.
-- Native balances: Etherscan V2 `balancemulti` where the free plan covers the chain (Ethereum, Arbitrum, Polygon, Linea, HyperEVM); public RPC for the rest (Base, Optimism, BNB and Ink are paid-only on Etherscan's free tier).
+For every saved wallet, the server reads native balances plus main tokens (USDC, USDT, WETH, ARB, OP) on Ethereum, Base, Robinhood Chain, Ink, BSC, HyperEVM, Elysium (chain id 99901, `rpc.elysium.kinetiq.xyz`), Arbitrum, Optimism and Avalanche, and native SOL for Solana addresses (public RPC). Read-only, no signatures. The Portfolio page sums these balances across every linked wallet (add as many as you like there or on Wallets).
+- Native balances: Etherscan V2 `balancemulti` where the free plan covers the chain; public RPC for the rest (Base, Optimism, BSC, Ink, Robinhood Chain, Elysium).
 - ERC-20 balances: Multicall3 over public RPC; decimals are read on-chain.
 - USD: CoinGecko simple price for natives/WETH/ARB/OP, stablecoins at $1. Assets without a price show "no price" and are left out of totals.
 - Cached for 10 minutes in `settings.wallet_track` (refetched immediately if the wallet list changes); **Refresh** forces it; the daily cron refreshes too.
@@ -155,7 +156,14 @@ farmOS ships a web manifest, PNG + maskable icons (`public/icons`, rendered from
 Offline, navigations show a small "You're offline" page.
 
 ## 13. Custom domain
-Current: free `*.vercel.app` (`frioos-iota.vercel.app`, `farmos-os.vercel.app`). Nothing has been bought. To add one later: buy any domain (Vercel Domains or any registrar), add it under Vercel → Project → Domains, then set `APP_URL` to it and add it to the Google OAuth client (origin + redirect), Telegram `/setdomain`, X/Discord/GitHub callbacks, and the Reown allowlist.
+Current: free `*.vercel.app`: `farmos-os.vercel.app` (canonical) and `frioos-iota.vercel.app` (redirects to it; set `ALIAS_HOSTS` to change the list). Nothing has been bought. To add one later: buy any domain (Vercel Domains or any registrar), add it under Vercel → Project → Domains, then set `APP_URL` to it and add it to the Google OAuth client (origin + redirect), Telegram `/setdomain`, X/Discord/GitHub callbacks, and the Reown allowlist.
+
+## 14. Chains, logos and AI review
+- Supported chains (selectors, wallet tracking, AI proposals): Ethereum, Base, Robinhood Chain, Ink, BSC, HyperEVM, Elysium, Solana, Zcash, Monero, Aptos, Sui, Arbitrum, Optimism, Avalanche (`src/lib/chain-meta.ts`). Official logos are self-hosted in `public/chains`. Older chain names were normalised by `npx tsx scripts/migrate-chains.mjs --apply` (aliases → canonical name; unsupported chains move into tags as `chain:<name>`).
+- Wallet app icons (MetaMask, Rabby, Phantom, OKX, Coinbase, Rainbow, Trust, Binance, Bitget, Backpack, Zerion, WalletConnect) are the official marks shipped with RainbowKit, in `public/wallets`. A linked wallet remembers its app (`wallets.provider`); pick it from the icon on the Wallets page.
+- Project logos come from the project's X profile picture (X link → `/api/avatar/x/<handle>`, fetched through unavatar.io without keys, cached 1 day in the browser and 7 days on Vercel's CDN). No X link or no picture → the monogram.
+- **AI review** (project → Rating → AI review): the research desk checks the sources with its tools, answers the audit questionnaire with evidence only, and suggests a star rating, tier, risk and verdict with reasons and sources. Nothing changes until you press **Accept** (or **Use answers in audit** to pre-fill the questionnaire).
+- **Feed + AI**: **AI brief** streams a short briefing of today's reading list (`/api/feed/digest`); **Ask AI** on any item opens the Research desk with that item as the question.
 
 ## Env var reference
 | Var | Required | Notes |
@@ -163,7 +171,7 @@ Current: free `*.vercel.app` (`frioos-iota.vercel.app`, `farmos-os.vercel.app`).
 | `DATABASE_URL` (+ Neon vars) | yes | set by the Neon integration |
 | `APP_PASSCODE` | yes | passcode gate |
 | `AUTH_SECRET` | yes | signs sessions, encrypts stored secrets |
-| `APP_URL` | yes | `https://frioos-iota.vercel.app` |
+| `APP_URL` | yes | `https://farmos-os.vercel.app` |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `ALLOWED_EMAIL` | optional | enables Google (Gmail, Calendar, and Google sign-in unlock); set on Production + Preview |
 | `AI_BASE_URL`, `AI_API_KEY`, `AI_MODEL` | optional | or configure in Settings |
 | `ETHERSCAN_API_KEY` | optional | richer audits + full-history SeaDrop allowlists; set on Production + Preview |
@@ -176,3 +184,4 @@ Current: free `*.vercel.app` (`frioos-iota.vercel.app`, `farmos-os.vercel.app`).
 | `TELEGRAM_BOT_TOKEN`, `NEXT_PUBLIC_TELEGRAM_BOT_USERNAME` | optional | Telegram Login Widget; set on Production + Preview (`NEXT_PUBLIC_TELEGRAM_BOT_USERNAME` is `friofarmOS_bot`) |
 | `CRON_SECRET` | yes for cron | random secret, Production + Preview (sensitive); Vercel sends it as `Authorization: Bearer` to `/api/cron/daily` |
 | `APP_TZ` | optional | day boundary for digest/backups, default `Asia/Jakarta` |
+| `ALIAS_HOSTS` | optional | comma-separated hosts that redirect to `APP_URL`, default `frioos-iota.vercel.app` |

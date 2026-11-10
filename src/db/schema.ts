@@ -32,10 +32,26 @@ export type KeyDates = {
   claimEnd?: string | null;
 };
 
+/** AI-suggested review of a project's audit/rating (suggestion only; the user accepts it). */
+export type AiReview = {
+  rating: number;
+  score: number;
+  tier?: "S" | "A" | "B" | "C" | null;
+  risk?: "low" | "medium" | "high" | "extreme" | null;
+  verdict: string;
+  summary: string;
+  reasons: { kind: "pro" | "con" | "unknown"; text: string }[];
+  sources: { title: string; url: string }[];
+  answers: Record<string, string[]>;
+  model?: string;
+  at: string;
+};
+
 export type ProjectAudit = {
   answers: Record<string, string[]>;
   score: number;
   updatedAt: string;
+  ai?: AiReview | null;
 };
 
 /** Read-only airdrop eligibility checker configured per project. */
@@ -166,6 +182,8 @@ export const wallets = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     address: text("address").notNull(),
     label: text("label").notNull().default(""),
+    /** Wallet app it lives in (metamask, rabby, phantom…), for the icon. Empty = unknown. */
+    provider: text("provider").notNull().default(""),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [uniqueIndex("wallets_address_idx").on(t.address)],

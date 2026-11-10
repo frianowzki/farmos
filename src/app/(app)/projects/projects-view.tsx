@@ -1,9 +1,12 @@
 "use client";
+import { Checkbox } from "@/components/motion/checkbox";
+import { ProjectMark } from "@/components/project-mark";
+import { ChainLabel } from "@/components/chain-logo";
 import { CalendarClock, Columns3, Filter, LayoutList, Plus, Rows3, Search, SlidersHorizontal } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
-import { Monogram, Page, PageHeader, useShell } from "@/components/shell";
+import { Page, PageHeader, useShell } from "@/components/shell";
 import { Button, Empty, InlineText, Pill, Popover, SelectPill, Skeleton } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import { CATEGORIES, STATUSES } from "@/lib/constants";
@@ -65,7 +68,6 @@ export function ProjectsView() {
   return (
     <Page wide>
       <PageHeader
-        eyebrow="Projects"
         title={catLabel}
         subtitle={isLoading ? " " : `${total} ${total === 1 ? "project" : "projects"} · ${list.length} shown`}
         right={
@@ -102,15 +104,15 @@ export function ProjectsView() {
         </Button>
         <Popover anchor={filterBtn} open={filterOpen} onClose={() => setFilterOpen(false)} width={220}>
           {STATUS_OPTS.map((s) => (
-            <label key={s.id} className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 hover:bg-hover">
-              <input type="checkbox" className="accent-[var(--accent)]" checked={statusFilter.includes(s.id)} onChange={(e) => setStatusFilter((f) => (e.target.checked ? [...f, s.id] : f.filter((x) => x !== s.id)))} />
-              <Pill tone={s.tone} dot>{s.label}</Pill>
-            </label>
+            <div key={s.id} className="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-hover">
+              <Checkbox aria-label={s.label} checked={statusFilter.includes(s.id)} onCheckedChange={(v) => setStatusFilter((f) => (v ? [...f, s.id] : f.filter((x) => x !== s.id)))} />
+              <button type="button" onClick={() => setStatusFilter((f) => (f.includes(s.id) ? f.filter((x) => x !== s.id) : [...f, s.id]))}><Pill tone={s.tone} dot>{s.label}</Pill></button>
+            </div>
           ))}
           <div className="mt-1 border-t border-line pt-1">
-            <label className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-[13px] text-ink-2 hover:bg-hover">
-              <input type="checkbox" className="accent-[var(--accent)]" checked={hideClosed} onChange={(e) => setHideClosed(e.target.checked)} /> Hide Done & Dropped
-            </label>
+            <div className="rounded-md px-2 py-1.5 text-[13px] text-ink-2 hover:bg-hover">
+              <Checkbox checked={hideClosed} onCheckedChange={setHideClosed} label="Hide Done & Dropped" className="gap-2" />
+            </div>
           </div>
         </Popover>
         <label className="flex h-8 items-center gap-1.5 rounded-md px-2 text-[12.5px] text-muted hover:bg-hover">
@@ -192,7 +194,7 @@ function TableView({ projects, pnl, today, showCat, onNew }: ViewProps & { onNew
               <tr key={p.id} className="group transition-colors hover:bg-[color-mix(in_oklab,var(--hover)_55%,transparent)]">
                 <td className={cn(td, "pl-2")}>
                   <Link href={`/projects/${p.id}`} className="flex items-center gap-2 rounded-md px-1.5 py-1 hover:bg-hover">
-                    <Monogram name={p.name} accent={p.accent} />
+                    <ProjectMark p={p} />
                     <span className="truncate font-medium">{p.name}</span>
                     {nd && <span className="ml-auto hidden shrink-0 items-center gap-1 text-[11.5px] text-muted group-hover:flex"><CalendarClock className="h-3 w-3" />{nd.label} {relDay(nd.day, today)}</span>}
                   </Link>
@@ -200,7 +202,7 @@ function TableView({ projects, pnl, today, showCat, onNew }: ViewProps & { onNew
                 {showCat && <td className={td}><SelectPill value={p.category} options={CATEGORY_OPTS} onChange={(v) => set(p.id, { category: v })} dot={false} /></td>}
                 <td className={td}><SelectPill value={p.status} options={STATUS_OPTS} onChange={(v) => set(p.id, { status: v })} /></td>
                 <td className={cn(td, "max-w-[180px]")}>
-                  <div className="flex gap-1 overflow-hidden px-1">{p.chains.slice(0, 3).map((c) => <Pill key={c}>{c}</Pill>)}{p.chains.length > 3 && <span className="text-[12px] text-faint">+{p.chains.length - 3}</span>}</div>
+                  <div className="flex gap-1 overflow-hidden px-1">{p.chains.slice(0, 3).map((c) => <Pill key={c}><ChainLabel chain={c} size={13} /></Pill>)}{p.chains.length > 3 && <span className="text-[12px] text-faint">+{p.chains.length - 3}</span>}</div>
                 </td>
                 <td className={td}><SelectPill value={p.priority} options={PRIORITY_OPTS} onChange={(v) => set(p.id, { priority: v })} dot={false} /></td>
                 <td className={td}><SelectPill value={p.tier} options={TIER_OPTS} onChange={(v) => set(p.id, { tier: v })} dot={false} /></td>
@@ -265,14 +267,14 @@ function Board({ projects, pnl, today, showCat }: ViewProps) {
                       className="block rounded-md border border-line bg-panel p-2.5 shadow-[0_1px_0_rgba(0,0,0,0.02)] transition-[border,transform] hover:border-line-strong active:scale-[0.99]"
                     >
                       <div className="flex items-start gap-2">
-                        <Monogram name={p.name} accent={p.accent} size={18} />
+                        <ProjectMark p={p} size={18} />
                         <div className="min-w-0 flex-1 text-[13.5px] font-medium leading-snug">{p.name}</div>
                         {p.rating > 0 ? <Rating value={p.rating} readOnly size={10} /> : <span className="num text-[11px] text-faint">{p.tier}</span>}
                       </div>
                       {p.summary && <p className="mt-1 line-clamp-2 text-[12.5px] text-muted">{p.summary}</p>}
                       <div className="mt-2 flex flex-wrap items-center gap-1">
                         {showCat && <Pill tone={catTone(p.category)}>{CATEGORY_OPTS.find((c) => c.id === p.category)?.label}</Pill>}
-                        {p.chains.slice(0, 2).map((c) => <Pill key={c}>{c}</Pill>)}
+                        {p.chains.slice(0, 2).map((c) => <Pill key={c}><ChainLabel chain={c} size={13} /></Pill>)}
                       </div>
                       {(nd || r.invested > 0) && (
                         <div className="mt-2 flex items-center justify-between text-[11.5px] text-muted">
@@ -303,7 +305,7 @@ function ListView({ projects, pnl, today }: ViewProps) {
         const st = STATUS_OPTS.find((s) => s.id === p.status)!;
         return (
           <Link key={p.id} href={`/projects/${p.id}`} className="flex items-center gap-3 px-3 py-2.5 transition-colors hover:bg-hover">
-            <Monogram name={p.name} accent={p.accent} size={28} />
+            <ProjectMark p={p} size={28} />
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
                 <span className="truncate text-[14px] font-medium">{p.name}</span>

@@ -9,7 +9,6 @@ export default function MailPage() {
   return (
     <Page>
       <PageHeader
-        eyebrow="Google"
         title="Mail"
         subtitle="Recent Gmail, matched to projects by sender domain, links and keywords. Flags whitelist, KYC, claim and mint mail."
         right={

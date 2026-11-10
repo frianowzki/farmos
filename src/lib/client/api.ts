@@ -79,7 +79,7 @@ export function useGoogleStatus() {
   return useQuery({ queryKey: keys.google, queryFn: () => api<GoogleStatus>("/api/google/status"), staleTime: 60_000 });
 }
 
-export type AiPublic = { baseUrl: string; model: string; hasKey: boolean; keyFromSettings: boolean; source: string; configured: boolean; tools: boolean; etherscan: boolean };
+export type AiPublic = { baseUrl: string; model: string; hasKey: boolean; keyFromSettings: boolean; keyMask: string | null; source: string; configured: boolean; tools: boolean; etherscan: boolean };
 export function useAiConfig() {
   return useQuery({ queryKey: keys.ai, queryFn: () => api<AiPublic>("/api/settings/ai") });
 }

@@ -8,6 +8,7 @@ import { createPublicClient, http, isAddress } from "viem";
 import { z } from "zod";
 import { db, schema } from "@/db";
 import { EVM_CHAINS, findChain, rpcFor } from "@/lib/chains";
+import { CHAIN_NAMES } from "@/lib/chain-meta";
 import { getAiConfig, getSetting } from "./settings";
 
 export async function aiModel() {
@@ -375,7 +376,7 @@ export function buildTools() {
         name: z.string(),
         category: z.enum(["airdrop", "testnet", "nft", "degen"]),
         summary: z.string().max(400),
-        chains: z.array(z.string()).optional(),
+        chains: z.array(z.string()).optional().describe(`Only from: ${CHAIN_NAMES.join(", ")}. Leave out other chains.`),
         tier: z.enum(["S", "A", "B", "C"]).optional(),
         risk: z.enum(["low", "medium", "high", "extreme"]).optional(),
         tags: z.array(z.string()).optional(),

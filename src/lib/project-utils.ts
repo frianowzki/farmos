@@ -67,3 +67,13 @@ export function sortProjects(list: Project[], by: string, today: string, pnl: (p
   });
   return arr;
 }
+
+/** X handle from a project's X link ("https://x.com/foo", "twitter.com/foo", "@foo" or "foo"). */
+export function xHandle(link?: string | null): string | null {
+  if (!link) return null;
+  const s = link.trim();
+  const m = s.match(/(?:x\.com|twitter\.com)\/(?:#!\/)?@?([A-Za-z0-9_]{1,15})(?:[/?#]|$)/i) ?? s.match(/^@?([A-Za-z0-9_]{1,15})$/);
+  const h = m?.[1];
+  if (!h || ["home", "i", "intent", "search", "share", "explore"].includes(h.toLowerCase())) return null;
+  return h;
+}

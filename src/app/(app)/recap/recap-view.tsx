@@ -1,8 +1,9 @@
 "use client";
+import { ProjectMark } from "@/components/project-mark";
 import { Check, NotebookPen, Layers } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { Page, PageHeader, Monogram } from "@/components/shell";
+import { Page, PageHeader } from "@/components/shell";
 import { Skeleton } from "@/components/ui";
 import { DateRangePicker, DateRangePickerContent, DateRangePickerTrigger, DateRangePickerCalendar, DateRangePickerPresets, DateRangePickerPreset, type DateRange } from "@/components/motion/date-range-picker";
 import { Timeline, type TimelineEvent } from "@/components/motion/timeline";
@@ -89,7 +90,6 @@ export function RecapView() {
   return (
     <Page>
       <PageHeader
-        eyebrow="Review"
         title="Recap"
         subtitle={`${fmtDay(from, { month: "short", day: "numeric" })} – ${fmtDay(to, { month: "short", day: "numeric", year: "numeric" })}`}
         right={
@@ -151,7 +151,7 @@ export function RecapView() {
                       <div className="font-serif text-[17px] text-ink">{fmtDay(d)}</div>
                       <div className="space-y-2 border-l border-line pl-4">
                         {v.created.map((p) => (
-                          <Link key={p.id} href={`/projects/${p.id}`} className="flex items-center gap-2 text-[13.5px] text-ink hover:underline"><Layers className="h-3.5 w-3.5 text-muted" /> Added <Monogram name={p.name} accent={p.accent} size={16} /> {p.name}</Link>
+                          <Link key={p.id} href={`/projects/${p.id}`} className="flex items-center gap-2 text-[13.5px] text-ink hover:underline"><Layers className="h-3.5 w-3.5 text-muted" /> Added <ProjectMark p={p} size={16} /> {p.name}</Link>
                         ))}
                         {v.done.map((x, i) => (
                           <div key={i} className="flex items-center gap-2 text-[13.5px] text-ink-2"><Check className="h-3.5 w-3.5 text-pos" /> {x.title}</div>

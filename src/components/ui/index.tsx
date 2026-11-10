@@ -63,9 +63,10 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaHTMLAttributes<H
 
 export function Pill({ tone = "gray", children, className, dot }: { tone?: string; children: ReactNode; className?: string; dot?: boolean }) {
   return (
-    <span className={cn("inline-flex h-[22px] max-w-full items-center gap-1.5 truncate rounded-[5px] px-1.5 text-[12.5px] font-medium leading-none", `tone-${tone}`, className)}>
+    // Line-height stays at 1.35 (not 1) so descenders (g, y, p) are never clipped by the truncation box.
+    <span className={cn("inline-flex min-h-[22px] max-w-full items-center gap-1.5 overflow-hidden rounded-[5px] px-1.5 py-px text-[12.5px] font-medium leading-[1.35]", `tone-${tone}`, className)}>
       {dot && <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", `dot-${tone}`)} />}
-      <span className="truncate">{children}</span>
+      <span className="min-w-0 truncate pt-px">{children}</span>
     </span>
   );
 }
@@ -155,18 +156,19 @@ export function SelectPill({ value, options, onChange, placeholder = "Empty", cl
 }
 
 /** Multi-value tag input (chains, tags, wallets) with suggestions. */
-export function TagInput({ value, onChange, suggestions = [], placeholder = "Add…", tone = "gray", render }: { value: string[]; onChange: (v: string[]) => void; suggestions?: string[]; placeholder?: string; tone?: string; render?: (v: string) => ReactNode }) {
+export function TagInput({ value, onChange, suggestions = [], placeholder = "Add…", tone = "gray", render, allowCreate = true }: { value: string[]; onChange: (v: string[]) => void; suggestions?: string[]; placeholder?: string; tone?: string; render?: (v: string) => ReactNode; allowCreate?: boolean }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
   const [box, setBox] = useState<HTMLDivElement | null>(null);
   const input = useRef<HTMLInputElement>(null);
   const add = (t: string) => {
-    const v = t.trim();
+    let v = t.trim();
+    if (!allowCreate) v = suggestions.find((s) => s.toLowerCase() === v.toLowerCase()) ?? (filtered.length === 1 ? filtered[0] : "");
     if (!v || value.includes(v)) return;
     onChange([...value, v]);
     setQ("");
   };
-  const filtered = suggestions.filter((s) => !value.includes(s) && s.toLowerCase().includes(q.toLowerCase())).slice(0, 12);
+  const filtered = suggestions.filter((s) => !value.includes(s) && s.toLowerCase().includes(q.toLowerCase())).slice(0, allowCreate ? 12 : 30);
   return (
     <>
       <div ref={setBox} onClick={(e) => { e.stopPropagation(); setOpen(true); setTimeout(() => input.current?.focus(), 0); }} className="flex min-h-[28px] w-full cursor-text flex-wrap items-center gap-1 rounded-md px-1 py-0.5 hover:bg-hover">
@@ -178,7 +180,7 @@ export function TagInput({ value, onChange, suggestions = [], placeholder = "Add
       <Popover anchor={box} open={open} onClose={() => setOpen(false)} width={280}>
         <div className="flex flex-wrap gap-1 border-b border-line p-1.5">
           {value.map((v) => (
-            <span key={v} className={cn("inline-flex h-[22px] items-center gap-1 rounded-[5px] pl-1.5 pr-0.5 text-[12.5px] font-medium", `tone-${tone}`)}>
+            <span key={v} className={cn("inline-flex min-h-[22px] items-center gap-1 rounded-[5px] pl-1.5 pr-0.5 text-[12.5px] font-medium leading-[1.35]", `tone-${tone}`)}>
               {render ? render(v) : v}
               <button type="button" aria-label={`Remove ${v}`} onClick={() => onChange(value.filter((x) => x !== v))} className="rounded p-0.5 opacity-60 hover:opacity-100">
                 <X className="h-3 w-3" />
@@ -193,7 +195,7 @@ export function TagInput({ value, onChange, suggestions = [], placeholder = "Add
               if (e.key === "Enter" || e.key === ",") { e.preventDefault(); add(q); }
               if (e.key === "Backspace" && !q && value.length) onChange(value.slice(0, -1));
             }}
-            placeholder="Type and press Enter"
+            placeholder={allowCreate ? "Type and press Enter" : "Search…"}
             className="min-w-[90px] flex-1 bg-transparent px-1 text-[13px] outline-none placeholder:text-faint"
           />
         </div>
@@ -202,7 +204,7 @@ export function TagInput({ value, onChange, suggestions = [], placeholder = "Add
             {render ? render(s) : s}
           </button>
         ))}
-        {q && !suggestions.includes(q) && (
+        {allowCreate && q && !suggestions.includes(q) && (
           <button type="button" onClick={() => add(q)} className="flex w-full items-center gap-1 rounded-md px-2 py-1.5 text-left text-[13px] hover:bg-hover">
             <span className="text-muted">Create</span> <Pill tone={tone}>{q}</Pill>
           </button>

@@ -56,11 +56,8 @@ export const LINK_FIELDS = [
   { id: "other", label: "Other" },
 ] as const;
 
-export const CHAIN_SUGGESTIONS = [
-  "Ethereum", "Base", "Arbitrum", "Optimism", "BNB", "Polygon", "Solana", "Ink", "Linea",
-  "zkSync", "Scroll", "Blast", "Monad", "MegaETH", "Berachain", "HyperEVM", "Sui", "Aptos",
-  "Sonic", "Abstract", "Unichain", "Robinhood", "Arc", "Elysium", "Bitcoin", "TON",
-];
+/** Chains offered in selectors: exactly the supported list in lib/chain-meta. */
+export { CHAIN_NAMES as CHAIN_SUGGESTIONS } from "./chain-meta";
 
 export function label<T extends readonly { id: string; label: string }[]>(list: T, id: string) {
   return list.find((x) => x.id === id)?.label ?? id;

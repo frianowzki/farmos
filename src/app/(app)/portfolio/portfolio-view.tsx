@@ -1,10 +1,12 @@
 "use client";
+import { ProjectMark } from "@/components/project-mark";
+import { WalletBalancesCard } from "@/components/wallet-forms";
 import { useQueryClient } from "@tanstack/react-query";
 import { RefreshCw } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { toast } from "@/lib/client/toast";
-import { Monogram, Page, PageHeader } from "@/components/shell";
+import { Page, PageHeader } from "@/components/shell";
 import { Button, Empty, Pill, SectionTitle, Skeleton } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import { CATEGORIES } from "@/lib/constants";
@@ -41,7 +43,8 @@ export function PortfolioView() {
 
   return (
     <Page wide>
-      <PageHeader eyebrow="Workspace" title="Portfolio" subtitle="Capital, gas, rewards and positions rolled up across every project." right={<Button size="sm" variant="ghost" onClick={refresh} disabled={busy}><RefreshCw className={cn("h-3.5 w-3.5", busy && "animate-spin")} /> Refresh prices</Button>} />
+      <PageHeader title="Portfolio" subtitle="Wallet balances, capital, gas, rewards and positions across every project." right={<Button size="sm" variant="ghost" onClick={refresh} disabled={busy}><RefreshCw className={cn("h-3.5 w-3.5", busy && "animate-spin")} /> Refresh prices</Button>} />
+      <WalletBalancesCard />
       {isLoading ? (
         <Skeleton className="h-40" />
       ) : rows.length === 0 ? (
@@ -108,7 +111,7 @@ export function PortfolioView() {
               <tbody>
                 {[...rows].sort((a, b) => b.r.net - a.r.net).map(({ p, r }) => (
                   <tr key={p.id} className="border-t border-line hover:bg-hover">
-                    <td className="h-10 px-3"><Link href={`/projects/${p.id}`} className="flex items-center gap-2 font-medium"><Monogram name={p.name} size={18} />{p.name}</Link></td>
+                    <td className="h-10 px-3"><Link href={`/projects/${p.id}`} className="flex items-center gap-2 font-medium"><ProjectMark p={p} size={18} />{p.name}</Link></td>
                     <td className="px-2"><Pill tone={catTone(p.category)}>{CATEGORIES.find((c) => c.id === p.category)?.label}</Pill></td>
                     <td className="num px-2 text-right text-ink-2">{usd(p.costSpent)}</td>
                     <td className="num px-2 text-right text-ink-2">{usd(r.invested)}</td>

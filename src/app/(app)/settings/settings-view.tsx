@@ -1,6 +1,6 @@
 "use client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, KeyRound, Monitor, Moon, Sun } from "lucide-react";
+import { Check, ExternalLink, KeyRound, Monitor, Moon, RefreshCw, ShieldAlert, Sun, Trash2 } from "lucide-react";
 import { signIn } from "next-auth/react";
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
@@ -9,6 +9,7 @@ import { Marker } from "@/components/panelui/marker";
 import { toast } from "@/lib/client/toast";
 import { GoogleMark } from "@/app/login/login-form";
 import { Page, PageHeader } from "@/components/shell";
+import { Checkbox } from "@/components/motion/checkbox";
 import { Switch } from "@/components/motion/switch";
 import { playUi, setSoundEnabled, useSoundEnabled } from "@/lib/client/sound";
 import { Button, Field, Input, Kbd, Pill } from "@/components/ui";
@@ -23,7 +24,7 @@ export function SettingsView({ appUrl, allowedEmail }: { appUrl: string; allowed
   const mounted = useMounted();
   return (
     <Page>
-      <PageHeader eyebrow="farmOS" title="Settings" />
+      <PageHeader title="Settings" />
       <nav aria-label="Settings sections" className="-mx-1 mb-2 flex gap-1 overflow-x-auto pb-2 text-[12.5px]">
         {[
           ["appearance", "Appearance"],
@@ -31,7 +32,7 @@ export function SettingsView({ appUrl, allowedEmail }: { appUrl: string; allowed
           ["ai", "Research desk"],
           ["google", "Google"],
           ["connections", "Connected accounts"],
-          ["integrations", "Data sources"],
+          ["keys", "API keys"],
           ["notifications", "Notifications"],
           ["keyboard", "Keyboard"],
           ["data", "Data"],
@@ -56,7 +57,7 @@ export function SettingsView({ appUrl, allowedEmail }: { appUrl: string; allowed
       <AiSection />
       <GoogleSection appUrl={appUrl} allowedEmail={allowedEmail} />
       <ConnectionsSection appUrl={appUrl} />
-      <IntegrationsSection />
+      <ApiKeysSection />
       <NotifySection />
       <Section id="keyboard" title="Keyboard" desc="Work without the mouse.">
         <div className="max-w-md divide-y divide-line rounded-lg border border-line bg-panel text-[13px]">
@@ -105,15 +106,13 @@ function AiForm({ data }: { data: AiPublic }) {
   const qc = useQueryClient();
   const [baseUrl, setBaseUrl] = useState(data.baseUrl);
   const [model, setModel] = useState(data.model);
-  const [key, setKey] = useState("");
   const [tools, setTools] = useState(data.tools);
   const [busy, setBusy] = useState(false);
   const [test, setTest] = useState<string | null>(null);
-  const save = async (extra: Record<string, unknown> = {}) => {
+  const save = async () => {
     setBusy(true);
     try {
-      await api("/api/settings/ai", { method: "PUT", body: { baseUrl, model, apiKey: key || undefined, tools, ...extra } });
-      setKey("");
+      await api("/api/settings/ai", { method: "PUT", body: { baseUrl, model, tools } });
       qc.invalidateQueries({ queryKey: keys.ai });
       toast.success("AI settings saved");
     } catch (e) {
@@ -131,28 +130,131 @@ function AiForm({ data }: { data: AiPublic }) {
     <Section
       id="ai"
       title="Research desk (AI)"
-      desc={<>Any OpenAI-compatible endpoint, e.g. DeepSeek <code className="num">https://api.deepseek.com/v1</code> or your own server. The key is encrypted server-side and never sent to the browser.</>}
+      desc={<>Any OpenAI-compatible endpoint, e.g. DeepSeek <code className="num">https://api.deepseek.com/v1</code> or your own server. The key lives under <a href="#keys" className="underline decoration-faint underline-offset-2 hover:text-ink">API keys</a>.</>}
     >
       <div className="max-w-xl space-y-3">
         <Field label="Base URL"><Input value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder="https://api.deepseek.com/v1" className="num" /></Field>
         <Field label="Model"><Input value={model} onChange={(e) => setModel(e.target.value)} placeholder="deepseek-chat" className="num" /></Field>
-        <Field label="API key" hint={data?.hasKey ? (data.keyFromSettings ? "A key is saved (encrypted). Leave blank to keep it." : "Using AI_API_KEY from the server environment. Enter a key to override.") : "No key set."}>
-          <Input type="password" value={key} onChange={(e) => setKey(e.target.value)} placeholder={data?.hasKey ? "••••••••••••••••" : "sk-…"} autoComplete="off" />
-        </Field>
-        <label className="flex items-center gap-2 text-[13px] text-ink-2">
-          <input type="checkbox" checked={tools} onChange={(e) => setTools(e.target.checked)} className="accent-[var(--accent)]" />
-          Enable research tools (web fetch, DefiLlama, DexScreener, GeckoTerminal, contract check). Turn off if your model doesn&apos;t support tool calls.
-        </label>
+        <Checkbox
+          checked={tools}
+          onCheckedChange={setTools}
+          label="Enable research tools"
+          description="Web fetch, DefiLlama, DexScreener, GeckoTerminal, contract check. Turn off if your model doesn't support tool calls."
+         
+        />
         <div className="flex flex-wrap items-center gap-2 pt-1">
-          <Button variant="primary" onClick={() => save()} disabled={busy}>Save</Button>
-          <Button onClick={runTest} disabled={!data?.configured}>Test connection</Button>
-          {data?.keyFromSettings && <Button variant="danger" onClick={() => save({ clearKey: true })}>Remove saved key</Button>}
-          <span className="text-[12px] text-faint">Source: {data?.source === "settings" ? "saved settings" : data?.source === "env" ? "server env" : "not configured"} · Etherscan {data?.etherscan ? "on" : "off"}</span>
+          <Button variant="primary" onClick={save} disabled={busy}>Save</Button>
+          <Button onClick={runTest} disabled={!data.configured || !data.hasKey}>Test connection</Button>
+          <span className="text-[12px] text-faint">Source: {data.source === "settings" ? "saved settings" : data.source === "env" ? "server env" : "not configured"}</span>
         </div>
         {test && <p className={cn("text-[12.5px]", test.startsWith("Failed") ? "text-neg" : "text-muted")}>{test}</p>}
       </div>
     </Section>
   );
+}
+
+type KeyItem = { id: string; label: string; ok: boolean; env: string; note: string; mask: string | null };
+
+/** Adapted from ninna-ui's API keys settings block: one table of every secret, masked only. */
+function ApiKeysSection() {
+  const qc = useQueryClient();
+  const ai = useAiConfig();
+  const q = useQuery({ queryKey: ["integrations"], queryFn: () => api<{ items: KeyItem[] }>("/api/integrations") });
+  const [editing, setEditing] = useState(false);
+  const [val, setVal] = useState("");
+  const [busy, setBusy] = useState(false);
+  const putKey = async (apiKey: string | null) => {
+    setBusy(true);
+    try {
+      await api("/api/settings/ai", { method: "PUT", body: apiKey === null ? { clearKey: true } : { apiKey } });
+      qc.invalidateQueries({ queryKey: keys.ai });
+      setVal("");
+      setEditing(false);
+      toast.success(apiKey === null ? "Saved key removed" : "Key saved (encrypted)");
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const d = ai.data;
+  const set = (q.data?.items ?? []).filter((i) => i.ok).length;
+  const total = (q.data?.items.length ?? 0) + 1;
+  return (
+    <Section id="keys" title="API keys" desc="Secrets farmOS uses server-side. Values are encrypted or kept in the server environment and only shown masked.">
+      <div className="max-w-3xl overflow-hidden rounded-xl border border-line bg-panel">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-4 py-3">
+          <div>
+            <div className="text-[14px] font-medium text-ink">Keys</div>
+            <div className="text-[12.5px] text-muted">{set + (d?.hasKey ? 1 : 0)} of {total} set</div>
+          </div>
+          <Button size="sm" variant="primary" onClick={() => setEditing(true)}><KeyRound className="h-3.5 w-3.5" /> {d?.keyFromSettings ? "Replace AI key" : "Add AI key"}</Button>
+        </div>
+        <div className="flex gap-2.5 border-b border-line bg-accent-soft/40 px-4 py-2.5 text-[12.5px] text-ink-2">
+          <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-accent" />
+          <span><span className="font-medium text-ink">Keep secret keys secure.</span> They never reach the browser; only a masked preview is shown here. Rotate a leaked key at the provider, then replace it.</span>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[620px] text-left text-[13px]">
+            <thead>
+              <tr className="border-b border-line text-[11.5px] uppercase tracking-[0.08em] text-faint">
+                <th className="px-4 py-2 font-medium">Name</th>
+                <th className="px-4 py-2 font-medium">Token</th>
+                <th className="px-4 py-2 font-medium">Stored in</th>
+                <th className="px-4 py-2 text-right font-medium">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-line">
+              <tr>
+                <td className="px-4 py-3 align-top">
+                  <div className="font-medium text-ink">AI provider key</div>
+                  <div className="text-[12px] text-muted">Research desk, AI review, Feed brief</div>
+                </td>
+                <td className="px-4 py-3 align-top">
+                  {editing ? (
+                    <form className="flex items-center gap-2" onSubmit={(e) => { e.preventDefault(); if (val.trim()) putKey(val.trim()); }}>
+                      <Input autoFocus type="password" value={val} onChange={(e) => setVal(e.target.value)} placeholder="sk-…" autoComplete="off" className="num h-8 w-52 text-[12.5px]" />
+                      <Button size="sm" variant="primary" type="submit" disabled={busy || !val.trim()}>Save</Button>
+                      <Button size="sm" variant="ghost" type="button" onClick={() => { setEditing(false); setVal(""); }}>Cancel</Button>
+                    </form>
+                  ) : d?.keyMask ? <MaskedToken mask={d.keyMask} /> : <span className="text-faint">Not set</span>}
+                </td>
+                <td className="px-4 py-3 align-top"><EnvTag kind={d?.keyFromSettings ? "saved" : d?.hasKey ? "env" : "none"} /></td>
+                <td className="px-4 py-3 text-right align-top">
+                  {!editing && (
+                    <div className="inline-flex gap-1">
+                      <Button size="sm" variant="ghost" onClick={() => setEditing(true)}><RefreshCw className="h-3.5 w-3.5" /> {d?.hasKey ? "Replace" : "Add"}</Button>
+                      {d?.keyFromSettings && <Button size="sm" variant="ghost" className="text-neg" onClick={() => { if (confirm("Remove the saved AI key?")) putKey(null); }} disabled={busy}><Trash2 className="h-3.5 w-3.5" /> Revoke</Button>}
+                    </div>
+                  )}
+                </td>
+              </tr>
+              {(q.data?.items ?? []).map((i) => (
+                <tr key={i.id}>
+                  <td className="px-4 py-3 align-top">
+                    <div className="flex items-center gap-2 font-medium text-ink">{["opensea", "x", "discord", "github", "telegram", "google"].includes(i.id) && <BrandIcon id={i.id as BrandId} size={16} />}{i.label}</div>
+                    <div className="text-[12px] text-muted">{i.note}</div>
+                  </td>
+                  <td className="px-4 py-3 align-top">{i.ok ? <MaskedToken mask={i.mask ?? "••••••••"} /> : <span className="text-[12px] text-faint"><code className="num">{i.env}</code> missing</span>}</td>
+                  <td className="px-4 py-3 align-top"><EnvTag kind={i.ok ? "env" : "none"} /></td>
+                  <td className="px-4 py-3 text-right align-top"><a href="https://vercel.com/docs/environment-variables" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[12px] text-muted hover:text-ink">Vercel env <ExternalLink className="h-3 w-3" /></a></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </Section>
+  );
+}
+
+function MaskedToken({ mask }: { mask: string }) {
+  return <code className="num inline-flex items-center rounded-md bg-hover px-2 py-1 text-[12px] tracking-tight text-ink-2" aria-label="Masked key">{mask}</code>;
+}
+
+function EnvTag({ kind }: { kind: "saved" | "env" | "none" }) {
+  if (kind === "none") return <Marker tone="gray">Not set</Marker>;
+  return kind === "saved" ? <Marker tone="green">Encrypted · settings</Marker> : <Marker tone="blue">Server env</Marker>;
 }
 
 function GoogleSection({ appUrl, allowedEmail }: { appUrl: string; allowedEmail: boolean }) {
@@ -320,24 +422,4 @@ function TelegramButton({ bot, onDone }: { bot: string | null; onDone: () => voi
   }, [shown, host, bot, onDone]);
   if (!bot) return null;
   return shown ? <div ref={setHost} className="min-h-7" /> : <Button size="sm" onClick={() => setShown(true)}>Connect</Button>;
-}
-
-function IntegrationsSection() {
-  const q = useQuery({ queryKey: ["integrations"], queryFn: () => api<{ items: { id: string; label: string; ok: boolean; env: string; note: string }[] }>("/api/integrations") });
-  return (
-    <Section id="integrations" title="Data sources" desc="Server-side keys. Only whether each is set is shown here, never the value.">
-      <ul className="max-w-xl divide-y divide-line rounded-lg border border-line bg-panel">
-        {(q.data?.items ?? []).map((i) => (
-          <li key={i.id} className="flex items-center gap-3 px-3 py-2.5">
-            {i.id === "opensea" ? <BrandIcon id="opensea" size={22} /> : <span className="h-[22px] w-[22px]" />}
-            <div className="min-w-0 flex-1">
-              <div className="text-[13px] font-medium text-ink">{i.label}</div>
-              <div className="text-[12px] text-muted">{i.note}</div>
-            </div>
-            {i.ok ? <Marker tone="green">Set</Marker> : <span className="text-[11.5px] text-faint"><code className="num">{i.env}</code> missing</span>}
-          </li>
-        ))}
-      </ul>
-    </Section>
-  );
 }

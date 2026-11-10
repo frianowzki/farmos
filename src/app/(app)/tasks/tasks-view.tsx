@@ -37,7 +37,7 @@ export function TasksView() {
 
   return (
     <Page>
-      <PageHeader eyebrow="Workspace" title="Daily tasks" subtitle="Recurring work across projects. Tick it, keep the streak." />
+      <PageHeader title="Daily tasks" subtitle="Recurring work across projects. Tick it, keep the streak." />
       <div className="mb-8 grid gap-3 sm:grid-cols-[1fr_1fr_1fr]">
         <Stat label="Current streak" value={model.streak} unit="days" icon={<Flame className={cn("h-4 w-4", model.streak ? "text-accent" : "text-faint")} />} />
         <Stat label="Best task streak" value={best} unit="in a row" icon={<Trophy className="h-4 w-4 text-faint" />} />

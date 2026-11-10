@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { requireSession } from "@/lib/server/guard";
+import { maskSecret } from "@/lib/server/mask";
 
 export const dynamic = "force-dynamic";
 
-/** Which optional server-side keys are present. Booleans only. */
+/** Which optional server-side keys are present, with a masked preview (prefix + last 4) only. */
 export async function GET() {
   const denied = await requireSession();
   if (denied) return denied;
@@ -19,5 +20,7 @@ export async function GET() {
     { id: "github", label: "GitHub", env: "GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET", ok: has("GITHUB_CLIENT_ID") && has("GITHUB_CLIENT_SECRET"), note: "GitHub identity and public profile" },
     { id: "telegram", label: "Telegram", env: "TELEGRAM_BOT_TOKEN, NEXT_PUBLIC_TELEGRAM_BOT_USERNAME", ok: has("TELEGRAM_BOT_TOKEN") && has("NEXT_PUBLIC_TELEGRAM_BOT_USERNAME"), note: "Telegram Login Widget" },
   ];
-  return NextResponse.json({ items });
+  // Mask the primary secret of each source; never the full value.
+  const secretOf: Record<string, string> = { opensea: "OPENSEA_API_KEY", etherscan: "ETHERSCAN_API_KEY", blob: "BLOB_READ_WRITE_TOKEN", walletconnect: "NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID", google: "GOOGLE_CLIENT_SECRET", x: "X_CLIENT_SECRET", discord: "DISCORD_CLIENT_SECRET", github: "GITHUB_CLIENT_SECRET", telegram: "TELEGRAM_BOT_TOKEN" };
+  return NextResponse.json({ items: items.map((i) => ({ ...i, mask: i.ok ? maskSecret(process.env[secretOf[i.id]]) : null })) });
 }

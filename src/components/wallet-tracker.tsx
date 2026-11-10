@@ -5,6 +5,10 @@ import Link from "next/link";
 import { useState } from "react";
 import { Button, SectionTitle, Skeleton } from "@/components/ui";
 import { EVM_CHAINS } from "@/lib/chains";
+import { chainMeta } from "@/lib/chain-meta";
+import { ChainLogo, ChainStack } from "@/components/chain-logo";
+import { WalletIcon } from "@/components/wallet-icon";
+import { useWallets } from "@/lib/client/api";
 import { cn } from "@/lib/cn";
 import { api, keys } from "@/lib/client/api";
 import { toast } from "@/lib/client/toast";
@@ -18,10 +22,12 @@ type PositionTrack = {
 };
 type Snapshot = { fetchedAt: string; wallets: WalletTrack[]; positions: PositionTrack[]; totalUsd: number; sources: Record<string, string>; priceSource: string; cached: boolean };
 
-const chainName = (k: string) => EVM_CHAINS.find((c) => c.key === k)?.name ?? k;
+const chainName = (k: string) => chainMeta(k)?.name ?? EVM_CHAINS.find((c) => c.key === k)?.name ?? k;
 
 /** Server-side, read-only balances (Etherscan V2 + public RPC), cached 10 minutes. */
 export function WalletTracker({ hasEvm }: { hasEvm: boolean }) {
+  const { data: wl } = useWallets();
+  const providerOf = (a: string) => wl?.wallets.find((w) => w.address.toLowerCase() === a.toLowerCase())?.provider ?? "";
   const qc = useQueryClient();
   const [refreshing, setRefreshing] = useState(false);
   const { data, isLoading, error } = useQuery({ queryKey: ["wallet-track"], queryFn: () => api<Snapshot>("/api/wallets/track"), enabled: hasEvm, staleTime: 5 * 60_000 });
@@ -49,11 +55,11 @@ export function WalletTracker({ hasEvm }: { hasEvm: boolean }) {
           <div className="mb-3 flex flex-wrap items-baseline gap-x-4 gap-y-1">
             <span className="num text-[26px] font-medium tracking-tight">{usd(data.totalUsd)}</span>
             <span className="text-[12px] text-muted">
-              Native + USDC/USDT/WETH and L2 tokens on {Object.keys(data.sources).length} chains · updated {new Date(data.fetchedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+              Native + main tokens on {Object.keys(data.sources).length} chains · updated {new Date(data.fetchedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
             </span>
           </div>
           <div className="divide-y divide-line rounded-lg border border-line bg-panel">
-            {data.wallets.map((w) => <TrackRow key={w.address} w={w} />)}
+            {data.wallets.map((w) => <TrackRow key={w.address} w={w} provider={providerOf(w.address)} />)}
           </div>
           <p className="mt-2 text-[11.5px] text-faint">Prices: {data.priceSource}. Sources: Etherscan V2 where your plan covers the chain, public RPC otherwise.</p>
           {data.positions.length > 0 && <OnchainPositions rows={data.positions} onSynced={refresh} />}
@@ -63,15 +69,16 @@ export function WalletTracker({ hasEvm }: { hasEvm: boolean }) {
   );
 }
 
-function TrackRow({ w }: { w: WalletTrack }) {
+function TrackRow({ w, provider }: { w: WalletTrack; provider: string }) {
   const [open, setOpen] = useState(false);
   return (
     <div>
       <button onClick={() => setOpen((o) => !o)} className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-hover/50">
         <ChevronDown className={cn("h-4 w-4 shrink-0 text-faint transition-transform", !open && "-rotate-90")} />
-        <span className="w-[140px] shrink-0 truncate text-[13.5px]">{w.label || <span className="text-faint">Unlabeled</span>}</span>
+        <WalletIcon provider={provider} size={22} />
+        <span className="w-[130px] shrink-0 truncate text-[13.5px]">{w.label || <span className="text-faint">Unlabeled</span>}</span>
         <span className="num min-w-0 flex-1 truncate text-[12.5px] text-muted">{shortAddr(w.address)}</span>
-        <span className="hidden text-[12px] text-faint sm:inline">{w.holdings.length} assets</span>
+        <span className="hidden sm:inline-flex"><ChainStack chains={w.holdings.map((h) => h.chain)} size={16} /></span>
         <span className="num w-[96px] text-right text-[13.5px]">{usd(w.totalUsd)}</span>
       </button>
       {open && (
@@ -84,7 +91,7 @@ function TrackRow({ w }: { w: WalletTrack }) {
                 {w.holdings.map((h) => (
                   <tr key={`${h.chain}-${h.symbol}`} className="border-b border-line/60 last:border-0">
                     <td className="py-1.5 text-ink-2">{h.symbol}</td>
-                    <td className="py-1.5 text-muted">{chainName(h.chain)}</td>
+                    <td className="py-1.5 text-muted"><span className="inline-flex items-center gap-1.5"><ChainLogo chain={h.chain} size={14} />{chainName(h.chain)}</span></td>
                     <td className="num py-1.5 text-right">{num(h.amount, h.amount < 1 ? 6 : 4)}</td>
                     <td className="num w-[96px] py-1.5 text-right text-ink-2">{h.usd == null ? <span className="text-faint">no price</span> : usd(h.usd)}</td>
                   </tr>

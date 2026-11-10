@@ -59,7 +59,6 @@ export function MintsView() {
   return (
     <Page>
       <PageHeader
-        eyebrow="NFT"
         title="Upcoming mints"
         subtitle="Drops from OpenSea. Eligibility is checked against your saved wallets with public and on-chain data only — no signatures, no transactions."
       />

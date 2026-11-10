@@ -1,6 +1,7 @@
 "use client";
+import { Checkbox } from "@/components/motion/checkbox";
 import { useQueryClient } from "@tanstack/react-query";
-import { Check, ExternalLink, Flame, Plus, Trash2 } from "lucide-react";
+import { ExternalLink, Flame, Plus, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { AnimatePresence, motion } from "motion/react";
 import { useMemo, useState } from "react";
@@ -80,22 +81,11 @@ export function TaskRow({ row, showProject = true, onDelete }: { row: ReturnType
   const done = row.doneToday;
   return (
     <div className="group flex items-center gap-3 rounded-md px-2 py-1.5 transition-colors hover:bg-hover">
-      <button
-        onClick={() => toggle(row.task.id, today, !done)}
-        aria-label={done ? "Mark not done" : "Mark done"}
-        className={cn(
-          "flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-[5px] border transition-all duration-200",
-          done ? "border-accent bg-accent text-accent-ink" : "border-line-strong bg-panel hover:border-accent",
-        )}
-      >
-        <AnimatePresence initial={false}>
-          {done && (
-            <motion.span key="c" initial={{ scale: 0.4, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.6, opacity: 0, transition: { duration: 0.1 } }} transition={{ type: "spring", stiffness: 600, damping: 26 }}>
-              <Check className="h-3 w-3" strokeWidth={3} />
-            </motion.span>
-          )}
-        </AnimatePresence>
-      </button>
+      <Checkbox
+        checked={done}
+        onCheckedChange={(v) => toggle(row.task.id, today, v)}
+        aria-label={done ? `Mark "${row.task.title}" not done` : `Mark "${row.task.title}" done`}
+      />
       <div className="min-w-0 flex-1">
         <div className={cn("truncate text-[14px] transition-colors", done && "text-muted line-through decoration-faint")}>{row.task.title}</div>
         <div className="flex items-center gap-2 text-[12px] text-faint">

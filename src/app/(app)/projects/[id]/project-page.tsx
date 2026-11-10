@@ -1,7 +1,8 @@
 "use client";
+import { ProjectMark } from "@/components/project-mark";
 import { useQueryClient } from "@tanstack/react-query";
 import {
-  AtSign, Banknote, CalendarRange, Palette, Star, CalendarDays, CalendarPlus, ChevronRight, CircleDot, Coins, ExternalLink, Flag, Gauge, Layers, Link2, Mail, MoreHorizontal,
+  AtSign, Banknote, CalendarRange, Palette, Star, CalendarDays, CalendarPlus, ChevronRight, CircleDot, Coins, Flag, Gauge, Layers, Link2, Mail, MoreHorizontal,
   Pin, PinOff, Plus, RefreshCw, ShieldAlert, Sparkles, Tag, Telescope, Trash2, Wallet as WalletIcon, Waypoints, ScanSearch,
 } from "lucide-react";
 import Link from "next/link";
@@ -10,13 +11,17 @@ import { useState, type ReactNode } from "react";
 import { toast } from "@/lib/client/toast";
 import { Editor } from "@/components/editor";
 import { MailList } from "@/components/mail";
-import { Monogram, Page } from "@/components/shell";
+import { Page } from "@/components/shell";
+import { ChainLabel } from "@/components/chain-logo";
+import { LinkIcon } from "@/components/icons/brand-glyphs";
 import { AddTask, TaskRow, useTaskModel } from "@/components/tasks";
 import { Button, Dialog, Empty, InlineText, Popover, SelectPill, Skeleton, TagInput } from "@/components/ui";
 import { ColorSelector, ColorSelectorItem, ColorSelectorList } from "@/components/motion/color-selector";
 import { WheelPicker } from "@/components/motion/wheel-picker";
 import { Attachments } from "@/components/panelui/attachment";
 import { AirdropCheckerPanel } from "@/components/airdrop-checker";
+import { AiReviewPanel } from "@/components/ai-review";
+import type { AiReview } from "@/db/schema";
 import { Questionnaire } from "@/components/panelui/questionnaire";
 import { Rating } from "@/components/panelui/rating";
 import { AUDIT, auditScore, scoreToRating } from "@/lib/audit";
@@ -66,7 +71,7 @@ export function ProjectPage({ id }: { id: string }) {
       </div>
 
       <div className="mb-1 flex items-start gap-3">
-        <Monogram name={p.name} accent={p.accent} size={44} className="mt-1 rounded-[10px]" />
+        <ProjectMark p={p} size={44} className="mt-1 rounded-[10px]" />
         <div className="min-w-0 flex-1">
           <TitleInput value={p.name} onSave={(name) => name.trim() && set({ name: name.trim() })} />
           <input
@@ -222,7 +227,7 @@ function Properties({ p, set, today }: { p: Project; set: (patch: Partial<Projec
         <Prop icon={<Gauge className={ic} />} label="Tier / potential"><SelectPill value={p.tier} options={TIER_OPTS.map((t) => ({ ...t, label: t.long }))} onChange={(v) => set({ tier: v })} dot={false} /></Prop>
         <Prop icon={<ShieldAlert className={ic} />} label="Risk"><SelectPill value={p.risk} options={RISK_OPTS} onChange={(v) => set({ risk: v })} /></Prop>
         <Prop icon={<Star className={ic} />} label="Rating">
-          <div className="flex items-center gap-2 py-1">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 py-1">
             <Rating value={p.rating} onChange={(v) => set({ rating: v })} />
             <AuditButton p={p} set={set} />
           </div>
@@ -234,7 +239,7 @@ function Properties({ p, set, today }: { p: Project; set: (patch: Partial<Projec
             </ColorSelectorList>
           </ColorSelector>
         </Prop>
-        <Prop icon={<Waypoints className={ic} />} label="Chains"><TagInput value={p.chains} onChange={(v) => set({ chains: v })} suggestions={CHAIN_SUGGESTIONS} placeholder="Empty" /></Prop>
+        <Prop icon={<Waypoints className={ic} />} label="Chains"><TagInput value={p.chains} onChange={(v) => set({ chains: v })} suggestions={CHAIN_SUGGESTIONS} placeholder="Empty" allowCreate={false} render={(c) => <ChainLabel chain={c} />} /></Prop>
         <Prop icon={<Tag className={ic} />} label="Tags"><TagInput value={p.tags} onChange={(v) => set({ tags: v })} suggestions={["points", "quests", "galxe", "zealy", "bridge", "swap", "lp", "staking", "node", "social", "gtd", "fcfs", "season-1"]} placeholder="Empty" tone="stone" /></Prop>
         <Prop icon={<WalletIcon className={ic} />} label="Wallets used">
           <TagInput value={p.wallets} onChange={(v) => set({ wallets: v })} suggestions={(w?.wallets ?? []).map((x) => x.address)} render={walletLabel} placeholder="Link wallets" tone="blue" />
@@ -289,9 +294,9 @@ function LinksCell({ links, onSave }: { links: Record<string, string | undefined
   return (
     <div className="flex flex-wrap items-center gap-1 py-0.5">
       {set.map(([k, v]) => (
-        <a key={k} href={v!.startsWith("http") ? v : `https://${v}`} target="_blank" rel="noreferrer" className="inline-flex h-[24px] items-center gap-1 rounded-md border border-line bg-panel px-2 text-[12.5px] text-ink-2 hover:border-line-strong hover:text-ink">
+        <a key={k} href={v!.startsWith("http") ? v : `https://${v}`} target="_blank" rel="noreferrer" title={v} className="inline-flex h-[26px] items-center gap-1.5 rounded-md border border-line bg-panel px-2 text-[12.5px] leading-[1.35] text-ink-2 transition-colors hover:border-line-strong hover:text-ink">
+          <LinkIcon field={k} className="h-3.5 w-3.5" />
           {LINK_FIELDS.find((f) => f.id === k)?.label ?? k}
-          <ExternalLink className="h-3 w-3 text-faint" />
         </a>
       ))}
       <button ref={setBtn} onClick={() => setOpen((o) => !o)} className="inline-flex h-[24px] items-center gap-1 rounded-md px-1.5 text-[12.5px] text-faint hover:bg-hover hover:text-ink-2">
@@ -301,7 +306,7 @@ function LinksCell({ links, onSave }: { links: Record<string, string | undefined
         <div className="space-y-1.5 p-1.5">
           {LINK_FIELDS.map((f) => (
             <label key={f.id} className="flex items-center gap-2">
-              <span className="w-[72px] text-[12px] text-muted">{f.label}</span>
+              <span className="flex w-[84px] items-center gap-1.5 text-[12px] text-muted"><LinkIcon field={f.id} className="h-3 w-3" />{f.label}</span>
               <input
                 defaultValue={links[f.id] ?? ""}
                 onBlur={(e) => {
@@ -546,20 +551,47 @@ const ACCENTS = ["amber", "red", "green", "blue", "violet", "stone"] as const;
 
 function AuditButton({ p, set }: { p: Project; set: (patch: Partial<Project>) => void }) {
   const [open, setOpen] = useState(false);
+  const [seed, setSeed] = useState<{ answers: Record<string, string[]>; n: number } | null>(null);
+  const ai = p.audit?.ai ?? null;
+  const accept = (r: AiReview, withTierRisk: boolean) => {
+    const base = p.audit ?? { answers: r.answers, score: r.score, updatedAt: new Date().toISOString() };
+    set({
+      rating: r.rating,
+      audit: { ...base, ai: r },
+      ...(withTierRisk && r.tier ? { tier: r.tier } : {}),
+      ...(withTierRisk && r.risk ? { risk: r.risk } : {}),
+    });
+    toast.success(`Rating set to ${r.rating}★ from the AI review`);
+  };
   return (
     <>
-      <button onClick={() => setOpen(true)} className="rounded px-1.5 py-0.5 text-[12px] text-muted hover:bg-hover hover:text-ink">
+      <button onClick={() => setOpen(true)} className="rounded px-1.5 py-0.5 text-[12px] leading-[1.4] text-muted hover:bg-hover hover:text-ink">
         {p.audit ? <>Audit <span className="num text-ink-2">{p.audit.score}</span>/100</> : "Run audit"}
       </button>
-      <Dialog open={open} onClose={() => setOpen(false)} title="Project audit" width={560}>
+      <button onClick={() => setOpen(true)} title="AI review" className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[12px] leading-[1.4] text-accent hover:bg-hover">
+        <Sparkles className="h-3 w-3" /> {ai ? <>AI {ai.rating}★</> : "AI review"}
+      </button>
+      <Dialog open={open} onClose={() => setOpen(false)} title="Project audit" width={600}>
+        <div className="mb-4">
+          <AiReviewPanel
+            projectId={p.id}
+            saved={ai}
+            onAcceptRating={accept}
+            onUseAnswers={(r) => {
+              setSeed((s) => ({ answers: r.answers, n: (s?.n ?? 0) + 1 }));
+              toast.success("AI answers filled in below. Review and save.");
+            }}
+          />
+        </div>
         <Questionnaire
+          key={seed?.n ?? 0}
           questions={AUDIT.map((q) => ({ id: q.id, title: q.title, help: q.help, options: q.options.map((o) => ({ id: o.id, label: o.label })) }))}
-          initial={p.audit?.answers ?? {}}
+          initial={seed?.answers ?? p.audit?.answers ?? {}}
           submitLabel="Save audit"
           onCancel={() => setOpen(false)}
           onSubmit={(answers) => {
             const score = auditScore(answers);
-            set({ audit: { answers, score, updatedAt: new Date().toISOString() }, ...(p.rating ? {} : { rating: scoreToRating(score) }) });
+            set({ audit: { answers, score, updatedAt: new Date().toISOString(), ai: p.audit?.ai ?? null }, ...(p.rating ? {} : { rating: scoreToRating(score) }) });
             setOpen(false);
             toast.success(`Audit saved · ${score}/100`);
           }}

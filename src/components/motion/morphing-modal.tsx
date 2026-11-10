@@ -16,8 +16,16 @@ import {
 } from "react";
 import { EASE_OUT, SPRING_PANEL } from "@/lib/ease";
 import { focusablesIn, useFocusTrap } from "@/lib/hooks/use-focus-trap";
+import { useMessages } from "@/lib/i18n";
 import { PresenceGate } from "@/lib/presence-gate";
 import { cn } from "@/lib/utils";
+
+/** English defaults. Override per instance with `labels`, or app-wide with `LocaleProvider`. */
+export const morphingModalMessages = {
+  close: "Close modal",
+};
+
+export type MorphingModalMessages = typeof morphingModalMessages;
 
 export interface MorphingModalProps {
   /** Which view is currently shown. `null` closes the modal. */
@@ -32,6 +40,8 @@ export interface MorphingModalProps {
    */
   ariaLabel?: string;
   className?: string;
+  /** Override any built-in string. */
+  labels?: Partial<MorphingModalMessages>;
 }
 
 export function MorphingModal({
@@ -41,7 +51,9 @@ export function MorphingModal({
   placement = "bottom",
   ariaLabel,
   className,
+  labels,
 }: MorphingModalProps) {
+  const t = useMessages("morphingModal", morphingModalMessages, labels);
   const open = viewId !== null;
   const reduce = useReducedMotion();
   const panelRef = useRef<HTMLDivElement>(null);
@@ -108,7 +120,7 @@ export function MorphingModal({
           {({ gate }) => (
             <motion.button
               type="button"
-              aria-label="Close modal"
+              aria-label={t("close")}
               // Outside the panel, so the focus trap never lands on it; it is
               // a pointer target, and Escape closes from the keyboard.
               tabIndex={-1}
@@ -118,7 +130,7 @@ export function MorphingModal({
               transition={{ duration: 0.2, ease: EASE_OUT }}
               {...gate}
               onClick={onClose}
-              className="pointer-events-auto fixed inset-0 z-[80] bg-black/25 dark:bg-black/50"
+              className="pointer-events-auto fixed inset-0 z-[80] bg-background/5 [backdrop-filter:blur(14px)_saturate(140%)] [-webkit-backdrop-filter:blur(14px)_saturate(140%)]"
             />
           )}
         </PresenceGate>
@@ -156,7 +168,7 @@ export function MorphingModal({
                 transition={SPRING_PANEL}
                 {...gate}
                 className={cn(
-                  "pointer-events-auto relative w-full max-w-sm overflow-hidden rounded-3xl border border-border bg-background shadow-pop outline-none will-change-transform",
+                  "pointer-events-auto relative w-full max-w-sm overflow-hidden rounded-3xl border border-border bg-background shadow-2xl outline-none will-change-transform",
                   className,
                 )}
               >

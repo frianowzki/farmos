@@ -57,7 +57,6 @@ export function DiaryView() {
   return (
     <Page>
       <PageHeader
-        eyebrow="Workspace"
         title="Diary"
         subtitle="Dated notes. Tag them to projects and they show up on the project page too."
         right={<Button variant="primary" onClick={() => router.replace(`${pathname}?new=1`)}><Plus className="h-3.5 w-3.5" /> New entry</Button>}

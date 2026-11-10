@@ -1,14 +1,20 @@
 "use client";
-import { ConnectButton } from "@rainbow-me/rainbowkit";
+import { ProjectMark } from "@/components/project-mark";
+import { useConnectModal } from "@rainbow-me/rainbowkit";
 import { useQueryClient } from "@tanstack/react-query";
-import { ChevronDown, Copy, ExternalLink, Link2, Plus, ShieldCheck, Trash2, Unplug } from "lucide-react";
+import { ChevronDown, Copy, ExternalLink, Link2, Plus, Trash2, Unplug } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { ChainLogo, ChainStack } from "@/components/chain-logo";
+import { WalletIcon } from "@/components/wallet-icon";
+import { ProviderPicker, WalletModal, type WalletModalView } from "@/components/wallet-forms";
+import { brandFromConnector } from "@/lib/wallet-brands";
 import Link from "next/link";
 import { useState } from "react";
 import { toast } from "@/lib/client/toast";
 import { formatUnits, isAddress } from "viem";
 import { useAccount, useBalance, useDisconnect } from "wagmi";
-import { Monogram, Page, PageHeader } from "@/components/shell";
-import { Button, Input, InlineText, SectionTitle, Skeleton } from "@/components/ui";
+import { Page, PageHeader } from "@/components/shell";
+import { Button, InlineText, SectionTitle, Skeleton } from "@/components/ui";
 import { WalletProvider, walletConnectReady } from "@/components/wallet-provider";
 import { WalletTracker } from "@/components/wallet-tracker";
 import { cn } from "@/lib/cn";
@@ -28,64 +34,67 @@ export function WalletsView() {
 
 function Inner() {
   const { address, isConnected, connector } = useAccount();
-  const { disconnect } = useDisconnect();
+  const { disconnectAsync } = useDisconnect();
+  const { openConnectModal } = useConnectModal();
   const { data, isLoading } = useWallets();
   const qc = useQueryClient();
-  const [addr, setAddr] = useState("");
-  const [label, setLabel] = useState("");
   const linked = data?.wallets ?? [];
   const isLinked = address && linked.some((w) => w.address.toLowerCase() === address.toLowerCase());
+  const provider = brandFromConnector(connector);
+  const [modal, setModal] = useState<WalletModalView | null>(null);
 
-  const add = async (a: string, l: string) => {
+  const add = async (a: string, l: string, prov: string) => {
     try {
-      await api("/api/wallets", { method: "POST", body: { address: a, label: l } });
+      await api("/api/wallets", { method: "POST", body: { address: a, label: l, provider: prov } });
       qc.invalidateQueries({ queryKey: keys.wallets });
       qc.invalidateQueries({ queryKey: ["wallet-track"] });
-      setAddr("");
-      setLabel("");
       toast.success("Wallet linked");
     } catch (e) {
       toast.error((e as Error).message);
     }
   };
+  // Link more than one: drop the current connection and reopen the picker (switch account/app there).
+  const connectAnother = async () => {
+    await disconnectAsync().catch(() => {});
+    setTimeout(() => openConnectModal?.(), 150);
+  };
 
   return (
     <Page>
-      <PageHeader eyebrow="Workspace" title="Wallets" subtitle="Read-only. farmOS never asks for signatures or sends transactions." />
+      <PageHeader title="Wallets" subtitle="Read-only. farmOS never asks for signatures or sends transactions." />
 
       <div className="mb-8 rounded-xl border border-line bg-panel p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-hover text-muted"><ShieldCheck className="h-4 w-4" /></div>
+            {isConnected ? (connector?.icon && !provider ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={connector.icon} alt={connector.name} className="h-9 w-9 rounded-[28%]" />
+            ) : <WalletIcon provider={provider} size={36} />) : (
+              <div className="flex items-center -space-x-2">
+                {(["metamask", "rabby", "phantom", "coinbase"] as const).map((b) => <span key={b} className="rounded-[28%] ring-2 ring-panel"><WalletIcon provider={b} size={26} /></span>)}
+              </div>
+            )}
             <div>
               <div className="text-[14px] font-medium">{isConnected ? shortAddr(address) : "No wallet connected"}</div>
               <div className="text-[12.5px] text-muted">{isConnected ? `via ${connector?.name ?? "wallet"}` : walletConnectReady ? "Browser wallets and WalletConnect" : "Browser wallets (injected). WalletConnect needs a project id."}</div>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {isConnected && address && !isLinked && <Button size="sm" variant="primary" onClick={() => add(address, connector?.name ?? "")}><Link2 className="h-3.5 w-3.5" /> Link to farmOS</Button>}
+            {isConnected && address && !isLinked && <Button size="sm" variant="primary" onClick={() => add(address, connector?.name ?? "", provider)}><Link2 className="h-3.5 w-3.5" /> Link to farmOS</Button>}
+            {isConnected && isLinked && <Button size="sm" onClick={() => setModal("menu")}><Plus className="h-3.5 w-3.5" /> Add another wallet</Button>}
             {isConnected ? (
-              <Button size="sm" variant="ghost" onClick={() => disconnect()}><Unplug className="h-3.5 w-3.5" /> Disconnect</Button>
+              <Button size="sm" variant="ghost" onClick={() => disconnectAsync()}><Unplug className="h-3.5 w-3.5" /> Disconnect</Button>
             ) : (
-              <ConnectButton.Custom>
-                {({ openConnectModal, mounted }) => (
-                  <Button variant="primary" disabled={!mounted} onClick={openConnectModal}>Connect wallet</Button>
-                )}
-              </ConnectButton.Custom>
+              <Button variant="primary" onClick={() => setModal("menu")}>Connect wallet</Button>
             )}
           </div>
         </div>
         {isConnected && address && <div className="mt-4 border-t border-line pt-4"><Balances address={address} /></div>}
       </div>
 
-      <WalletTracker hasEvm={linked.some((w) => isAddress(w.address))} />
+      <WalletTracker hasEvm={linked.length > 0} />
 
-      <SectionTitle>Linked wallets</SectionTitle>
-      <form onSubmit={(e) => { e.preventDefault(); if (addr.trim()) add(addr.trim(), label.trim()); }} className="mb-3 flex flex-wrap gap-2">
-        <Input value={addr} onChange={(e) => setAddr(e.target.value)} placeholder="0x… or Solana address (watch-only)" className="num min-w-[240px] flex-[2]" />
-        <Input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Label, e.g. Farm 03" className="min-w-[140px] flex-1" />
-        <Button type="submit" disabled={!addr.trim()}><Plus className="h-3.5 w-3.5" /> Add</Button>
-      </form>
+      <SectionTitle right={<Button size="sm" onClick={() => setModal("menu")}><Plus className="h-3.5 w-3.5" /> Add wallet</Button>}>Linked wallets</SectionTitle>
       {isLoading ? (
         <Skeleton className="h-24" />
       ) : linked.length === 0 ? (
@@ -95,13 +104,18 @@ function Inner() {
           {linked.map((w) => <WalletRow key={w.id} w={w} />)}
         </div>
       )}
+      <WalletModal view={modal} setView={setModal} onConnect={() => (isConnected ? connectAnother() : openConnectModal?.())} connectLabel={isConnected ? "Connect another wallet app" : "Connect a wallet app"} />
     </Page>
   );
 }
 
-function WalletRow({ w }: { w: { id: string; address: string; label: string } }) {
+type TrackSnap = { wallets: { address: string; holdings: { chain: string }[] }[] };
+
+function WalletRow({ w }: { w: { id: string; address: string; label: string; provider: string } }) {
   const [open, setOpen] = useState(false);
   const qc = useQueryClient();
+  const track = useQuery({ queryKey: ["wallet-track"], queryFn: () => api<TrackSnap>("/api/wallets/track"), staleTime: 5 * 60_000 });
+  const held = track.data?.wallets.find((x) => x.address.toLowerCase() === w.address.toLowerCase())?.holdings.map((h) => h.chain) ?? [];
   const { data } = useProjects();
   const used = (data?.projects ?? []).filter((p) => p.wallets.some((x) => x.toLowerCase() === w.address.toLowerCase()));
   const evm = isAddress(w.address);
@@ -111,11 +125,13 @@ function WalletRow({ w }: { w: { id: string; address: string; label: string } })
         <button onClick={() => evm && setOpen((o) => !o)} className={cn("rounded p-0.5 text-faint", evm ? "hover:text-ink" : "opacity-30")} aria-label="Show balances">
           <ChevronDown className={cn("h-4 w-4 transition-transform", !open && "-rotate-90")} />
         </button>
-        <div className="w-[160px] shrink-0">
+        <ProviderPicker compact value={w.provider} onChange={async (v) => { await api(`/api/wallets/${w.id}`, { method: "PATCH", body: { provider: v } }); qc.invalidateQueries({ queryKey: keys.wallets }); }} />
+        <div className="w-[150px] shrink-0">
           <InlineText value={w.label} placeholder="Add label" onSave={async (v) => { await api(`/api/wallets/${w.id}`, { method: "PATCH", body: { label: v } }); qc.invalidateQueries({ queryKey: keys.wallets }); }} />
         </div>
         <span className="num min-w-0 flex-1 truncate text-[12.5px] text-ink-2">{w.address}</span>
-        <div className="hidden items-center gap-1 sm:flex">{used.slice(0, 3).map((p) => <Link key={p.id} href={`/projects/${p.id}`} title={p.name}><Monogram name={p.name} size={18} /></Link>)}{used.length > 3 && <span className="text-[11.5px] text-faint">+{used.length - 3}</span>}</div>
+        {held.length > 0 && <span className="hidden md:inline-flex"><ChainStack chains={held} size={16} max={5} /></span>}
+        <div className="hidden items-center gap-1 sm:flex">{used.slice(0, 3).map((p) => <Link key={p.id} href={`/projects/${p.id}`} title={p.name}><ProjectMark p={p} size={18} /></Link>)}{used.length > 3 && <span className="text-[11.5px] text-faint">+{used.length - 3}</span>}</div>
         <button onClick={() => { navigator.clipboard.writeText(w.address); toast.success("Copied"); }} className="rounded p-1 text-faint hover:text-ink" aria-label="Copy"><Copy className="h-3.5 w-3.5" /></button>
         {evm && <a href={`https://debank.com/profile/${w.address}`} target="_blank" rel="noreferrer" className="rounded p-1 text-faint hover:text-ink" aria-label="Open in DeBank"><ExternalLink className="h-3.5 w-3.5" /></a>}
         <button onClick={async () => { if (!confirm("Unlink this wallet?")) return; await api(`/api/wallets/${w.id}`, { method: "DELETE" }); qc.invalidateQueries({ queryKey: keys.wallets }); }} className="rounded p-1 text-faint opacity-0 hover:text-neg group-hover:opacity-100" aria-label="Unlink"><Trash2 className="h-3.5 w-3.5" /></button>
@@ -128,17 +144,17 @@ function WalletRow({ w }: { w: { id: string; address: string; label: string } })
 function Balances({ address }: { address: `0x${string}` }) {
   return (
     <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-      {CHAINS.map((c) => <BalanceCell key={c.key} address={address} chainId={c.chain.id} name={c.name} />)}
+      {CHAINS.map((c) => <BalanceCell key={c.key} address={address} chainId={c.chain.id} name={c.name} chainKey={c.key} />)}
     </div>
   );
 }
 
-function BalanceCell({ address, chainId, name }: { address: `0x${string}`; chainId: number; name: string }) {
+function BalanceCell({ address, chainId, name, chainKey }: { address: `0x${string}`; chainId: number; name: string; chainKey: string }) {
   const { data, isLoading, isError } = useBalance({ address, chainId, query: { staleTime: 60_000, retry: 1 } });
   const v = data ? Number(formatUnits(data.value, data.decimals)) : null;
   return (
     <div className="rounded-lg border border-line bg-panel px-3 py-2">
-      <div className="text-[11.5px] text-muted">{name}</div>
+      <div className="flex items-center gap-1.5 text-[11.5px] text-muted"><ChainLogo chain={chainKey} size={14} />{name}</div>
       <div className={cn("num text-[14px]", v === 0 && "text-faint")}>
         {isLoading ? <span className="text-faint">…</span> : isError ? <span className="text-[12px] text-faint">RPC error</span> : `${num(v, v && v < 1 ? 5 : 4)} ${data?.symbol ?? ""}`}
       </div>

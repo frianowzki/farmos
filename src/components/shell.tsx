@@ -22,11 +22,12 @@ import { Dock, DockItem } from "@/components/motion/dock";
 import { MorphingModal } from "@/components/motion/morphing-modal";
 import { Tabs, TabsList, TabsTrigger } from "@/components/motion/tabs";
 import { Fab } from "@/components/panelui/fab";
+import { ChainLabel } from "@/components/chain-logo";
 import { AddTask } from "@/components/tasks";
 import { cn } from "@/lib/cn";
 import { CHAIN_SUGGESTIONS, CATEGORIES } from "@/lib/constants";
 import { api, useCreateProject, useProjects } from "@/lib/client/api";
-import { CATEGORY_OPTS, monoTone } from "@/lib/options";
+import { CATEGORY_OPTS } from "@/lib/options";
 
 type ShellCtx = { newProject: (category?: string) => void; openPalette: () => void; openQuick: () => void };
 const Ctx = createContext<ShellCtx>({ newProject: () => {}, openPalette: () => {}, openQuick: () => {} });
@@ -50,23 +51,14 @@ const NAV = [
   { href: "/wallets", label: "Wallets", icon: Wallet },
 ];
 
-export function Monogram({ name, size = 20, className, accent }: { name: string; size?: number; className?: string; accent?: string | null }) {
-  const t = accent || monoTone(name || "?");
-  return (
-    <span
-      style={{ width: size, height: size, fontSize: size * 0.55 }}
-      className={cn("inline-flex shrink-0 items-center justify-center rounded-[5px] font-serif font-medium leading-none", `tone-${t}`, className)}
-    >
-      {(name.match(/[\p{L}\p{N}]/u)?.[0] ?? "?").toUpperCase()}
-    </span>
-  );
-}
+export { Monogram } from "@/components/project-mark";
+import { ProjectMark } from "@/components/project-mark";
 
 export function Logo({ className }: { className?: string }) {
   return (
-    <span className={cn("inline-flex items-baseline gap-[1px] select-none", className)}>
-      <span className="font-serif text-[19px] font-medium italic tracking-[-0.01em] text-ink">farm</span>
-      <span className="font-label text-[11px] font-medium tracking-[0.16em] text-accent">OS</span>
+    <span className={cn("inline-flex items-center gap-[3px] select-none", className)} aria-label="farmOS">
+      <span className="font-wordmark text-[21px] font-bold leading-none tracking-[-0.055em] text-ink [font-variation-settings:'opsz'_96,'wdth'_92]">farm</span>
+      <span className="font-wordmark rounded-[5px] bg-accent px-[4px] py-[2px] text-[10.5px] font-extrabold leading-none tracking-[0.01em] text-accent-ink">OS</span>
     </span>
   );
 }
@@ -174,10 +166,10 @@ function SidebarBody() {
             <Search className="h-4 w-4" />
           </button>
         ) : (
-          <button type="button" onClick={openPalette} className="flex h-8 w-full items-center gap-2 rounded-lg border border-line bg-panel px-2.5 text-[13px] text-muted transition-colors hover:border-line-strong">
-            <Search className="h-3.5 w-3.5" />
-            <span className="flex-1 text-left">Search or jump to…</span>
-            <Kbd>⌘K</Kbd>
+          <button type="button" onClick={openPalette} className="flex h-9 w-full min-w-0 items-center gap-2 overflow-hidden rounded-lg border border-line bg-panel px-2.5 text-[13px] leading-[1.4] text-muted transition-colors hover:border-line-strong">
+            <Search className="h-3.5 w-3.5 shrink-0" />
+            <span className="min-w-0 flex-1 truncate py-0.5 text-left">Search…</span>
+            <span className="shrink-0"><Kbd>⌘K</Kbd></span>
           </button>
         )}
       </AnimatedSidebarHeader>
@@ -220,7 +212,7 @@ function SidebarBody() {
             <AnimatedSidebarMenu>
               {pinned.map((p) => (
                 <AnimatedSidebarMenuItem key={p.id}>
-                  <AnimatedSidebarMenuButton href={`/projects/${p.id}`} isActive={pathname === `/projects/${p.id}`} icon={<Monogram name={p.name} size={18} accent={p.accent} />} className={btn}>{p.name}</AnimatedSidebarMenuButton>
+                  <AnimatedSidebarMenuButton href={`/projects/${p.id}`} isActive={pathname === `/projects/${p.id}`} icon={<ProjectMark p={p} size={18} />} className={btn}>{p.name}</AnimatedSidebarMenuButton>
                 </AnimatedSidebarMenuItem>
               ))}
             </AnimatedSidebarMenu>
@@ -326,7 +318,7 @@ function NewProjectForm({ initialCategory, onDone }: { initialCategory?: string;
         <Field label="X handle"><Input placeholder="@project" value={x} onChange={(e) => setX(e.target.value)} /></Field>
       </div>
       <Field label="Chains">
-        <div className="rounded-md border border-line px-1"><TagInput value={chains} onChange={setChains} suggestions={CHAIN_SUGGESTIONS} placeholder="Add chains" /></div>
+        <div className="rounded-md border border-line px-1"><TagInput value={chains} onChange={setChains} suggestions={CHAIN_SUGGESTIONS} placeholder="Add chains" allowCreate={false} render={(c) => <ChainLabel chain={c} />} /></div>
       </Field>
       <div className="flex items-center justify-between pt-1">
         <span className="text-[12px] text-faint">Everything else lives on the project page.</span>
@@ -424,7 +416,7 @@ function Palette({ open, onClose }: { open: boolean; onClose: () => void }) {
             <Command.Group heading="Projects" className={group}>
               {data!.projects.map((p) => (
                 <Command.Item key={p.id} value={`${p.name} ${p.category} ${p.tags.join(" ")}`} className={itemCls} onSelect={() => go(`/projects/${p.id}`)}>
-                  <Monogram name={p.name} size={18} /> {p.name}
+                  <ProjectMark p={p} size={18} /> {p.name}
                   <span className="ml-auto text-[12px] capitalize text-faint">{p.category}</span>
                 </Command.Item>
               ))}
@@ -528,11 +520,10 @@ export function AppShell({ children }: { children: ReactNode }) {
   );
 }
 
-export function PageHeader({ title, subtitle, right, eyebrow }: { title: ReactNode; subtitle?: ReactNode; right?: ReactNode; eyebrow?: ReactNode }) {
+export function PageHeader({ title, subtitle, right }: { title: ReactNode; subtitle?: ReactNode; right?: ReactNode }) {
   return (
     <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
       <div className="min-w-0">
-        {eyebrow && <div className="mb-1 text-[12px] font-medium text-muted">{eyebrow}</div>}
         <h1 className="font-serif text-[30px] font-normal leading-[1.1] tracking-[-0.015em] text-ink sm:text-[34px]">{title}</h1>
         {subtitle && <p className="mt-1.5 text-[13.5px] text-muted">{subtitle}</p>}
       </div>
