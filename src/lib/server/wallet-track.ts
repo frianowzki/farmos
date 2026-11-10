@@ -41,12 +41,14 @@ const TOKENS: Record<string, { symbol: string; address: Address; cg?: string }[]
   hyperevm: [],
   robinhood: [],
   elysium: [],
+  // Arc's USDC ERC-20 interface mirrors the native balance, so only the native read counts (no double count).
+  arc: [],
 };
 
 /** CoinGecko ids for native gas tokens. */
 const NATIVE_CG: Record<string, string> = {
   ethereum: "ethereum", base: "ethereum", arbitrum: "ethereum", optimism: "ethereum", ink: "ethereum", robinhood: "ethereum",
-  bsc: "binancecoin", avalanche: "avalanche-2", hyperevm: "hyperliquid", elysium: "hyperliquid",
+  bsc: "binancecoin", avalanche: "avalanche-2", hyperevm: "hyperliquid", elysium: "hyperliquid", arc: "usd-coin",
 };
 const STABLES = new Set(["USDC", "USDT"]);
 export const TRACK_CHAINS = Object.keys(TOKENS);
@@ -233,7 +235,7 @@ export async function trackWallets(pid: string): Promise<TrackSnapshot> {
         }
         for (const a of addrs) {
           const v = Number(formatUnits(native.get(a.toLowerCase()) ?? BigInt(0), meta.chain.nativeCurrency.decimals));
-          if (v > 0) raw.push({ addr: a.toLowerCase(), chain: ck, symbol: meta.chain.nativeCurrency.symbol, token: null, amount: v, cg: NATIVE_CG[ck] });
+          if (v > 0) raw.push({ addr: a.toLowerCase(), chain: ck, symbol: meta.chain.nativeCurrency.symbol, token: null, amount: v, cg: NATIVE_CG[ck], stable: STABLES.has(meta.chain.nativeCurrency.symbol) });
         }
       } catch (e) {
         for (const a of addrs) res.get(a.toLowerCase())!.errors.push(`${meta.name}: ${(e as Error).message.slice(0, 60)}`);

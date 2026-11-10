@@ -1,7 +1,7 @@
 /**
  * The only chains farmOS offers (project chains, wallet tracking, selectors).
  * Logos are the chains' official marks, self-hosted in /public/chains (96px webp).
- * Sources: Trust Wallet assets (NEAR too), CoinGecko (Canton Coin mark), (official submissions), DefiLlama chain icons, and the chain's official X avatar (Elysium).
+ * Sources: Trust Wallet assets (NEAR too), CoinGecko (Canton Coin mark), (official submissions), DefiLlama chain icons, and the chain's official X avatar (Elysium, Arc).
  */
 export type ChainMeta = { key: string; name: string; aliases: string[]; evm: boolean };
 
@@ -13,6 +13,7 @@ export const CHAINS: ChainMeta[] = [
   { key: "bsc", name: "BSC", aliases: ["bnb", "bnb chain", "bnbchain", "bnb smart chain", "binance smart chain", "binance"], evm: true },
   { key: "hyperevm", name: "HyperEVM", aliases: ["hyperliquid", "hype evm", "hype", "hyperliquid evm", "hl"], evm: true },
   { key: "elysium", name: "Elysium", aliases: ["elysium l2", "kinetiq elysium"], evm: true },
+  { key: "arc", name: "Arc", aliases: ["arc network", "circle arc", "arc mainnet"], evm: true },
   { key: "solana", name: "Solana", aliases: ["sol"], evm: false },
   { key: "zcash", name: "Zcash", aliases: ["zec"], evm: false },
   { key: "monero", name: "Monero", aliases: ["xmr"], evm: false },

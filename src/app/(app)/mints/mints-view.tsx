@@ -38,7 +38,7 @@ const VERDICT: Record<Verdict, { tone: string; label: string }> = {
 };
 
 const stageName = (s: DropStage) => s.label || s.stage_type.replace(/_/g, " ");
-const NATIVE: Record<string, string> = { ethereum: "ETH", base: "ETH", arbitrum: "ETH", optimism: "ETH", zora: "ETH", blast: "ETH", ink: "ETH", shape: "ETH", abstract: "ETH", unichain: "ETH", polygon: "POL", matic: "POL", avalanche: "AVAX", bsc: "BNB", ape_chain: "APE", apechain: "APE", sei: "SEI", flow: "FLOW", ronin: "RON", hyperevm: "HYPE", monad: "MON", berachain: "BERA", soneium: "ETH", b3: "ETH", gunzilla: "GUN", somnia: "SOMI", animechain: "ANIME" };
+const NATIVE: Record<string, string> = { ethereum: "ETH", base: "ETH", arbitrum: "ETH", optimism: "ETH", zora: "ETH", blast: "ETH", ink: "ETH", shape: "ETH", abstract: "ETH", unichain: "ETH", polygon: "POL", matic: "POL", avalanche: "AVAX", bsc: "BNB", ape_chain: "APE", apechain: "APE", sei: "SEI", flow: "FLOW", ronin: "RON", hyperevm: "HYPE", elysium: "HYPE", arc: "USDC", monad: "MON", berachain: "BERA", soneium: "ETH", b3: "ETH", gunzilla: "GUN", somnia: "SOMI", animechain: "ANIME" };
 function priceOf(raw: string | null | undefined, currency: string | null | undefined, chain = "ethereum") {
   if (raw == null) return "—";
   if (raw === "0") return "Free";

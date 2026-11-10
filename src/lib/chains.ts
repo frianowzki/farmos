@@ -1,4 +1,4 @@
-import { arbitrum, avalanche, base, bsc, hyperEvm, ink, mainnet, optimism, robinhood } from "viem/chains";
+import { arbitrum, arc, avalanche, base, bsc, hyperEvm, ink, mainnet, optimism, robinhood } from "viem/chains";
 import { defineChain, type Chain } from "viem";
 import { chainMeta } from "./chain-meta";
 
@@ -27,6 +27,8 @@ export const EVM_CHAINS: { key: string; name: string; chain: Chain }[] = [
   { key: "bsc", name: "BSC", chain: bsc },
   { key: "hyperevm", name: "HyperEVM", chain: hyperEvm },
   { key: "elysium", name: "Elysium", chain: elysium },
+  // Circle's Arc L1 mainnet (chain id 5042, public RPC rpc.mainnet.arc.io); gas token is native USDC (18 decimals).
+  { key: "arc", name: "Arc", chain: arc },
   { key: "arbitrum", name: "Arbitrum", chain: arbitrum },
   { key: "optimism", name: "Optimism", chain: optimism },
   { key: "avalanche", name: "Avalanche", chain: avalanche },

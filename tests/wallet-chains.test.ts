@@ -23,3 +23,17 @@ describe("wallet families", () => {
     expect(chainMeta("Canton")?.name).toBe("Canton Network");
   });
 });
+
+describe("EVM chain coverage", () => {
+  it("HyperEVM, Elysium and Arc are supported everywhere chain-meta is used", async () => {
+    const { EVM_CHAINS, findChain } = await import("@/lib/chains");
+    for (const k of ["hyperevm", "elysium", "arc"]) {
+      expect(chainMeta(k)?.evm).toBe(true);
+      expect(EVM_CHAINS.some((c) => c.key === k)).toBe(true);
+    }
+    expect(findChain(5042)?.key).toBe("arc");
+    expect(findChain("circle arc")?.key).toBe("arc");
+    expect(findChain(99901)?.key).toBe("elysium");
+    expect(findChain("hyperliquid")?.key).toBe("hyperevm");
+  });
+});
