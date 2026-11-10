@@ -53,14 +53,26 @@ const NAV = [
 export { Monogram } from "@/components/project-mark";
 import { ProjectMark } from "@/components/project-mark";
 
-export function Logo({ className }: { className?: string }) {
+export function Logo({ className, mark = false }: { className?: string; mark?: boolean }) {
+  // Brand logo (sprout + wordmark), vector-traced from the master PNG; a light-green variant for dark mode.
+  // `mark` renders the sprout glyph on its own (square-ish), for compact/branding spots such as the login page.
   return (
-    // Brand logo (sprout + wordmark), vector-traced from the master PNG; a light-green variant for dark mode.
     <span className={cn("inline-flex h-[26px] select-none items-center", className)} role="img" aria-label="farmOS">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src="/brand/farmos-logo.svg" alt="" width={90} height={26} className="h-full w-auto dark:hidden" draggable={false} />
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src="/brand/farmos-logo-dark.svg" alt="" width={90} height={26} className="hidden h-full w-auto dark:block" draggable={false} />
+      {mark ? (
+        <>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/brand/farmos-sprout.svg" alt="" width={26} height={34} className="h-full w-auto dark:hidden" draggable={false} />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/brand/farmos-sprout-dark.svg" alt="" width={26} height={34} className="hidden h-full w-auto dark:block" draggable={false} />
+        </>
+      ) : (
+        <>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/brand/farmos-logo.svg" alt="" width={90} height={26} className="h-full w-auto dark:hidden" draggable={false} />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/brand/farmos-logo-dark.svg" alt="" width={90} height={26} className="hidden h-full w-auto dark:block" draggable={false} />
+        </>
+      )}
     </span>
   );
 }
