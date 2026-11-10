@@ -215,6 +215,8 @@ button, a, input, textarea, select, label, [role="button"] {
   outline-offset: 1px;
   border-radius: 4px;
 }
+/* Inputs whose wrapper already draws the focus ring (converter fields). */
+.no-ring:focus-visible { outline: none; }
 .num {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;

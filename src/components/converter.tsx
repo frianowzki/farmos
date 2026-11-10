@@ -124,7 +124,7 @@ function AmountInput({ label, value, onChange, active, loading }: { label: strin
         placeholder={loading && !active ? "…" : "0"}
         onChange={(e) => onChange(e.target.value)}
         onFocus={(e) => e.target.select()}
-        className="num min-w-0 flex-1 bg-transparent text-right text-[16px] text-ink outline-none placeholder:text-faint sm:text-[14px]"
+        className="num min-w-0 flex-1 bg-transparent text-right text-[16px] text-ink outline-none placeholder:text-faint no-ring sm:text-[14px]"
       />
     </label>
   );
