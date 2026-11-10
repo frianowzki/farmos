@@ -22,7 +22,8 @@ import { WalletTracker } from "@/components/wallet-tracker";
 import { cn } from "@/lib/cn";
 import { EVM_CHAINS, WALLET_CHAIN_KEYS } from "@/lib/chains";
 import { num, shortAddr } from "@/lib/format";
-import { api, keys, useProjects, useWallets } from "@/lib/client/api";
+import { api, keys, useProjects, useWallets, type Wallet } from "@/lib/client/api";
+import { LayoutGroup, motion } from "motion/react";
 
 const CHAINS = WALLET_CHAIN_KEYS.map((k) => EVM_CHAINS.find((c) => c.key === k)!);
 
@@ -120,7 +121,13 @@ function Inner() {
         <div className="rounded-lg border border-dashed border-line px-4 py-6 text-center text-[13.5px] text-muted">Link your farming wallets to tag them on projects and check balances across chains.</div>
       ) : (
         <div className="divide-y divide-line rounded-lg border border-line bg-panel">
-          {linked.map((w) => <WalletRow key={w.id} w={w} />)}
+          <LayoutGroup>
+            {[...linked].sort((a, b) => Number(Boolean(b.isDefault)) - Number(Boolean(a.isDefault))).map((w) => (
+              <motion.div key={w.id} layout="position" transition={{ type: "spring", stiffness: 420, damping: 36 }} className="bg-panel first:rounded-t-lg last:rounded-b-lg">
+                <WalletRow w={w} />
+              </motion.div>
+            ))}
+          </LayoutGroup>
         </div>
       )}
       <WalletModal view={modal} setView={setModal} onConnect={() => (isConnected ? connectAnother() : openConnectModal?.())} connectLabel={isConnected ? "Another EVM wallet" : "EVM wallet"} />
@@ -156,7 +163,24 @@ function WalletRow({ w }: { w: { id: string; address: string; label: string; pro
         <button onClick={() => { navigator.clipboard.writeText(w.address); toast.success("Copied"); }} className="rounded p-1 text-faint hover:text-ink" aria-label="Copy"><Copy className="h-3.5 w-3.5" /></button>
         {fam && WATCH_ONLY.includes(fam) && <span className="hidden shrink-0 rounded-full border border-line px-1.5 py-0.5 text-[10.5px] text-muted sm:inline">Watch-only</span>}
         <button
-          onClick={async () => { await api(`/api/wallets/${w.id}`, { method: "PATCH", body: { isDefault: !w.isDefault } }); qc.invalidateQueries({ queryKey: keys.wallets }); toast.success(w.isDefault ? "Default cleared" : "Set as default wallet"); }}
+          onClick={async () => {
+            const next = !w.isDefault;
+            // Optimistic: flip the flag and move the new default to the top right away (the list animates).
+            const prev = qc.getQueryData<{ wallets: Wallet[] }>(keys.wallets);
+            if (prev) {
+              const ws = prev.wallets.map((x) => ({ ...x, isDefault: next ? x.id === w.id : x.id === w.id ? false : x.isDefault }));
+              qc.setQueryData(keys.wallets, { ...prev, wallets: ws.sort((a, b) => Number(b.isDefault) - Number(a.isDefault)) });
+            }
+            try {
+              await api(`/api/wallets/${w.id}`, { method: "PATCH", body: { isDefault: next } });
+              toast.success(next ? "Set as default wallet" : "Default cleared");
+            } catch (e) {
+              if (prev) qc.setQueryData(keys.wallets, prev);
+              toast.error((e as Error).message);
+            } finally {
+              qc.invalidateQueries({ queryKey: keys.wallets });
+            }
+          }}
           className={cn("rounded p-1 hover:text-ink", w.isDefault ? "text-accent" : "text-faint sm:opacity-0 sm:group-hover:opacity-100")}
           aria-label={w.isDefault ? "Clear default wallet" : "Set as default"}
           title={w.isDefault ? "Default wallet" : "Set as default"}
