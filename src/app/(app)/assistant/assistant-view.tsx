@@ -385,7 +385,6 @@ function Chat({ id, initialMessages, initialMode, initialProject, initialQuery, 
                 })}
               </div>
               {composer(true)}
-              <p className="mt-1.5 text-center text-[11px] text-faint">Research only. Never shares keys, never sends transactions. Verify before you ape.</p>
             </div>
           </div>
         </>
@@ -405,7 +404,6 @@ function Chat({ id, initialMessages, initialMode, initialProject, initialQuery, 
           </div>
           <div className="px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-1 sm:px-6">
             <div className="mx-auto max-w-[760px]">{composer()}</div>
-            <p className="mx-auto mt-1.5 max-w-[760px] text-center text-[11px] text-faint">Research only. Never shares keys, never sends transactions. Verify before you ape.</p>
           </div>
         </>
       )}
