@@ -116,6 +116,47 @@ The private Blob store `frioos-files` (region `sin1`) is connected to the projec
 
 Hobby (free) included usage: 1 GB storage/month (monthly average), 10,000 simple operations, 2,000 advanced operations, and 10 GB Blob data transfer. Going over a limit is not billed; Blob access is blocked until the 30-day usage window resets. Source: https://vercel.com/docs/vercel-blob/usage-and-pricing.
 
+## 8. Telegram notifications (Settings → Notifications)
+Uses the existing bot `@friofarmOS_bot` (`TELEGRAM_BOT_TOKEN`). The bot only sends you messages; it never reads anything else.
+1. Settings → Notifications → **Link Telegram**. Telegram opens the bot with a one-time `/start` token (valid 30 minutes). Press **Start**.
+2. Back in farmOS press **I pressed Start**. farmOS reads the bot's pending updates (`getUpdates`, no webhook), finds the token, and saves that chat id.
+   - Shortcut: **Use connected account** reuses the Telegram account from Connected accounts (works once you have pressed Start in the bot at least once).
+3. Toggle sections: mint countdowns (watched mints starting within 24h + projects with a mint date today/tomorrow), campaign deadlines (deadline, campaign end, snapshot, TGE, claim open/close in the next 3 days), today's open tasks, streaks at risk (due today, streak ≥ 2).
+4. **Send test** sends today's digest now. `GET /api/notify/test` previews it without sending.
+
+The digest runs from Vercel Cron `/api/cron/daily` at `0 0 * * *` UTC = **07:00 WIB** (Hobby allows daily crons; Vercel may fire anywhere within that hour). The route is public in the proxy but requires `Authorization: Bearer $CRON_SECRET`, which Vercel adds automatically. Days are computed in `APP_TZ` (default `Asia/Jakarta`).
+
+## 9. Wallet auto-track (Wallets page)
+For every saved EVM wallet, the server reads native balances plus main tokens (USDC, USDT, WETH, ARB, OP) on Ethereum, Base, Arbitrum, Optimism, BNB, Polygon, Linea, Ink and HyperEVM. Read-only, no signatures.
+- Native balances: Etherscan V2 `balancemulti` where the free plan covers the chain (Ethereum, Arbitrum, Polygon, Linea, HyperEVM); public RPC for the rest (Base, Optimism, BNB and Ink are paid-only on Etherscan's free tier).
+- ERC-20 balances: Multicall3 over public RPC; decimals are read on-chain.
+- USD: CoinGecko simple price for natives/WETH/ARB/OP, stablecoins at $1. Assets without a price show "no price" and are left out of totals.
+- Cached for 10 minutes in `settings.wallet_track` (refetched immediately if the wallet list changes); **Refresh** forces it; the daily cron refreshes too.
+- **Degen positions, on-chain**: open positions with a token address on a known chain get their on-chain size summed across linked wallets. PnL = on-chain size × (current − entry). **Use on-chain size** writes it back to the position.
+
+## 10. Airdrop checker (project → Eligibility tab)
+Only real sources; with nothing configured the tab says **No checker configured**.
+- **Checker API (JSON)**: the project's public endpoint with `{address}`, e.g. `https://api.project.xyz/eligibility/{address}`. Optional field path (`amount`, `data.eligible`). A 404 counts as not eligible.
+- **Claim contract view**: chain + contract + a view taking one address, e.g. `claimable(address) returns (uint256)`. Read with `eth_call` only.
+- **Merkle / claims list (JSON)**: a published claims file, `{ "0xabc…": "123" }` or `[{ address, amount }]`.
+- Optional decimals scale raw integer amounts (wei-style). Optional claim page link.
+Wallets checked: the ones tagged on the project, otherwise all linked EVM wallets. https only, 12 s timeout, 5 MB max response. Results are stored on the project (`projects.checker.lastRun`).
+
+## 11. Backup, export and restore (Settings → Data)
+- **JSON backup** `GET /api/export`: all tables. Never included: OAuth/Google tokens (`connected_accounts`, `google_tokens`), the encrypted AI key, the Telegram link, and the wallet cache.
+- **CSV per table** `GET /api/export?format=csv&table=<name>` for projects, positions, tasks, completions, diary, wallets, mints, feed, attachments, threads. Arrays/objects are JSON inside the cell; formula-looking cells are prefixed with `'`.
+- **Import JSON**: uploads are first validated (dry run with row counts), then a confirm dialog. On confirm farmOS saves a safety snapshot to Blob, then replaces all data in one transaction. Your AI key and Telegram link are kept. Upload limit 4 MB.
+- **Daily snapshots**: the daily cron writes `backups/farmos-YYYY-MM-DD.json` to the private Blob store and keeps the newest 7. **Snapshot now** saves one immediately; snapshots download through `/api/backups?download=…` after the session check.
+
+## 12. Install as an app (PWA)
+farmOS ships a web manifest, PNG + maskable icons (`public/icons`, rendered from `src/app/icon.svg` by `node scripts/gen-pwa-icons.mjs`) and a service worker (`public/sw.js`) that caches only the offline page and static build assets. API data is never cached.
+- Android/Chrome: open the site → menu → **Install app**.
+- iPhone/Safari: Share → **Add to Home Screen**.
+Offline, navigations show a small "You're offline" page.
+
+## 13. Custom domain
+Current: free `*.vercel.app` (`frioos-iota.vercel.app`, `farmos-os.vercel.app`). Nothing has been bought. To add one later: buy any domain (Vercel Domains or any registrar), add it under Vercel → Project → Domains, then set `APP_URL` to it and add it to the Google OAuth client (origin + redirect), Telegram `/setdomain`, X/Discord/GitHub callbacks, and the Reown allowlist.
+
 ## Env var reference
 | Var | Required | Notes |
 | --- | --- | --- |
@@ -133,3 +174,5 @@ Hobby (free) included usage: 1 GB storage/month (monthly average), 10,000 simple
 | `DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET` | optional | Discord connection; set on Production + Preview |
 | `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | optional | GitHub connection; set on Production + Preview |
 | `TELEGRAM_BOT_TOKEN`, `NEXT_PUBLIC_TELEGRAM_BOT_USERNAME` | optional | Telegram Login Widget; set on Production + Preview (`NEXT_PUBLIC_TELEGRAM_BOT_USERNAME` is `friofarmOS_bot`) |
+| `CRON_SECRET` | yes for cron | random secret, Production + Preview (sensitive); Vercel sends it as `Authorization: Bearer` to `/api/cron/daily` |
+| `APP_TZ` | optional | day boundary for digest/backups, default `Asia/Jakarta` |
