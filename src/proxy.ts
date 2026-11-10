@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { SESSION_COOKIE, verifySessionToken } from "@/lib/session";
 
-const PUBLIC = [/^\/login$/, /^\/api\/unlock$/, /^\/api\/auth(\/|$)/, /^\/api\/health$/];
+const PUBLIC = [/^\/login$/, /^\/api\/unlock$/, /^\/api\/auth(\/|$)/, /^\/api\/health$/, /^\/api\/cron\//];
 
 export async function proxy(req: NextRequest) {
   const { pathname, search } = req.nextUrl;
@@ -16,5 +16,5 @@ export async function proxy(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|icon.svg|manifest.webmanifest|robots.txt).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|icon.svg|manifest.webmanifest|robots.txt|sw.js|offline.html|icons/).*)"],
 };

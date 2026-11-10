@@ -1,9 +1,9 @@
 "use client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, Download, KeyRound, Monitor, Moon, Sun } from "lucide-react";
+import { Check, KeyRound, Monitor, Moon, Sun } from "lucide-react";
 import { signIn } from "next-auth/react";
 import { useTheme } from "next-themes";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState } from "react";
 import { BrandIcon, type BrandId } from "@/components/brand";
 import { Marker } from "@/components/panelui/marker";
 import { toast } from "@/lib/client/toast";
@@ -15,18 +15,8 @@ import { Button, Field, Input, Kbd, Pill } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import { api, keys, useAiConfig, useGoogleStatus, type AiPublic } from "@/lib/client/api";
 import { useMounted } from "@/lib/client/use-mounted";
-
-function Section({ id, title, desc, children }: { id?: string; title: string; desc?: ReactNode; children: ReactNode }) {
-  return (
-    <section id={id} className="grid scroll-mt-6 gap-4 border-t border-line py-7 md:grid-cols-[220px_1fr]">
-      <div>
-        <h2 className="text-[14px] font-semibold">{title}</h2>
-        {desc && <p className="mt-1 text-[12.5px] text-muted">{desc}</p>}
-      </div>
-      <div className="min-w-0">{children}</div>
-    </section>
-  );
-}
+import { Section } from "./section";
+import { DataSection, NotifySection } from "./notify-data";
 
 export function SettingsView({ appUrl, allowedEmail }: { appUrl: string; allowedEmail: boolean }) {
   const { theme, setTheme } = useTheme();
@@ -42,6 +32,7 @@ export function SettingsView({ appUrl, allowedEmail }: { appUrl: string; allowed
           ["google", "Google"],
           ["connections", "Connected accounts"],
           ["integrations", "Data sources"],
+          ["notifications", "Notifications"],
           ["keyboard", "Keyboard"],
           ["data", "Data"],
         ].map(([id, label]) => (
@@ -66,6 +57,7 @@ export function SettingsView({ appUrl, allowedEmail }: { appUrl: string; allowed
       <GoogleSection appUrl={appUrl} allowedEmail={allowedEmail} />
       <ConnectionsSection appUrl={appUrl} />
       <IntegrationsSection />
+      <NotifySection />
       <Section id="keyboard" title="Keyboard" desc="Work without the mouse.">
         <div className="max-w-md divide-y divide-line rounded-lg border border-line bg-panel text-[13px]">
           {[
@@ -79,9 +71,7 @@ export function SettingsView({ appUrl, allowedEmail }: { appUrl: string; allowed
           ))}
         </div>
       </Section>
-      <Section id="data" title="Data" desc="Everything lives in your Neon Postgres database.">
-        <a href="/api/export"><Button><Download className="h-3.5 w-3.5" /> Export JSON backup</Button></a>
-      </Section>
+      <DataSection />
     </Page>
   );
 }
