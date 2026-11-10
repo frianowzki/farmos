@@ -53,7 +53,6 @@ export function LoginForm({ next, error, googleLogin }: { next: string; error?: 
               </>
             )}
           </form>
-          <p className="mt-8 text-[12px] text-faint">Private workspace · wallets are read-only · nothing here can send a transaction.</p>
         </div>
       </div>
       <aside className="relative hidden overflow-hidden border-l border-line bg-sidebar lg:flex lg:flex-col lg:justify-between lg:p-12">
