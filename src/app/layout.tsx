@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { EB_Garamond, Google_Sans, Google_Sans_Code, Jost } from "next/font/google";
 import { Providers } from "@/components/providers";
+import { ServiceWorkerRegister } from "@/components/sw-register";
 import "./globals.css";
 
 // Type system (all SIL OFL 1.1 via Google Fonts, self-hosted by next/font):
@@ -17,9 +18,13 @@ export const metadata: Metadata = {
   title: { default: "farmOS", template: "%s · farmOS" },
   description: "A private workspace for airdrops, testnets, NFT whitelists and degen plays.",
   robots: { index: false, follow: false },
+  applicationName: "farmOS",
+  appleWebApp: { capable: true, title: "farmOS", statusBarStyle: "black-translucent" },
+  icons: { icon: "/icon.svg", apple: "/icons/apple-touch-icon.png" },
 };
 
 export const viewport: Viewport = {
+  viewportFit: "cover",
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "#fbfaf7" },
     { media: "(prefers-color-scheme: dark)", color: "#171615" },
@@ -31,6 +36,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     <html lang="en" suppressHydrationWarning>
       <body className={`${sans.variable} ${display.variable} ${label.variable} ${mono.variable} antialiased`}>
         <Providers>{children}</Providers>
+        <ServiceWorkerRegister />
       </body>
     </html>
   );
