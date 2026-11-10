@@ -78,14 +78,17 @@ export function ProjectPage({ id }: { id: string }) {
         <ProjectMark p={p} size={44} className="mt-1 rounded-[10px]" />
         <div className="min-w-0 flex-1">
           <TitleInput value={p.name} onSave={(name) => name.trim() && set({ name: name.trim() })} />
-          <input
-            key={p.summary ?? ""}
-            defaultValue={p.summary ?? ""}
-            onBlur={(e) => e.target.value !== (p.summary ?? "") && set({ summary: e.target.value || null })}
-            onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
-            placeholder="Add a one-line summary"
-            className="mt-0.5 w-full bg-transparent text-[15px] text-ink-2 outline-none placeholder:text-faint"
-          />
+          <div className="group/sum mt-0.5 flex items-center gap-2">
+            <input
+              key={p.summary ?? ""}
+              defaultValue={p.summary ?? ""}
+              onBlur={(e) => e.target.value !== (p.summary ?? "") && set({ summary: e.target.value || null })}
+              onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
+              placeholder="Add a one-line summary"
+              className="min-w-0 flex-1 bg-transparent text-[15px] text-ink-2 outline-none placeholder:text-faint"
+            />
+            {(p.links?.x || p.links?.site) && <BioButton p={p} set={set} />}
+          </div>
         </div>
       </div>
 
@@ -136,6 +139,37 @@ function ClaimLine({ p, today, onOpen }: { p: Project; today: string; onOpen: ()
     <button type="button" onClick={onOpen} className="mt-3 inline-flex items-center gap-2 rounded-md px-1 py-0.5 text-[12px] text-faint hover:bg-hover">
       <Pill tone={b.tone} dot>{b.label}</Pill>
       {at && <span>checked {new Date(at).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</span>}
+    </button>
+  );
+}
+
+/** Pull the project's X bio (or website description) into the summary. Asks before replacing a written one. */
+function BioButton({ p, set }: { p: Project; set: (patch: Partial<Project>) => void }) {
+  const [busy, setBusy] = useState(false);
+  const run = async () => {
+    setBusy(true);
+    try {
+      const b = await api<{ bio: string; source: string }>(`/api/projects/${p.id}/bio`);
+      if (b.bio === p.summary) return toast.success("Summary already matches the bio");
+      if (p.summary?.trim() && !confirm(`Replace your summary with this?\n\n${b.bio}`)) return;
+      set({ summary: b.bio });
+      toast.success(b.source === "website" ? "Filled from the website" : "Filled from X bio");
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <button
+      type="button"
+      onClick={run}
+      disabled={busy}
+      title={p.links?.x ? "Fetch from X bio" : "Fetch from website"}
+      className={cn("inline-flex h-7 shrink-0 items-center gap-1.5 rounded-lg px-2 text-[12px] text-muted hover:bg-hover hover:text-ink disabled:opacity-60", p.summary?.trim() && "sm:opacity-0 sm:group-hover/sum:opacity-100 sm:focus-visible:opacity-100")}
+    >
+      {p.links?.x ? <LinkIcon field="x" /> : <RefreshCw className={cn("h-3.5 w-3.5", busy && "animate-spin")} />}
+      <span className="max-sm:hidden">{busy ? "Fetching…" : p.links?.x ? "Fetch from X bio" : "Fetch from site"}</span>
     </button>
   );
 }

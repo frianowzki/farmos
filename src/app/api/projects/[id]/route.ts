@@ -1,5 +1,6 @@
 import { and, arrayContains, desc, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
+import { autofillSummary } from "@/lib/server/xbio";
 import { db, schema } from "@/db";
 import { bad, readJson, requireProfile } from "@/lib/server/guard";
 import { clean, projectInput } from "@/lib/server/validate";
@@ -37,6 +38,11 @@ export async function PATCH(req: Request, ctx: Ctx) {
     .where(and(eq(schema.projects.profileId, pid), eq(schema.projects.id, id)))
     .returning();
   if (!row) return bad("not found", 404);
+  // Links just set and still no summary: fill it from the X bio (never overwrites a written summary).
+  if (parsed.data.links && parsed.data.summary === undefined) {
+    const filled = await autofillSummary(pid, row).catch(() => null);
+    if (filled) return NextResponse.json({ project: filled });
+  }
   return NextResponse.json({ project: row });
 }
 

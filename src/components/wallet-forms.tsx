@@ -275,10 +275,10 @@ export function WalletModal({ view, setView, onConnect, connectLabel = "EVM wall
               </span>
             </button>
             <button type="button" onClick={() => setView("watch")} className={tile}>
-              <span className="flex w-[62px] items-center"><ChainStack chains={["ethereum", "solana", "zcash"]} size={22} /></span>
+              <span className="flex w-[62px] items-center"><ChainStack chains={["ethereum", "solana", "near", "canton"]} size={22} /></span>
               <span className="min-w-0 flex-1">
                 <span className="block text-[14px] font-medium text-ink">Watch an address</span>
-                <span className="block text-[12.5px] text-muted">Any EVM, Solana, Aptos, Sui or Zcash address</span>
+                <span className="block text-[12.5px] text-muted">EVM, Solana, Aptos, Sui, NEAR, Canton, Zcash</span>
               </span>
             </button>
           </div>
@@ -324,9 +324,9 @@ export function WalletModal({ view, setView, onConnect, connectLabel = "EVM wall
       {view === "watch" && (
         <form onSubmit={(e) => { e.preventDefault(); submit(); }}>
           <h2 className="font-serif text-[22px] leading-tight text-ink">Watch an address</h2>
-          <p className="mt-1 text-[13px] text-muted">EVM, Solana, Aptos, Sui or Zcash. Balances show on Portfolio.</p>
+          <p className="mt-1 text-[13px] text-muted">EVM, Solana, Aptos, Sui, NEAR, Canton or Zcash. Balances show on Portfolio.</p>
           <div className="mt-4 space-y-2.5">
-            <Input autoFocus value={addr} onChange={(e) => setAddr(e.target.value)} placeholder="0x…, Solana, or t1… address" className="num w-full" />
+            <Input autoFocus value={addr} onChange={(e) => setAddr(e.target.value)} placeholder="0x…, name.near, party::1220…, or t1…" className="num w-full" />
             {ambiguous && (
               <div className="flex items-center gap-2 text-[12.5px] text-muted">
                 This could be
@@ -338,6 +338,7 @@ export function WalletModal({ view, setView, onConnect, connectLabel = "EVM wall
               </div>
             )}
             {!ambiguous && families[0] && <div className="flex items-center gap-1.5 text-[12px] text-muted"><ChainLogo chain={FAMILY_CHAIN[families[0]]} size={14} /> {FAMILY_LABEL[families[0]]} address</div>}
+            {families[0] === "canton" && <p className="text-[12px] text-faint">Canton has no public balance API (Scan is validator-only). farmOS saves this party as watch-only with an explorer link.</p>}
             {shielded && <p className="text-[12px] text-faint">Shielded Zcash balances are private. farmOS can save this address but can only read balances of transparent (t1/t3) addresses.</p>}
             <Input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Label, e.g. Farm 03" className="w-full" />
             <div>

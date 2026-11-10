@@ -171,13 +171,47 @@ async function zcashBalances(addr: string): Promise<Bal[]> {
   return [{ symbol: "ZEC", amount: zat / 1e8, cg: "zcash" }];
 }
 
-const NON_EVM: Record<string, (a: string) => Promise<Bal[]>> = { solana: solanaBalances, aptos: aptosBalances, sui: suiBalances, zcash: zcashBalances };
-const FAMILY_NAME: Record<string, string> = { solana: "Solana", aptos: "Aptos", sui: "Sui", zcash: "Zcash" };
+const NEAR_RPCS = ["https://free.rpc.fastnear.com", "https://rpc.mainnet.near.org"];
+const NEAR_FT: { symbol: string; contract: string; dec: number }[] = [
+  { symbol: "USDC", contract: "17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1", dec: 6 },
+  { symbol: "USDT", contract: "usdt.tether-token.near", dec: 6 },
+];
+async function nearQuery(params: Record<string, unknown>) {
+  let last: unknown = null;
+  for (const url of NEAR_RPCS) {
+    const j = await post(url, { jsonrpc: "2.0", id: 1, method: "query", params: { finality: "final", ...params } }).catch((e) => ({ error: { message: (e as Error).message } }));
+    if (j?.result) return j.result;
+    last = j?.error;
+    // unknown account is a real answer, not an RPC failure
+    if (JSON.stringify(j?.error ?? "").includes("UNKNOWN_ACCOUNT") || JSON.stringify(j?.error ?? "").includes("does not exist")) return null;
+  }
+  throw new Error((last as { message?: string })?.message ?? "NEAR RPC error");
+}
+/** NEAR + native USDC/USDT (NEP-141) over public NEAR RPC (FastNEAR, then near.org). */
+async function nearBalances(addr: string): Promise<Bal[]> {
+  const acct = await nearQuery({ request_type: "view_account", account_id: addr });
+  if (!acct) return [];
+  const out: Bal[] = [{ symbol: "NEAR", amount: Number(BigInt(acct.amount) / BigInt(1e18)) / 1e6, cg: "near" }];
+  const args = Buffer.from(JSON.stringify({ account_id: addr })).toString("base64");
+  await Promise.all(
+    NEAR_FT.map(async (t) => {
+      const r = await nearQuery({ request_type: "call_function", account_id: t.contract, method_name: "ft_balance_of", args_base64: args }).catch(() => null);
+      if (!r?.result) return;
+      const raw = JSON.parse(Buffer.from(r.result).toString()) as string;
+      const amt = Number(raw) / 10 ** t.dec;
+      if (amt > 0) out.push({ symbol: t.symbol, amount: amt, stable: true, token: t.contract });
+    }),
+  );
+  return out;
+}
+
+const NON_EVM: Record<string, (a: string) => Promise<Bal[]>> = { solana: solanaBalances, aptos: aptosBalances, sui: suiBalances, zcash: zcashBalances, near: nearBalances };
+const FAMILY_NAME: Record<string, string> = { solana: "Solana", aptos: "Aptos", sui: "Sui", zcash: "Zcash", near: "NEAR" };
 
 export async function trackWallets(pid: string): Promise<TrackSnapshot> {
   const d = db();
   const all = await d.select().from(schema.wallets).where(eq(schema.wallets.profileId, pid));
-  const other = all.map((w) => ({ w, fam: walletFamily(w) })).filter((x) => x.fam && x.fam !== "evm") as { w: (typeof all)[number]; fam: string }[];
+  const other = all.map((w) => ({ w, fam: walletFamily(w) })).filter((x) => x.fam && x.fam !== "evm" && NON_EVM[x.fam]) as { w: (typeof all)[number]; fam: string }[];
   const wallets = all.filter((w) => isAddress(w.address));
   const addrs = wallets.map((w) => getAddress(w.address));
   const res = new Map<string, WalletTrack>(wallets.map((w) => [w.address.toLowerCase(), { address: w.address, label: w.label, holdings: [], totalUsd: 0, errors: [] }]));

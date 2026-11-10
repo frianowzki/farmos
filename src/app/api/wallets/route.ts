@@ -19,7 +19,7 @@ export async function POST(req: Request) {
   const prov = provider && isWalletBrand(provider) ? provider : "";
   const raw = (address ?? "").trim();
   const opts = familiesFor(raw);
-  if (!opts.length) return bad("Enter a valid EVM, Solana, Aptos, Sui or Zcash address");
+  if (!opts.length) return bad("Enter a valid EVM, Solana, Aptos, Sui, NEAR, Canton party or Zcash address");
   if (chain && !opts.includes(chain as WalletFamily)) return bad(`That doesn't look like a ${chain} address`);
   const fam = walletFamily({ address: raw, chain, provider: prov });
   if (opts.length > 1 && !chain && !prov) return bad("Pick Aptos or Sui for this address");

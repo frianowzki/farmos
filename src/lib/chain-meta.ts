@@ -1,7 +1,7 @@
 /**
  * The only chains farmOS offers (project chains, wallet tracking, selectors).
  * Logos are the chains' official marks, self-hosted in /public/chains (96px webp).
- * Sources: Trust Wallet assets (official submissions), DefiLlama chain icons, and the chain's official X avatar (Elysium).
+ * Sources: Trust Wallet assets (NEAR too), CoinGecko (Canton Coin mark), (official submissions), DefiLlama chain icons, and the chain's official X avatar (Elysium).
  */
 export type ChainMeta = { key: string; name: string; aliases: string[]; evm: boolean };
 
@@ -18,6 +18,8 @@ export const CHAINS: ChainMeta[] = [
   { key: "monero", name: "Monero", aliases: ["xmr"], evm: false },
   { key: "aptos", name: "Aptos", aliases: ["apt"], evm: false },
   { key: "sui", name: "Sui", aliases: [], evm: false },
+  { key: "near", name: "NEAR", aliases: ["near protocol", "near mainnet"], evm: false },
+  { key: "canton", name: "Canton Network", aliases: ["canton", "canton coin", "cc"], evm: false },
   { key: "arbitrum", name: "Arbitrum", aliases: ["arb", "arbitrum one"], evm: true },
   { key: "optimism", name: "Optimism", aliases: ["op", "op mainnet"], evm: true },
   { key: "avalanche", name: "Avalanche", aliases: ["avax", "avalanche c-chain", "c-chain"], evm: true },

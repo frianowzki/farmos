@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { db, schema } from "@/db";
 import { bad, readJson, requireProfile } from "@/lib/server/guard";
 import { clean, projectInput } from "@/lib/server/validate";
+import { autofillSummary } from "@/lib/server/xbio";
 
 export async function GET() {
   const pid = await requireProfile();
@@ -22,5 +23,7 @@ export async function POST(req: Request) {
   const v = clean(parsed.data);
   if (!v.name) return bad("Name is required");
   const [row] = await db().insert(schema.projects).values({ ...v, name: v.name, profileId: pid }).returning();
-  return NextResponse.json({ project: row }, { status: 201 });
+  // New project with an X/website link and no summary: fill it from the X bio (never overwrites).
+  const filled = await autofillSummary(pid, row).catch(() => null);
+  return NextResponse.json({ project: filled ?? row }, { status: 201 });
 }

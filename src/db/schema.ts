@@ -213,7 +213,7 @@ export const wallets = pgTable(
     label: text("label").notNull().default(""),
     /** Wallet app it lives in (metamask, rabby, phantom…), for the icon. Empty = unknown. */
     provider: text("provider").notNull().default(""),
-    /** Address family: evm | solana | aptos | sui | zcash. Empty = inferred from the address. */
+    /** Address family: evm | solana | aptos | sui | zcash | near | canton. Empty = inferred from the address. */
     chain: text("chain").notNull().default(""),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },

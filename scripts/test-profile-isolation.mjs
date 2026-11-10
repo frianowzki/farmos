@@ -165,6 +165,15 @@ for (const [tag, me, o, oProj] of [["default vs p2", a, COST.P2, S.p2.proj.id], 
 const kd = await a("PATCH", `/api/projects/${S.def.proj.id}`, { keyDates: { mint: today, times: { mint: "21:30" } }, links: { other: "https://example.com/check", "label.other": "Checker" } });
 ok("key-date time + link label saved", kd.s === 200 && kd.j?.project?.keyDates?.times?.mint === "21:30" && kd.j?.project?.links?.["label.other"] === "Checker", String(kd.s));
 ok("bad time rejected", (await a("PATCH", `/api/projects/${S.def.proj.id}`, { keyDates: { mint: today, times: { mint: "25:99" } } })).s === 400);
+// --- NEAR / Canton watch addresses; bio lookup scoping -----------------------------------------
+const nw = (await a("POST", "/api/wallets", { address: "ISO-Test.near", label: "ISO-NEAR" })).j?.wallet;
+ok("NEAR named account saved as near", nw?.chain === "near" && nw?.address === "iso-test.near");
+const cw = (await a("POST", "/api/wallets", { address: "ISO-party::1220" + "ab".repeat(32), label: "ISO-CANTON" })).j?.wallet;
+ok("Canton party saved as canton", cw?.chain === "canton");
+ok("p2 wallets hide default NEAR/Canton", !((await p("GET", "/api/wallets")).j?.wallets ?? []).some((x) => x.id === nw?.id || x.id === cw?.id));
+for (const w of [nw, cw]) if (w) await a("DELETE", `/api/wallets/${w.id}`);
+ok("bio lookup on other's project -> 404", (await p("GET", `/api/projects/${S.def.proj.id}/bio`)).s === 404);
+ok("bio lookup needs a link", (await a("GET", `/api/projects/${S.def.proj.id}/bio`)).s === 422 || (await a("GET", `/api/projects/${S.def.proj.id}/bio`)).s === 404);
 // --- Saved wire items -------------------------------------------------------------------------
 const sv = (await p("POST", "/api/feed", { title: "ISO-P2 saved headline", url: "https://example.com/iso-p2", summary: "x", source: "ISO", category: "news" })).j;
 ok("p2 saved a wire item", Boolean(sv?.id));

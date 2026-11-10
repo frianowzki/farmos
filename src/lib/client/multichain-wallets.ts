@@ -9,7 +9,7 @@ import type { WalletFamily } from "@/lib/wallet-chains";
  * @mysten/dapp-kit and the Aptos wallet adapter). farmOS only calls connect to read the address:
  * no signing feature is ever invoked, and it disconnects right after.
  */
-export type MultiFamily = Exclude<WalletFamily, "evm" | "zcash">;
+export type MultiFamily = Exclude<WalletFamily, "evm" | "zcash" | "near" | "canton">;
 
 export type KnownWallet = { brand: string; name: string; families: MultiFamily[]; url: string };
 /** Wallets surfaced even when not installed (with their official download page). */
