@@ -30,7 +30,7 @@ export function LoginForm({ next, error, googleLogin }: { next: string; error?: 
     <div className="grid min-h-dvh lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)]">
       <div className="flex items-center justify-center px-5 py-12">
         <div className="anim-rise w-full max-w-[360px]">
-          <Logo className="mb-10 origin-left scale-[1.35]" />
+          <Logo className="mb-10 h-[38px]" />
           <TextReveal as="h1" split="word" text="Welcome back." className="font-serif text-[34px] leading-[1.1] tracking-[-0.015em] text-ink" />
           <p className="mt-2 text-[14px] text-muted">Enter your passcode to open the desk.</p>
           <form onSubmit={submit} className="mt-7">

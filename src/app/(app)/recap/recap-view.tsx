@@ -6,7 +6,6 @@ import { useMemo, useState } from "react";
 import { Page, PageHeader } from "@/components/shell";
 import { Skeleton } from "@/components/ui";
 import { DateRangePicker, DateRangePickerContent, DateRangePickerTrigger, DateRangePickerCalendar, DateRangePickerPresets, DateRangePickerPreset, type DateRange } from "@/components/motion/date-range-picker";
-import { Timeline, type TimelineEvent } from "@/components/motion/timeline";
 import { BarChart } from "@/components/panelui/bar-chart";
 import { EmptyState } from "@/components/panelui/empty-state";
 import { useDiary, useProjects, useTasks } from "@/lib/client/api";
@@ -64,29 +63,6 @@ export function RecapView() {
   }, [data]);
 
   const chart = useMemo(() => [...days].reverse().map((d) => ({ day: fmtDay(d, { month: "short", day: "numeric" }), done: data.get(d)?.done.length ?? 0, notes: data.get(d)?.diary.length ?? 0 })), [days, data]);
-  const events: TimelineEvent[] = useMemo(
-    () =>
-      [...days].reverse().filter((d) => {
-        const v = data.get(d)!;
-        return v.done.length || v.diary.length || v.created.length;
-      }).map((d) => {
-        const v = data.get(d)!;
-        return {
-          id: d,
-          date: `${d}T00:00:00Z`,
-          title: v.diary[0]?.title ?? (v.done.length ? `${v.done.length} task${v.done.length > 1 ? "s" : ""} done` : `${v.created.length} new project${v.created.length > 1 ? "s" : ""}`),
-          media: (
-            <div className="space-y-1 p-3 text-left text-[12px] text-ink-2">
-              {v.done.slice(0, 3).map((x, i) => <div key={i} className="flex items-center gap-1.5 truncate"><Check className="h-3 w-3 shrink-0 text-pos" />{x.title}</div>)}
-              {v.diary.slice(0, 1).map((x) => <div key={x.id} className="line-clamp-2 text-muted">{x.text}</div>)}
-            </div>
-          ),
-          meta: <span className="num text-[11px] text-muted">{v.done.length} done · {v.diary.length} notes</span>,
-        };
-      }),
-    [days, data],
-  );
-
   const loading = tasks.isLoading || diary.isLoading || projects.isLoading;
   return (
     <Page>
@@ -138,11 +114,6 @@ export function RecapView() {
                   <BarChart.Tooltip labels={{ done: "Tasks done", notes: "Diary notes" }} formatValue={(v) => String(v)} />
                 </BarChart>
               </section>
-              {events.length > 1 && (
-                <section className="mb-8 hidden md:block">
-                  <Timeline events={events} defaultValue={events[events.length - 1]?.id} itemWidth={220} height={300} ruler aria-label="Active days" formatDate={(d) => d.toLocaleDateString(undefined, { month: "short", day: "numeric", timeZone: "UTC" })} />
-                </section>
-              )}
               <ol className="space-y-6">
                 {days.map((d) => {
                   const v = data.get(d)!;

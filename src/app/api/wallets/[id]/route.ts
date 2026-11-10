@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { db, schema } from "@/db";
 import { readJson, requireProfile } from "@/lib/server/guard";
 import { isWalletBrand } from "@/lib/wallet-brands";
+import { setDefaultWallet } from "@/lib/server/wallets";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -10,8 +11,14 @@ export async function PATCH(req: Request, ctx: Ctx) {
   const pid = await requireProfile();
   if (pid instanceof NextResponse) return pid;
   const { id } = await ctx.params;
-  const { label, provider } = await readJson<{ label?: string; provider?: string }>(req);
-  const set: { label?: string; provider?: string } = {};
+  const { label, provider, isDefault } = await readJson<{ label?: string; provider?: string; isDefault?: boolean }>(req);
+  if (isDefault === true) {
+    const row = await setDefaultWallet(pid, id);
+    if (!row) return NextResponse.json({ error: "not found" }, { status: 404 });
+    return NextResponse.json({ wallet: row });
+  }
+  const set: { label?: string; provider?: string; isDefault?: boolean } = {};
+  if (isDefault === false) set.isDefault = false;
   if (typeof label === "string") set.label = label.slice(0, 60);
   if (typeof provider === "string") set.provider = isWalletBrand(provider) ? provider : "";
   if (!Object.keys(set).length) return NextResponse.json({ error: "nothing to update" }, { status: 400 });

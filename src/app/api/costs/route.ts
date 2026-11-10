@@ -24,7 +24,7 @@ export async function POST(req: Request) {
   if (!(await ownsProject(pid, v.projectId))) return bad("project not found", 404);
   const [row] = await db()
     .insert(schema.costs)
-    .values({ profileId: pid, projectId: v.projectId, type: v.type ?? "gas", symbol: v.symbol.toUpperCase(), coinId: v.coinId ?? null, chain: v.chain || null, amount: v.amount, valueAtEntry: v.valueAtEntry ?? null, spentAt: v.spentAt, note: v.note || null })
+    .values({ profileId: pid, projectId: v.projectId, type: v.type ?? "gas", symbol: v.symbol.toUpperCase(), coinId: v.coinId ?? null, chain: v.chain || null, amount: v.amount, valueAtEntry: v.valueAtEntry ?? null, spentAt: v.spentAt, note: v.note || null, wallet: v.wallet || null })
     .returning();
   return NextResponse.json({ cost: row }, { status: 201 });
 }

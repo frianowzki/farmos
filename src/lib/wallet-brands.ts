@@ -23,6 +23,11 @@ export const WALLET_BRANDS = [
   { id: "slush", name: "Slush" },
   { id: "zashi", name: "Zashi" },
   { id: "ywallet", name: "YWallet" },
+  { id: "meteor", name: "Meteor" },
+  { id: "hot", name: "HOT Wallet" },
+  { id: "mynearwallet", name: "MyNearWallet" },
+  { id: "sender", name: "Sender" },
+  { id: "intear", name: "Intear" },
 ] as const;
 export type WalletBrandId = (typeof WALLET_BRANDS)[number]["id"];
 
@@ -52,4 +57,4 @@ export function brandFromConnector(c?: { id?: string; name?: string } | null): W
 }
 
 /** Icon file per brand (most are SVG). */
-export const BRAND_ICON_EXT: Partial<Record<WalletBrandId, "png">> = { petra: "png", martian: "png", zashi: "png", ywallet: "png" };
+export const BRAND_ICON_EXT: Partial<Record<WalletBrandId, "png">> = { petra: "png", martian: "png", zashi: "png", ywallet: "png", meteor: "png", hot: "png", mynearwallet: "png", sender: "png" };

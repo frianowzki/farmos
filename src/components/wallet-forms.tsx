@@ -1,10 +1,10 @@
 "use client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, ChevronDown, Plus, RefreshCw } from "lucide-react";
+import { Check, ChevronDown, Plus, RefreshCw, Star } from "lucide-react";
 import { motion } from "motion/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { ChainLogo, ChainStack } from "@/components/chain-logo";
 import type { Wallet } from "@wallet-standard/base";
 import { MorphingModal } from "@/components/motion/morphing-modal";
@@ -19,6 +19,8 @@ import { cn } from "@/lib/cn";
 import { toast } from "@/lib/client/toast";
 import { shortAddr, usd } from "@/lib/format";
 import { WALLET_BRANDS } from "@/lib/wallet-brands";
+import { connectNear, nearWallets } from "@/lib/client/near-wallets";
+import { connectCanton } from "@/lib/client/canton-wallet";
 
 type Holding = { chain: string; symbol: string; token: string | null; amount: number; usd: number | null };
 type Snapshot = { fetchedAt: string; wallets: { address: string; label: string; holdings: Holding[]; totalUsd: number; errors: string[] }[]; totalUsd: number; cached: boolean };
@@ -174,7 +176,17 @@ export function WalletBalancesCard() {
   );
 }
 
-export type WalletModalView = "menu" | "multichain" | "watch";
+export type WalletModalView = "menu" | "multichain" | "near" | "watch";
+
+const noop = () => () => {};
+/** Phones and tablets: injected wallets only exist inside the wallet app's own browser there. */
+const useIsMobile = () => useSyncExternalStore(noop, () => /Android|iPhone|iPad|iPod/i.test(navigator.userAgent), () => false);
+/** "Open this page in the wallet's in-app browser" universal links (official, documented by each wallet). */
+const APP_BROWSE: Record<string, (url: string) => string> = {
+  phantom: (u) => `https://phantom.app/ul/browse/${encodeURIComponent(u)}?ref=${encodeURIComponent(new URL(u).origin)}`,
+  solflare: (u) => `https://solflare.com/ul/v1/browse/${encodeURIComponent(u)}?ref=${encodeURIComponent(new URL(u).origin)}`,
+  okx: (u) => `https://web3.okx.com/download?deeplink=${encodeURIComponent(`okx://wallet/dapp/url?dappUrl=${encodeURIComponent(u)}`)}`,
+};
 
 const FAMILY_TABS: { id: MultiFamily; label: string }[] = [
   { id: "solana", label: "Solana" },
@@ -194,10 +206,13 @@ export function WalletModal({ view, setView, onConnect, connectLabel = "EVM wall
   const [chain, setChain] = useState<WalletFamily | "">("");
   const [family, setFamily] = useState<MultiFamily>("solana");
   const [busy, setBusy] = useState<string | null>(null);
+  const [makeDefault, setMakeDefault] = useState(false);
   const installed = useStandardWallets();
+  const mobile = useIsMobile();
+  const near = useQuery({ queryKey: ["near-wallets"], queryFn: nearWallets, enabled: view === "near", staleTime: Infinity, retry: 1 });
   const close = () => setView(null);
   const save = async (body: { address: string; label: string; provider: string; chain?: string }) => {
-    await api("/api/wallets", { method: "POST", body });
+    await api("/api/wallets", { method: "POST", body: { ...body, isDefault: makeDefault || undefined } });
     qc.invalidateQueries({ queryKey: keys.wallets });
     qc.invalidateQueries({ queryKey: ["wallet-track"] });
     qc.invalidateQueries({ queryKey: ["wallet-nfts"] });
@@ -249,6 +264,39 @@ export function WalletModal({ view, setView, onConnect, connectLabel = "EVM wall
     }
   };
 
+  const connectNearRow = async (w: { id: string; name: string; brand: string }) => {
+    setBusy(w.id);
+    try {
+      const accountId = await connectNear(w.id);
+      if (!accountId) return; // redirect wallet: farmOS picks the account up on return
+      await save({ address: accountId, label: w.name, provider: w.brand, chain: "near" });
+      toast.success(`${w.name} · ${accountId} added`);
+      close();
+    } catch (e) {
+      toast.error((e as Error).message || "Connection cancelled");
+    } finally {
+      setBusy(null);
+    }
+  };
+  const connectCantonWallet = async () => {
+    setBusy("canton");
+    try {
+      const party = await connectCanton();
+      await save({ address: party, label: "Canton", provider: "", chain: "canton" });
+      toast.success("Canton party added (watch-only)");
+      close();
+    } catch (e) {
+      toast.error((e as Error).message || "No Canton wallet connected");
+    } finally {
+      setBusy(null);
+    }
+  };
+  const defaultToggle = (
+    <button type="button" onClick={() => setMakeDefault((v) => !v)} aria-pressed={makeDefault} className={cn("mt-3 inline-flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-[12.5px]", makeDefault ? "border-accent bg-accent/10 text-ink" : "border-line text-muted hover:bg-hover hover:text-ink")}>
+      <Star className={cn("h-3.5 w-3.5", makeDefault && "fill-current text-accent")} /> Set as default wallet
+    </button>
+  );
+
   const tile = "flex w-full items-center gap-3 rounded-xl border border-line px-3 py-3 text-left outline-none hover:bg-hover focus-visible:ring-2 focus-visible:ring-[var(--ring)]";
   return (
     <MorphingModal viewId={view} onClose={close} placement="center" className="max-w-[480px] rounded-2xl border-line bg-panel">
@@ -274,14 +322,31 @@ export function WalletModal({ view, setView, onConnect, connectLabel = "EVM wall
                 <span className="block text-[12.5px] text-muted">Phantom, Solflare, OKX, Petra, Martian, Nightly, Slush</span>
               </span>
             </button>
+            <button type="button" onClick={() => setView("near")} className={tile}>
+              <span className="flex w-[62px] items-center -space-x-2">
+                {(["meteor", "hot", "mynearwallet"] as const).map((b) => <span key={b} className="rounded-[28%] ring-2 ring-panel"><WalletIcon provider={b} size={26} /></span>)}
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-[14px] font-medium text-ink">NEAR wallet</span>
+                <span className="block text-[12.5px] text-muted">Meteor, HOT, MyNearWallet, Nightly, Sender, Intear</span>
+              </span>
+            </button>
+            <button type="button" disabled={busy !== null} onClick={connectCantonWallet} className={cn(tile, "disabled:opacity-60")}>
+              <span className="flex w-[62px] items-center"><ChainLogo chain="canton" size={26} /></span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-[14px] font-medium text-ink">{busy === "canton" ? "Check your wallet…" : "Canton wallet"}</span>
+                <span className="block text-[12.5px] text-muted">Console, Loop or any Canton dApp-standard wallet · watch-only</span>
+              </span>
+            </button>
             <button type="button" onClick={() => setView("watch")} className={tile}>
-              <span className="flex w-[62px] items-center"><ChainStack chains={["ethereum", "solana", "near", "canton"]} size={22} /></span>
+              <span className="flex w-[62px] items-center"><ChainStack chains={["ethereum", "solana", "zcash", "monero"]} size={22} /></span>
               <span className="min-w-0 flex-1">
                 <span className="block text-[14px] font-medium text-ink">Watch an address</span>
-                <span className="block text-[12.5px] text-muted">EVM, Solana, Aptos, Sui, NEAR, Canton, Zcash</span>
+                <span className="block text-[12.5px] text-muted">Any chain, incl. Zcash and Monero (watch-only)</span>
               </span>
             </button>
           </div>
+          {defaultToggle}
         </div>
       )}
       {view === "multichain" && (
@@ -297,10 +362,10 @@ export function WalletModal({ view, setView, onConnect, connectLabel = "EVM wall
             {rows.map((r) => (
               <li key={r.key}>
                 {r.url ? (
-                  <a href={r.url} target="_blank" rel="noreferrer" className="flex items-center gap-3 rounded-xl px-2.5 py-2 hover:bg-hover">
+                  <a href={mobile && APP_BROWSE[r.brand] ? APP_BROWSE[r.brand](location.href) : r.url} target="_blank" rel="noreferrer" className="flex items-center gap-3 rounded-xl px-2.5 py-2 hover:bg-hover">
                     <WalletIcon provider={r.brand} size={30} />
                     <span className="flex-1 text-[14px] text-ink-2">{r.name}</span>
-                    <span className="text-[12px] text-faint">Not installed · Get</span>
+                    <span className="text-[12px] text-faint">{mobile && APP_BROWSE[r.brand] ? "Open in app" : "Not installed · Get"}</span>
                   </a>
                 ) : (
                   <button type="button" disabled={busy !== null} onClick={() => connectRow(r)} className="flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-left hover:bg-hover disabled:opacity-60">
@@ -321,6 +386,38 @@ export function WalletModal({ view, setView, onConnect, connectLabel = "EVM wall
           </div>
         </div>
       )}
+      {view === "near" && (
+        <div>
+          <h2 className="font-serif text-[22px] leading-tight text-ink">Connect a NEAR wallet</h2>
+          <p className="mt-1 text-[13px] text-muted">farmOS signs in without any contract permission, reads the account, then signs out.</p>
+          <ul className="mt-3 space-y-1">
+            {near.isLoading && [0, 1, 2, 3].map((i) => <li key={i}><Skeleton className="h-11" /></li>)}
+            {near.error && <li className="px-2.5 py-2 text-[13px] text-muted">NEAR wallets couldn&apos;t load. Paste the account instead.</li>}
+            {(near.data ?? []).map((w) => (
+              <li key={w.id}>
+                {w.type === "injected" && !w.available ? (
+                  <a href={w.url} target="_blank" rel="noreferrer" className="flex items-center gap-3 rounded-xl px-2.5 py-2 hover:bg-hover">
+                    <WalletIcon provider={w.brand} size={30} />
+                    <span className="flex-1 text-[14px] text-ink-2">{w.name}</span>
+                    <span className="text-[12px] text-faint">{mobile ? "Get the app" : "Not installed · Get"}</span>
+                  </a>
+                ) : (
+                  <button type="button" disabled={busy !== null} onClick={() => connectNearRow(w)} className="flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-left hover:bg-hover disabled:opacity-60">
+                    <WalletIcon provider={w.brand} size={30} />
+                    <span className="flex-1 text-[14px] font-medium text-ink">{w.name}</span>
+                    <span className="text-[12px] text-accent">{busy === w.id ? "Check your wallet…" : w.type === "browser" ? "Sign in" : "Connect"}</span>
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
+          {defaultToggle}
+          <div className="mt-4 flex items-center justify-between">
+            <Button type="button" variant="ghost" onClick={() => setView("menu")}>Back</Button>
+            <button type="button" onClick={() => { setChain("near"); setView("watch"); }} className="text-[12.5px] text-muted hover:text-ink">Paste a .near account instead</button>
+          </div>
+        </div>
+      )}
       {view === "watch" && (
         <form onSubmit={(e) => { e.preventDefault(); submit(); }}>
           <h2 className="font-serif text-[22px] leading-tight text-ink">Watch an address</h2>
@@ -338,6 +435,7 @@ export function WalletModal({ view, setView, onConnect, connectLabel = "EVM wall
               </div>
             )}
             {!ambiguous && families[0] && <div className="flex items-center gap-1.5 text-[12px] text-muted"><ChainLogo chain={FAMILY_CHAIN[families[0]]} size={14} /> {FAMILY_LABEL[families[0]]} address</div>}
+            {families[0] === "monero" && <p className="text-[12px] text-faint">Monero balances are private (they need a view key). farmOS saves this address as watch-only.</p>}
             {families[0] === "canton" && <p className="text-[12px] text-faint">Canton has no public balance API (Scan is validator-only). farmOS saves this party as watch-only with an explorer link.</p>}
             {shielded && <p className="text-[12px] text-faint">Shielded Zcash balances are private. farmOS can save this address but can only read balances of transparent (t1/t3) addresses.</p>}
             <Input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Label, e.g. Farm 03" className="w-full" />
@@ -352,6 +450,7 @@ export function WalletModal({ view, setView, onConnect, connectLabel = "EVM wall
               </div>
             </div>
           </div>
+          {defaultToggle}
           <div className="mt-5 flex items-center justify-between">
             <Button type="button" variant="ghost" onClick={() => setView("menu")}>Back</Button>
             <Button type="submit" variant="primary" disabled={!addr.trim() || busy !== null || (ambiguous && !chain && !["petra", "martian", "slush"].includes(provider))}><Plus className="h-3.5 w-3.5" /> Add wallet</Button>

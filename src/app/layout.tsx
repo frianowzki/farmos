@@ -24,7 +24,7 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
   applicationName: "farmOS",
   appleWebApp: { capable: true, title: "farmOS", statusBarStyle: "black-translucent" },
-  icons: { icon: "/icon.svg", apple: "/icons/apple-touch-icon.png" },
+  icons: { icon: [{ url: "/favicon.ico", sizes: "48x48" }, { url: "/icon.svg", type: "image/svg+xml" }], apple: [{ url: "/icons/apple-touch-icon.png", sizes: "180x180" }] },
 };
 
 export const viewport: Viewport = {

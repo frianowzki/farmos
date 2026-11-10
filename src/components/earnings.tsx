@@ -1,4 +1,5 @@
 "use client";
+import { WalletSelect } from "@/components/wallet-select";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Coins, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
@@ -123,7 +124,7 @@ function AddEarning({ projectId, onDone }: { projectId: string; onDone: () => vo
     try {
       const v = value.trim() ? parseAmount(value) : guess;
       await api("/api/earnings", { method: "POST", body: { projectId, symbol: sym, coinId: coin?.id ?? null, amount: amt, valueAtClaim: v != null && Number.isFinite(v) ? v : null, claimedAt: day, wallet: wallet.trim() || null } });
-      setAmount(""); setValue(""); setWallet("");
+      setAmount(""); setValue("");
       onDone();
     } catch (e) {
       toast.error((e as Error).message);
@@ -139,7 +140,7 @@ function AddEarning({ projectId, onDone }: { projectId: string; onDone: () => vo
       <input className={cn(inp, "num w-[110px]")} placeholder="Amount" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} />
       <input className={cn(inp, "num w-[130px]")} placeholder={guess != null ? `≈ ${usd(guess)}` : "Value at claim $"} inputMode="decimal" value={value} onChange={(e) => setValue(e.target.value)} title="Leave empty to use the current price" />
       <input className={cn(inp, "num w-[150px]")} type="date" value={day} onChange={(e) => setDay(e.target.value)} aria-label="Claimed on" />
-      <input className={cn(inp, "num min-w-[120px] flex-1")} placeholder="Wallet (optional)" value={wallet} onChange={(e) => setWallet(e.target.value)} />
+      <WalletSelect value={wallet} onChange={setWallet} className={cn(inp, "min-w-[140px] flex-1")} />
       <Button size="sm" variant="primary" type="submit" disabled={!ok || busy}>{busy ? "Saving…" : "Add"}</Button>
     </form>
   );

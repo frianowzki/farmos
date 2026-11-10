@@ -2,15 +2,16 @@
 import { ProjectMark } from "@/components/project-mark";
 import { useConnectModal } from "@rainbow-me/rainbowkit";
 import { useQueryClient } from "@tanstack/react-query";
-import { ChevronDown, Copy, ExternalLink, Link2, Plus, Trash2, Unplug } from "lucide-react";
+import { ChevronDown, Copy, ExternalLink, Link2, Plus, Star, Trash2, Unplug } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { ChainLogo, ChainStack } from "@/components/chain-logo";
 import { WalletIcon } from "@/components/wallet-icon";
 import { ProviderPicker, WalletModal, type WalletModalView } from "@/components/wallet-forms";
 import { brandFromConnector } from "@/lib/wallet-brands";
-import { FAMILY_CHAIN, walletFamily } from "@/lib/wallet-chains";
+import { FAMILY_CHAIN, WATCH_ONLY, walletFamily } from "@/lib/wallet-chains";
+import { nearBrand, pendingNearAccount } from "@/lib/client/near-wallets";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "@/lib/client/toast";
 import { formatUnits, isAddress } from "viem";
 import { useAccount, useBalance, useDisconnect } from "wagmi";
@@ -43,6 +44,23 @@ function Inner() {
   const isLinked = address && linked.some((w) => w.address.toLowerCase() === address.toLowerCase());
   const provider = brandFromConnector(connector);
   const [modal, setModal] = useState<WalletModalView | null>(null);
+
+  // Back from a redirect NEAR wallet (MyNearWallet): save the account it signed in, then clean the URL.
+  useEffect(() => {
+    const q = new URLSearchParams(location.search);
+    if (!q.has("near")) return;
+    history.replaceState(null, "", "/wallets");
+    if (q.get("near") !== "1") return void toast.error("NEAR sign-in cancelled");
+    pendingNearAccount()
+      .then(async (r) => {
+        if (!r) return;
+        await api("/api/wallets", { method: "POST", body: { address: r.accountId, label: "NEAR", provider: nearBrand(r.walletId), chain: "near" } });
+        qc.invalidateQueries({ queryKey: keys.wallets });
+        qc.invalidateQueries({ queryKey: ["wallet-track"] });
+        toast.success(`${r.accountId} added`);
+      })
+      .catch((e) => toast.error((e as Error).message));
+  }, [qc]);
 
   const add = async (a: string, l: string, prov: string) => {
     try {
@@ -112,7 +130,7 @@ function Inner() {
 
 type TrackSnap = { wallets: { address: string; holdings: { chain: string }[] }[] };
 
-function WalletRow({ w }: { w: { id: string; address: string; label: string; provider: string; chain?: string } }) {
+function WalletRow({ w }: { w: { id: string; address: string; label: string; provider: string; chain?: string; isDefault?: boolean } }) {
   const [open, setOpen] = useState(false);
   const qc = useQueryClient();
   const track = useQuery({ queryKey: ["wallet-track"], queryFn: () => api<TrackSnap>("/api/wallets/track"), staleTime: 5 * 60_000 });
@@ -132,10 +150,19 @@ function WalletRow({ w }: { w: { id: string; address: string; label: string; pro
           <InlineText value={w.label} placeholder="Add label" onSave={async (v) => { await api(`/api/wallets/${w.id}`, { method: "PATCH", body: { label: v } }); qc.invalidateQueries({ queryKey: keys.wallets }); }} />
         </div>
         <span className="num min-w-0 flex-1 truncate text-[12.5px] text-ink-2">{w.address}</span>
+        {w.isDefault && <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-accent/10 px-1.5 py-0.5 text-[10.5px] font-medium text-accent"><Star className="h-2.5 w-2.5 fill-current" />Default</span>}
         {held.length > 0 ? <span className="hidden md:inline-flex"><ChainStack chains={held} size={16} max={5} /></span> : !evm && fam && <span className="hidden md:inline-flex"><ChainLogo chain={FAMILY_CHAIN[fam]} size={16} /></span>}
         <div className="hidden items-center gap-1 sm:flex">{used.slice(0, 3).map((p) => <Link key={p.id} href={`/projects/${p.id}`} title={p.name}><ProjectMark p={p} size={18} /></Link>)}{used.length > 3 && <span className="text-[11.5px] text-faint">+{used.length - 3}</span>}</div>
         <button onClick={() => { navigator.clipboard.writeText(w.address); toast.success("Copied"); }} className="rounded p-1 text-faint hover:text-ink" aria-label="Copy"><Copy className="h-3.5 w-3.5" /></button>
-        {fam === "canton" && <span className="hidden shrink-0 rounded-full border border-line px-1.5 py-0.5 text-[10.5px] text-muted sm:inline">Watch-only</span>}
+        {fam && WATCH_ONLY.includes(fam) && <span className="hidden shrink-0 rounded-full border border-line px-1.5 py-0.5 text-[10.5px] text-muted sm:inline">Watch-only</span>}
+        <button
+          onClick={async () => { await api(`/api/wallets/${w.id}`, { method: "PATCH", body: { isDefault: !w.isDefault } }); qc.invalidateQueries({ queryKey: keys.wallets }); toast.success(w.isDefault ? "Default cleared" : "Set as default wallet"); }}
+          className={cn("rounded p-1 hover:text-ink", w.isDefault ? "text-accent" : "text-faint sm:opacity-0 sm:group-hover:opacity-100")}
+          aria-label={w.isDefault ? "Clear default wallet" : "Set as default"}
+          title={w.isDefault ? "Default wallet" : "Set as default"}
+        >
+          <Star className={cn("h-3.5 w-3.5", w.isDefault && "fill-current")} />
+        </button>
         {(fam === "canton" || fam === "near") && <a href={fam === "canton" ? `https://ccscan.xyz/party/${encodeURIComponent(w.address)}` : `https://nearblocks.io/address/${w.address}`} target="_blank" rel="noreferrer" className="rounded p-1 text-faint hover:text-ink" aria-label="Open in explorer"><ExternalLink className="h-3.5 w-3.5" /></a>}
         {evm && <a href={`https://debank.com/profile/${w.address}`} target="_blank" rel="noreferrer" className="rounded p-1 text-faint hover:text-ink" aria-label="Open in DeBank"><ExternalLink className="h-3.5 w-3.5" /></a>}
         <button onClick={async () => { if (!confirm("Unlink this wallet?")) return; await api(`/api/wallets/${w.id}`, { method: "DELETE" }); qc.invalidateQueries({ queryKey: keys.wallets }); }} className="rounded p-1 text-faint opacity-0 hover:text-neg group-hover:opacity-100" aria-label="Unlink"><Trash2 className="h-3.5 w-3.5" /></button>

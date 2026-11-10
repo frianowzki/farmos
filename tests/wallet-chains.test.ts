@@ -12,6 +12,9 @@ describe("wallet families", () => {
   it("detects Canton party ids", () => {
     expect(familiesFor("Cumberland-1::12201aa8a23046d5740c9edd58f7e820c83e7f5c58f25551f955f3252d3a04240860")).toEqual(["canton"]);
   });
+  it("detects Monero addresses (watch-only)", () => {
+    expect(familiesFor("4" + "A".repeat(94))).toEqual(["monero"]);
+  });
   it("keeps existing families", () => {
     expect(familiesFor("0x000000000000000000000000000000000000dEaD")).toEqual(["evm"]);
     expect(familiesFor("0x" + "a".repeat(64))).toEqual(["aptos", "sui"]);

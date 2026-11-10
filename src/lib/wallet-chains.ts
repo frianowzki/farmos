@@ -1,11 +1,11 @@
 /** Address families farmOS can watch. Aptos and Sui share the 0x + 64-hex shape, so they need a hint. */
-export type WalletFamily = "evm" | "solana" | "aptos" | "sui" | "zcash" | "near" | "canton";
+export type WalletFamily = "evm" | "solana" | "aptos" | "sui" | "zcash" | "near" | "canton" | "monero";
 
-export const FAMILY_LABEL: Record<WalletFamily, string> = { evm: "EVM", solana: "Solana", aptos: "Aptos", sui: "Sui", zcash: "Zcash", near: "NEAR", canton: "Canton" };
+export const FAMILY_LABEL: Record<WalletFamily, string> = { evm: "EVM", solana: "Solana", aptos: "Aptos", sui: "Sui", zcash: "Zcash", near: "NEAR", canton: "Canton", monero: "Monero" };
 /** Chain-logo key for each family (EVM shows its own per-chain logos). */
-export const FAMILY_CHAIN: Record<WalletFamily, string> = { evm: "ethereum", solana: "solana", aptos: "aptos", sui: "sui", zcash: "zcash", near: "near", canton: "canton" };
+export const FAMILY_CHAIN: Record<WalletFamily, string> = { evm: "ethereum", solana: "solana", aptos: "aptos", sui: "sui", zcash: "zcash", near: "near", canton: "canton", monero: "monero" };
 /** Families whose balances have no public read API: saved as watch-only (explorer link instead). */
-export const WATCH_ONLY: WalletFamily[] = ["canton"];
+export const WATCH_ONLY: WalletFamily[] = ["canton", "monero"];
 
 const EVM_RE = /^0x[a-fA-F0-9]{40}$/;
 const MOVE_RE = /^0x[a-fA-F0-9]{1,64}$/;
@@ -15,6 +15,8 @@ const ZEC_SHIELDED_RE = /^(zs1[0-9a-z]{70,}|u1[0-9a-z]{100,})$/;
 /** NEAR implicit account (64 hex, no 0x) or a named account under .near / .tg. */
 const NEAR_IMPLICIT_RE = /^[0-9a-f]{64}$/;
 const NEAR_NAMED_RE = /^(?=.{2,64}$)(([a-z0-9]+[-_])*[a-z0-9]+\.)+(near|tg)$/;
+/** Monero standard (4…) or subaddress (8…) address, 95 base58 chars; integrated addresses are 106. */
+const XMR_RE = /^[48][1-9A-HJ-NP-Za-km-z]{94}([1-9A-HJ-NP-Za-km-z]{11})?$/;
 /** Canton party id: hint::1220 + 64-hex fingerprint. */
 const CANTON_RE = /^[A-Za-z0-9._\-:]{1,185}::1220[0-9a-f]{64}$/;
 
@@ -28,6 +30,7 @@ export function familiesFor(address: string): WalletFamily[] {
   const a = address.trim();
   if (EVM_RE.test(a)) return ["evm"];
   if (CANTON_RE.test(a)) return ["canton"];
+  if (XMR_RE.test(a)) return ["monero"];
   if (NEAR_IMPLICIT_RE.test(a) || NEAR_NAMED_RE.test(a.toLowerCase())) return ["near"];
   if (ZEC_T_RE.test(a) || ZEC_SHIELDED_RE.test(a)) return ["zcash"];
   if (MOVE_RE.test(a)) return ["aptos", "sui"];

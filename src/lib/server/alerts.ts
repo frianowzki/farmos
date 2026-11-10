@@ -42,7 +42,11 @@ export async function checkClaims(pid: string, only?: { projectId: string }) {
   const projects = only ? all.filter((p) => p.checker) : all.filter((p) => p.checker && p.checker.autoCheck !== false && !["done", "dropped"].includes(p.status) && p.checker.claimStatus !== "claimed" && p.checker.claimStatus !== "closed");
   if (!projects.length) return { checked: 0, alerts: 0 };
   const tg = await notifier(pid, "claims");
-  const allWallets = (await d.select({ address: schema.wallets.address }).from(schema.wallets).where(eq(schema.wallets.profileId, pid))).map((w) => w.address).filter((a) => isAddress(a));
+  // Default wallet first, so it is checked (and reported) first.
+  const allWallets = (await d.select({ address: schema.wallets.address, isDefault: schema.wallets.isDefault }).from(schema.wallets).where(eq(schema.wallets.profileId, pid)))
+    .sort((a, b) => Number(b.isDefault) - Number(a.isDefault))
+    .map((w) => w.address)
+    .filter((a) => isAddress(a));
   let alerts = 0;
   for (const p of projects) {
     const c = p.checker as AirdropChecker;

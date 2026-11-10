@@ -55,9 +55,12 @@ import { ProjectMark } from "@/components/project-mark";
 
 export function Logo({ className }: { className?: string }) {
   return (
-    <span className={cn("inline-flex items-center gap-[3px] select-none", className)} aria-label="farmOS">
-      <span className="font-wordmark text-[21px] font-bold leading-none tracking-[-0.055em] text-ink [font-variation-settings:'opsz'_96,'wdth'_92]">farm</span>
-      <span className="font-wordmark rounded-[5px] bg-accent px-[4px] py-[2px] text-[10.5px] font-extrabold leading-none tracking-[0.01em] text-accent-ink">OS</span>
+    // Brand logo (sprout + wordmark), vector-traced from the master PNG; a light-green variant for dark mode.
+    <span className={cn("inline-flex h-[26px] select-none items-center", className)} role="img" aria-label="farmOS">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src="/brand/farmos-logo.svg" alt="" width={90} height={26} className="h-full w-auto dark:hidden" draggable={false} />
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src="/brand/farmos-logo-dark.svg" alt="" width={90} height={26} className="hidden h-full w-auto dark:block" draggable={false} />
     </span>
   );
 }

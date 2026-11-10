@@ -12,6 +12,7 @@ import {
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 export type ProjectLinks = {
   site?: string;
@@ -215,9 +216,11 @@ export const wallets = pgTable(
     provider: text("provider").notNull().default(""),
     /** Address family: evm | solana | aptos | sui | zcash | near | canton. Empty = inferred from the address. */
     chain: text("chain").notNull().default(""),
+    /** The profile's default wallet (at most one per profile; partial unique index). Preselected in pickers. */
+    isDefault: boolean("is_default").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [uniqueIndex("wallets_profile_address_idx").on(t.profileId, t.address)],
+  (t) => [uniqueIndex("wallets_profile_address_idx").on(t.profileId, t.address), uniqueIndex("wallets_profile_default_idx").on(t.profileId).where(sql`${t.isDefault}`)],
 );
 
 /** Key/value settings per profile. Shared caches (news wire…) live under profile "_global". */
@@ -389,6 +392,8 @@ export const costs = pgTable(
     valueAtEntry: doublePrecision("value_at_entry"),
     spentAt: date("spent_at").notNull(),
     note: text("note"),
+    /** Wallet that paid (optional; defaults to the profile's default wallet in the form). */
+    wallet: text("wallet"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("costs_profile_idx").on(t.profileId), index("costs_project_idx").on(t.projectId)],

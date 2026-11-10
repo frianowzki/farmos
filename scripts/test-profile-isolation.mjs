@@ -174,6 +174,26 @@ ok("p2 wallets hide default NEAR/Canton", !((await p("GET", "/api/wallets")).j?.
 for (const w of [nw, cw]) if (w) await a("DELETE", `/api/wallets/${w.id}`);
 ok("bio lookup on other's project -> 404", (await p("GET", `/api/projects/${S.def.proj.id}/bio`)).s === 404);
 ok("bio lookup needs a link", (await a("GET", `/api/projects/${S.def.proj.id}/bio`)).s === 422 || (await a("GET", `/api/projects/${S.def.proj.id}/bio`)).s === 404);
+// --- Default wallet ----------------------------------------------------------------------------
+{
+  const before = ((await a("GET", "/api/wallets")).j?.wallets ?? []).find((x) => x.isDefault)?.id ?? null;
+  const d1 = (await a("PATCH", `/api/wallets/${S.def.wal.id}`, { isDefault: true })).j?.wallet;
+  ok("default: set default wallet", d1?.isDefault === true);
+  const list = (await a("GET", "/api/wallets")).j?.wallets ?? [];
+  ok("default: exactly one default, listed first", list.filter((x) => x.isDefault).length === 1 && list[0]?.id === S.def.wal.id);
+  ok("p2 can't set default on default's wallet", (await p("PATCH", `/api/wallets/${S.def.wal.id}`, { isDefault: true })).s === 404);
+  const p2prev = ((await p("GET", "/api/wallets")).j?.wallets ?? []).find((x) => x.isDefault)?.id ?? null;
+  const p2d = (await p("PATCH", `/api/wallets/${S.p2.wal.id}`, { isDefault: true })).j?.wallet;
+  ok("p2 default is independent", p2d?.isDefault === true && ((await a("GET", "/api/wallets")).j?.wallets ?? []).some((x) => x.id === S.def.wal.id && x.isDefault));
+  const cw = (await a("POST", "/api/costs", { projectId: S.def.proj.id, type: "gas", symbol: "ETH", amount: 0.001, spentAt: today, wallet: S.def.wal.address })).j?.cost;
+  ok("cost keeps the picked wallet", cw?.wallet === S.def.wal.address);
+  if (cw) await a("DELETE", `/api/costs/${cw.id}`);
+  // restore the previous default (wallets of the test are deleted at the end anyway)
+  if (before && before !== S.def.wal.id) await a("PATCH", `/api/wallets/${before}`, { isDefault: true });
+  else await a("PATCH", `/api/wallets/${S.def.wal.id}`, { isDefault: false });
+  if (p2prev) await p("PATCH", `/api/wallets/${p2prev}`, { isDefault: true });
+  else await p("PATCH", `/api/wallets/${S.p2.wal.id}`, { isDefault: false });
+}
 // --- Saved wire items -------------------------------------------------------------------------
 const sv = (await p("POST", "/api/feed", { title: "ISO-P2 saved headline", url: "https://example.com/iso-p2", summary: "x", source: "ISO", category: "news" })).j;
 ok("p2 saved a wire item", Boolean(sv?.id));

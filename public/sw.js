@@ -1,7 +1,7 @@
 /* farmOS service worker: offline app shell only. API responses and HTML pages are never cached. */
 // Bump on every SW change: activate deletes every other cache, so stale CSS/JS from old builds goes away.
-const VERSION = "farmos-v3";
-const SHELL = ["/offline.html", "/icon.svg", "/icons/icon-192.png", "/icons/icon-512.png"];
+const VERSION = "farmos-v4"; // v4: sprout brand icons
+const SHELL = ["/offline.html", "/icon.svg", "/icons/icon-192.png", "/icons/icon-512.png", "/brand/farmos-logo.svg", "/brand/farmos-logo-dark.svg"];
 
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(VERSION).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));

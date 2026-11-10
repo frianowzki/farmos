@@ -110,11 +110,14 @@ export async function dashTasks(pid: string) {
 }
 
 export async function dashPortfolio(pid: string) {
-  const t = await getCachedTrack(pid);
-  if (!t) return { note: "No wallet snapshot yet. Open Wallets once to load balances." };
+  const [t, saved] = await Promise.all([getCachedTrack(pid), db().select({ address: schema.wallets.address, label: schema.wallets.label, chain: schema.wallets.chain, isDefault: schema.wallets.isDefault }).from(schema.wallets).where(eq(schema.wallets.profileId, pid))]);
+  const def = saved.find((w) => w.isDefault);
+  const defaultWallet = def ? { label: def.label || short(def.address), address: short(def.address), chain: def.chain || null } : null;
+  if (!t) return { defaultWallet, note: "No wallet snapshot yet. Open Wallets once to load balances." };
+  const isDef = (a: string) => Boolean(def && def.address.toLowerCase() === a.toLowerCase());
   return {
-    fetchedAt: t.fetchedAt, totalUsd: t.totalUsd,
-    wallets: t.wallets.map((w) => ({ label: w.label || short(w.address), address: short(w.address), totalUsd: w.totalUsd, top: [...w.holdings].sort((a, b) => (b.usd ?? 0) - (a.usd ?? 0)).slice(0, 6).map((h) => ({ chain: h.chain, symbol: h.symbol, amount: h.amount, usd: h.usd })) })),
+    fetchedAt: t.fetchedAt, totalUsd: t.totalUsd, defaultWallet,
+    wallets: [...t.wallets].sort((a, b) => Number(isDef(b.address)) - Number(isDef(a.address))).map((w) => ({ label: w.label || short(w.address), address: short(w.address), isDefault: isDef(w.address), totalUsd: w.totalUsd, top: [...w.holdings].sort((a, b) => (b.usd ?? 0) - (a.usd ?? 0)).slice(0, 6).map((h) => ({ chain: h.chain, symbol: h.symbol, amount: h.amount, usd: h.usd })) })),
     positions: t.positions.map((p) => ({ project: p.projectName, token: p.token, chain: p.chain, value: p.value, pnl: p.pnl })),
   };
 }

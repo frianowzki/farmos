@@ -262,7 +262,8 @@ function Properties({ p, set, today }: { p: Project; set: (patch: Partial<Projec
   const [more, setMore] = useState(false);
   const walletLabel = (a: string) => {
     const found = w?.wallets.find((x) => x.address.toLowerCase() === a.toLowerCase());
-    return found?.label ? `${found.label} · ${shortAddr(a)}` : shortAddr(a);
+    const name = found?.label ? `${found.label} · ${shortAddr(a)}` : shortAddr(a);
+    return found?.isDefault ? `★ ${name}` : name;
   };
   const kd = p.keyDates ?? {};
   const links = p.links ?? {};
@@ -292,7 +293,14 @@ function Properties({ p, set, today }: { p: Project; set: (patch: Partial<Projec
         <Prop icon={<Waypoints className={ic} />} label="Chains"><TagInput value={p.chains} onChange={(v) => set({ chains: v })} suggestions={CHAIN_SUGGESTIONS} placeholder="Empty" allowCreate={false} render={(c) => <ChainLabel chain={c} />} /></Prop>
         <Prop icon={<Tag className={ic} />} label="Tags"><TagInput value={p.tags} onChange={(v) => set({ tags: v })} suggestions={["points", "quests", "galxe", "zealy", "bridge", "swap", "lp", "staking", "node", "social", "gtd", "fcfs", "season-1"]} placeholder="Empty" tone="stone" /></Prop>
         <Prop icon={<WalletIcon className={ic} />} label="Wallets used">
-          <TagInput value={p.wallets} onChange={(v) => set({ wallets: v })} suggestions={(w?.wallets ?? []).map((x) => x.address)} render={walletLabel} placeholder="Link wallets" tone="blue" />
+          <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+            <TagInput value={p.wallets} onChange={(v) => set({ wallets: v })} suggestions={(w?.wallets ?? []).map((x) => x.address)} render={walletLabel} placeholder="Link wallets" tone="blue" />
+            {(() => {
+              const d = w?.wallets.find((x) => x.isDefault);
+              if (!d || p.wallets.some((a) => a.toLowerCase() === d.address.toLowerCase())) return null;
+              return <button type="button" onClick={() => set({ wallets: [...p.wallets, d.address] })} className="inline-flex h-6 items-center gap-1 rounded-md border border-dashed border-line px-1.5 text-[12px] text-muted hover:bg-hover hover:text-ink">+ Default · {d.label || shortAddr(d.address)}</button>;
+            })()}
+          </div>
         </Prop>
       </div>
       <div className="space-y-0.5">

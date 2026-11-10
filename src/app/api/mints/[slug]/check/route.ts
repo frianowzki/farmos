@@ -14,7 +14,8 @@ export async function POST(_: Request, ctx: Ctx) {
   if (!openseaConfigured()) return bad("OPENSEA_API_KEY is not set", 412);
   const { slug } = await ctx.params;
   if (!/^[a-z0-9-_.]{1,120}$/i.test(slug)) return bad("bad slug");
-  const wallets = await db().select().from(schema.wallets).where(eq(schema.wallets.profileId, pid));
+  // Default wallet first: the eligibility card leads with it.
+  const wallets = (await db().select().from(schema.wallets).where(eq(schema.wallets.profileId, pid))).sort((a, b) => Number(b.isDefault) - Number(a.isDefault));
   if (!wallets.length) return bad("Add a wallet on the Wallets page first", 412);
   let drop;
   try {

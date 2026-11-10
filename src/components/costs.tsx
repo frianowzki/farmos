@@ -1,4 +1,5 @@
 "use client";
+import { WalletSelect } from "@/components/wallet-select";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronDown, Flame, Plus, Trash2, Wallet as WalletIcon, Receipt } from "lucide-react";
 import { useState } from "react";
@@ -10,7 +11,7 @@ import { earningTotals, useEarnings } from "@/components/earnings";
 import { CHAINS } from "@/lib/chain-meta";
 import { cn } from "@/lib/cn";
 import { today as todayFn } from "@/lib/dates";
-import { num, pct, tone, usd } from "@/lib/format";
+import { num, pct, shortAddr, tone, usd } from "@/lib/format";
 import { api } from "@/lib/client/api";
 import { parseAmount, usePrices } from "@/lib/client/prices";
 import { toast } from "@/lib/client/toast";
@@ -86,7 +87,7 @@ export function ProjectCosts({ projectId }: { projectId: string }) {
                       {r.chain && <ChainLogo chain={r.chain} size={14} title fallback />}
                       <span className="num truncate text-[12px] text-faint">{r.spentAt}</span>
                     </div>
-                    {(r.note || T.id !== "gas") && <div className="truncate pl-[22px] text-[12px] text-muted">{T.label}{r.note ? ` · ${r.note}` : ""}</div>}
+                    {(r.note || r.wallet || T.id !== "gas") && <div className="truncate pl-[22px] text-[12px] text-muted">{T.label}{r.wallet ? ` · ${shortAddr(r.wallet)}` : ""}{r.note ? ` · ${r.note}` : ""}</div>}
                   </div>
                   <div className="num text-right text-ink-2" title="Value when paid">
                     {r.valueAtEntry == null ? <span className="text-faint">—</span> : usd(r.valueAtEntry)}
@@ -129,6 +130,7 @@ export function AddCostDialog({ open, projectId, onClose, onDone }: { open: bool
   const [chain, setChain] = useState<string | null>(null);
   const [day, setDay] = useState(todayFn());
   const [note, setNote] = useState("");
+  const [wallet, setWallet] = useState("");
   const [busy, setBusy] = useState(false);
   const px = usePrices([coin.id]);
   const live = px.data?.[coin.id]?.usd;
@@ -141,7 +143,7 @@ export function AddCostDialog({ open, projectId, onClose, onDone }: { open: bool
     if (!ok) return;
     setBusy(true);
     try {
-      await api("/api/costs", { method: "POST", body: { projectId, type, symbol: coin.symbol, coinId: coin.id, chain, amount: amt, valueAtEntry: entry != null && Number.isFinite(entry) ? entry : null, spentAt: day, note: note.trim() || null } });
+      await api("/api/costs", { method: "POST", body: { projectId, type, symbol: coin.symbol, coinId: coin.id, chain, amount: amt, valueAtEntry: entry != null && Number.isFinite(entry) ? entry : null, spentAt: day, note: note.trim() || null, wallet: wallet || null } });
       toast.success("Cost added");
       setAmount(""); setValue(""); setNote("");
       onDone();
@@ -174,6 +176,7 @@ export function AddCostDialog({ open, projectId, onClose, onDone }: { open: bool
         <label className="block"><span className={lab}>$ value when paid <span className="font-normal text-faint">(optional)</span></span>
           <input className={cn(inp, "num")} inputMode="decimal" placeholder={liveValue != null ? `≈ ${usd(liveValue)} at live price` : "USD"} value={value} onChange={(e) => setValue(e.target.value)} />
         </label>
+        <label className="block"><span className={lab}>Wallet</span><WalletSelect value={wallet} onChange={setWallet} className={cn(inp, "w-full")} /></label>
         <label className="block"><span className={lab}>Note</span><input className={inp} placeholder="Bridge, deposit to vault, quest fee…" value={note} onChange={(e) => setNote(e.target.value)} maxLength={300} /></label>
         <div className="grid grid-cols-2 gap-2 rounded-lg border border-line bg-panel px-3 py-2 text-[12.5px]">
           <div><div className="text-faint">Live value</div><div className="num text-[15px] text-ink">{liveValue == null ? "—" : usd(liveValue)}</div>{live != null && <div className="num text-[11px] text-faint">1 {coin.symbol} = {usd(live)}</div>}</div>

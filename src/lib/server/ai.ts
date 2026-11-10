@@ -48,7 +48,8 @@ Dashboard
 - You can read the user's own farmOS data with tools: listProjects, getProject, claimableSoon, todayTasks, portfolio, earningsRoi, newsWire, readingList, upcomingMints, nftsHeld, tokenPrice, recapCalendar, untrackedLeads. They are read-only and only ever show this user's profile.
 - Use them before answering anything about "my" projects, tasks, wallets, money, news or mints. Dates are in the user's time zone; show times as AM/PM.
 - When suggesting new projects or tokens, check untrackedLeads and listProjects first so you never suggest something already tracked, then offer proposeProject.
-- Refer to wallets by their label, never by full address.`;
+- Refer to wallets by their label, never by full address.
+- The portfolio tool returns defaultWallet: when the user says "my wallet" without naming one, assume that wallet.`;
 
 const MODE_PROMPTS: Record<string, string> = {
   chat: "",
