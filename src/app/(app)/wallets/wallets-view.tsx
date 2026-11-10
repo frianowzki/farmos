@@ -10,6 +10,7 @@ import { useAccount, useBalance, useDisconnect } from "wagmi";
 import { Monogram, Page, PageHeader } from "@/components/shell";
 import { Button, Input, InlineText, SectionTitle, Skeleton } from "@/components/ui";
 import { WalletProvider, walletConnectReady } from "@/components/wallet-provider";
+import { WalletTracker } from "@/components/wallet-tracker";
 import { cn } from "@/lib/cn";
 import { EVM_CHAINS, WALLET_CHAIN_KEYS } from "@/lib/chains";
 import { num, shortAddr } from "@/lib/format";
@@ -39,6 +40,7 @@ function Inner() {
     try {
       await api("/api/wallets", { method: "POST", body: { address: a, label: l } });
       qc.invalidateQueries({ queryKey: keys.wallets });
+      qc.invalidateQueries({ queryKey: ["wallet-track"] });
       setAddr("");
       setLabel("");
       toast.success("Wallet linked");
@@ -75,6 +77,8 @@ function Inner() {
         </div>
         {isConnected && address && <div className="mt-4 border-t border-line pt-4"><Balances address={address} /></div>}
       </div>
+
+      <WalletTracker hasEvm={linked.some((w) => isAddress(w.address))} />
 
       <SectionTitle>Linked wallets</SectionTitle>
       <form onSubmit={(e) => { e.preventDefault(); if (addr.trim()) add(addr.trim(), label.trim()); }} className="mb-3 flex flex-wrap gap-2">
