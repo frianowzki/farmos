@@ -112,7 +112,9 @@ Redeploy after adding any env var (`vercel --prod`).
 4. **Watch** keeps a drop under Watching. **Track as project** creates an NFT project with the mint date and OpenSea link.
 
 ## 7. Attachments (Vercel Blob)
-The private Blob store `frioos-files` is linked to the project, which provides `BLOB_READ_WRITE_TOKEN`. Files on projects (Files tab) and diary entries are stored privately and streamed through `/api/attachments/<id>/file` after the session check. The limit is 4 MB per file, which keeps uploads under Vercel's function body limit.
+The private Blob store `frioos-files` (region `sin1`) is connected to the project for Production, Preview, and Development, which provides `BLOB_READ_WRITE_TOKEN`. Files on projects (Files tab) and diary entries are stored privately and streamed through `/api/attachments/<id>/file` after the session check. The app limit is 4 MB per file, which keeps uploads under Vercel's function body limit.
+
+Hobby (free) included usage: 1 GB storage/month (monthly average), 10,000 simple operations, 2,000 advanced operations, and 10 GB Blob data transfer. Going over a limit is not billed; Blob access is blocked until the 30-day usage window resets. Source: https://vercel.com/docs/vercel-blob/usage-and-pricing.
 
 ## Env var reference
 | Var | Required | Notes |
@@ -126,7 +128,7 @@ The private Blob store `frioos-files` is linked to the project, which provides `
 | `ETHERSCAN_API_KEY` | optional | richer audits + full-history SeaDrop allowlists; set on Production + Preview |
 | `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` | optional | WalletConnect; public by design; set on Production + Preview |
 | `OPENSEA_API_KEY` | optional | Upcoming mints + live-stage WL check |
-| `BLOB_READ_WRITE_TOKEN` | optional | attachments (set by the Blob integration) |
+| `BLOB_READ_WRITE_TOKEN` | optional | attachments (set by the Blob integration on Production, Preview, and Development) |
 | `X_CLIENT_ID`, `X_CLIENT_SECRET` | optional | X connection + Feed timeline; set on Production + Preview |
 | `DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET` | optional | Discord connection; set on Production + Preview |
 | `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | optional | GitHub connection; set on Production + Preview |
