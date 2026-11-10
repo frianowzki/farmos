@@ -13,6 +13,8 @@ export async function GET() {
     { id: "etherscan", label: "Etherscan (v2, all chains)", env: "ETHERSCAN_API_KEY", ok: has("ETHERSCAN_API_KEY"), note: "Contract verification in audits, full-history allowlist logs" },
     { id: "blob", label: "Vercel Blob", env: "BLOB_READ_WRITE_TOKEN", ok: has("BLOB_READ_WRITE_TOKEN"), note: "Private attachments on projects and diary" },
     { id: "walletconnect", label: "WalletConnect", env: "NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID", ok: has("NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID"), note: "QR / mobile wallets (injected wallets work without it)" },
+    { id: "x", label: "X", env: "X_CLIENT_ID, X_CLIENT_SECRET", ok: has("X_CLIENT_ID") && has("X_CLIENT_SECRET"), note: "X connection and Feed timeline" },
+    { id: "discord", label: "Discord", env: "DISCORD_CLIENT_ID, DISCORD_CLIENT_SECRET", ok: has("DISCORD_CLIENT_ID") && has("DISCORD_CLIENT_SECRET"), note: "Discord identity on your profile" },
   ];
   return NextResponse.json({ items });
 }
