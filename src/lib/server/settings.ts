@@ -28,7 +28,7 @@ export async function getProfileName(pid: ProfileId): Promise<string> {
   return (await getProfileInfo(pid)).name;
 }
 
-/** Name + time zone of a profile, with per-profile defaults (Iya: Asia/Jakarta, Nadine: Asia/Manila). */
+/** Name + time zone of a profile, with per-profile defaults (Iya and Rizka: Asia/Jakarta, Nadine: Asia/Manila). */
 export async function getProfileInfo(pid: ProfileId): Promise<{ name: string; tz: string; fiat: Fiat }> {
   const v = (await getSetting<StoredProfile>(pid, "profile")) ?? {};
   return { name: v.name?.trim() || DEFAULT_PROFILE_NAME[pid], tz: isTimeZone(v.tz) ? v.tz : DEFAULT_PROFILE_TZ[pid], fiat: isFiat(v.fiat) ? v.fiat : profileFiat(pid) };

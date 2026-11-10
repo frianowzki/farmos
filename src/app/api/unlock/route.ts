@@ -2,7 +2,7 @@ import { createHash, timingSafeEqual as cryptoEqual } from "node:crypto";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { SESSION_COOKIE, createSessionToken, sessionCookieOptions } from "@/lib/session";
-import { TZ_COOKIE } from "@/lib/profiles";
+import { PROFILE_IDS, PROFILE_PASSCODE_ENV, TZ_COOKIE, type ProfileId } from "@/lib/profiles";
 import { getProfileTz } from "@/lib/server/settings";
 
 /** Fixed-length digests so the comparison is constant-time regardless of input length. */
@@ -24,19 +24,26 @@ export async function POST(req: Request) {
   const given = String(body.passcode ?? "");
   await new Promise((r) => setTimeout(r, 350));
   const g = digest(given);
-  // The entered passcode picks the profile. Both are always compared (no early exit).
-  const p2 = process.env.FARMOS_PROFILE2_PASSCODE?.trim();
-  const isDefault = same(g, digest(expected));
-  const isP2 = Boolean(p2) && p2 !== expected && same(g, digest(p2 ?? ""));
-  if (!isDefault && !isP2) {
+  // The entered passcode picks the profile. Every profile is compared (no early exit), and a
+  // passcode that equals another profile's is ignored so two profiles can never share one.
+  const codes = PROFILE_IDS.map((id) => (id === "default" ? expected : process.env[PROFILE_PASSCODE_ENV[id]]?.trim() ?? ""));
+  let match: ProfileId | null = null;
+  PROFILE_IDS.forEach((id, i) => {
+    const code = codes[i];
+    const unique = Boolean(code) && codes.filter((c) => c === code).length === 1;
+    const hit = same(g, digest(code || "\u0000unset"));
+    if (unique && hit && !match) match = id;
+  });
+  const pid = match as ProfileId | null;
+  if (!pid) {
     attempts.set(ip, { n: (a && now - a.t < 15 * 60_000 ? a.n : 0) + 1, t: a && now - a.t < 15 * 60_000 ? a.t : now });
     return NextResponse.json({ error: "Wrong passcode." }, { status: 401 });
   }
   attempts.delete(ip);
   const jar = await cookies();
-  jar.set(SESSION_COOKIE, await createSessionToken(isDefault ? "passcode" : "profile:p2"), sessionCookieOptions);
+  jar.set(SESSION_COOKIE, await createSessionToken(pid === "default" ? "passcode" : `profile:${pid}`), sessionCookieOptions);
   // Non-secret mirror of the profile's zone so the first render already uses it.
-  const tz = await getProfileTz(isDefault ? "default" : "p2").catch(() => null);
+  const tz = await getProfileTz(pid).catch(() => null);
   if (tz) jar.set(TZ_COOKIE, tz, { ...sessionCookieOptions, httpOnly: false });
   return NextResponse.json({ ok: true });
 }

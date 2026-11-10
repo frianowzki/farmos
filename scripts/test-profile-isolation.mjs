@@ -1,5 +1,5 @@
-// Usage: build, `next start -p 3123`, then: APP_PASSCODE=… FARMOS_PROFILE2_PASSCODE=… node scripts/test-profile-isolation.mjs
-// Two-profile isolation test against a local `next start` build. Never prints passcodes.
+// Usage: build, `next start -p 3123`, then: APP_PASSCODE=… FARMOS_PROFILE2_PASSCODE=… FARMOS_PROFILE3_PASSCODE=… node scripts/test-profile-isolation.mjs
+// Three-profile isolation test against a local `next start` build. Never prints passcodes.
 const B = "http://localhost:3123";
 const results = [];
 const ok = (name, pass, extra = "") => { results.push({ name, pass }); console.log(`${pass ? "PASS" : "FAIL"}  ${name}${extra ? "  " + extra : ""}`); };
@@ -16,14 +16,16 @@ const call = (jar) => async (method, path, body) => {
 const today = new Date().toISOString().slice(0, 10);
 const A = await login(process.env.APP_PASSCODE);
 const P = await login(process.env.FARMOS_PROFILE2_PASSCODE);
+const Q = await login(process.env.FARMOS_PROFILE3_PASSCODE);
 const W = await login("definitely-wrong-passcode");
 ok("default passcode unlocks", A.status === 200 && A.cookie.includes("frio_session"));
 ok("profile-2 passcode unlocks", P.status === 200 && P.cookie.includes("frio_session"));
+ok("profile-3 passcode unlocks", Q.status === 200 && Q.cookie.includes("frio_session"));
 ok("wrong passcode rejected", W.status === 401);
 ok("no session -> 401", (await call("")("GET", "/api/projects")).s === 401);
-const a = call(A.cookie), p = call(P.cookie);
+const a = call(A.cookie), p = call(P.cookie), r = call(Q.cookie);
 // Remove leftovers from an aborted earlier run.
-for (const c of [a, p]) {
+for (const c of [a, p, r]) {
   for (const x of (await c("GET", "/api/projects")).j.projects.filter((x) => x.name.startsWith("ISO-"))) await c("DELETE", `/api/projects/${x.id}`);
   for (const x of (await c("GET", "/api/wallets")).j.wallets.filter((x) => (x.label ?? "").startsWith("ISO-"))) await c("DELETE", `/api/wallets/${x.id}`);
   for (const x of (await c("GET", "/api/diary")).j.entries.filter((x) => (x.title ?? "").startsWith("ISO-"))) await c("DELETE", `/api/diary/${x.id}`);
@@ -32,6 +34,12 @@ for (const c of [a, p]) {
 ok("default profile id/name", (await a("GET", "/api/profile")).j?.id === "default");
 const pp = (await p("GET", "/api/profile")).j;
 ok("profile 2 id + default name Nadine", pp?.id === "p2" && pp?.name === "Nadine", JSON.stringify(pp));
+const rp = (await r("GET", "/api/profile")).j;
+ok("profile 3 id + name Rizka, Asia/Jakarta, USD", rp?.id === "p3" && rp?.name === "Rizka" && rp?.tz === "Asia/Jakarta" && rp?.fiat === "usd", JSON.stringify({ id: rp?.id, name: rp?.name, tz: rp?.tz, fiat: rp?.fiat }));
+ok("p3 has no Google integration", (await r("GET", "/api/google/status")).j?.configured === false);
+const r3tz = await r("PUT", "/api/profile", { tz: "Asia/Makassar" });
+ok("p3 zone editable + isolated", r3tz.s === 200 && (await r("GET", "/api/profile")).j?.tz === "Asia/Makassar" && (await a("GET", "/api/profile")).j?.tz === "Asia/Jakarta" && (await p("GET", "/api/profile")).j?.tz === "Asia/Manila");
+await r("PUT", "/api/profile", { tz: "Asia/Jakarta" });
 
 async function seed(c, tag) {
   const proj = (await c("POST", "/api/projects", { name: `ISO-${tag}`, category: "airdrop" })).j.project;
@@ -42,8 +50,11 @@ async function seed(c, tag) {
   const mint = (await c("PATCH", `/api/mints/iso-test-${tag}`, { note: `ISO-${tag}` })).j?.watch;
   return { proj, task, diary, pos, wal, mint };
 }
-const S = { p2: await seed(p, "P2"), def: await seed(a, "DEF") };
-ok("seeded both profiles", Boolean(S.p2.proj && S.p2.task && S.p2.diary && S.p2.pos && S.p2.wal && S.def.proj && S.def.wal), "");
+const S = { p2: await seed(p, "P2"), def: await seed(a, "DEF"), p3: await seed(r, "P3") };
+ok("seeded all three profiles", Boolean(S.p2.proj && S.p2.task && S.p2.diary && S.p2.pos && S.p2.wal && S.def.proj && S.def.wal && S.p3.proj && S.p3.wal), "");
+// Every ordered pair of profiles: [client, name, tag, seed]
+const PROF = [[a, "default", "DEF", "def"], [p, "p2", "P2", "p2"], [r, "p3", "P3", "p3"]];
+const PAIRS = PROF.flatMap((m) => PROF.filter((o) => o !== m).map((o) => [m, o]));
 
 async function attack(me, meName, other, o) {
   const tag = `${meName} vs other`;
@@ -84,8 +95,7 @@ async function attack(me, meName, other, o) {
   const ab = await me("GET", `/api/attachments?projectId=${o.proj.id}`);
   ok(`${tag}: attachments of other project empty`, (ab.j?.attachments ?? []).length === 0);
 }
-await attack(a, "default", p, S.p2);
-await attack(p, "p2", a, S.def);
+for (const [m, o] of PAIRS) await attack(m[0], `${m[1]}~${o[1]}`, o[0], S[o[3]]);
 
 async function intact(c, s, tag) {
   const d = await c("GET", `/api/projects/${s.proj.id}`);
@@ -96,27 +106,30 @@ async function intact(c, s, tag) {
 }
 await intact(p, S.p2, "P2");
 await intact(a, S.def, "DEF");
+await intact(r, S.p3, "P3");
 
 // --- New tables: earnings, watchlist; claim watch; reports -----------------------------------
 const EARN = {};
-for (const [c, s, tag] of [[a, S.def, "DEF"], [p, S.p2, "P2"]]) {
+for (const [c, , tag, k] of PROF) {
+  const s = S[k];
   const e = await c("POST", "/api/earnings", { projectId: s.proj.id, symbol: `ISO${tag}`, coinId: "ethereum", amount: 1, valueAtClaim: 100, claimedAt: today, note: `ISO-${tag}` });
   EARN[tag] = e.j?.earning;
 }
-ok("earnings created in both profiles", Boolean(EARN.DEF && EARN.P2));
-for (const [me, tag, other] of [[a, "default", "P2"], [p, "p2", "DEF"]]) {
+ok("earnings created in all profiles", Boolean(EARN.DEF && EARN.P2 && EARN.P3));
+for (const [[me, mn], [, , other, ok3]] of PAIRS) {
+  const tag = `${mn}~${other}`;
   const o = EARN[other];
   const list = (await me("GET", "/api/earnings")).j?.earnings ?? [];
   ok(`${tag}: list earnings hides other`, !list.some((x) => x.id === o.id));
   ok(`${tag}: PATCH other earning -> 404`, (await me("PATCH", `/api/earnings/${o.id}`, { note: "HACKED" })).s === 404);
   ok(`${tag}: DELETE other earning -> 404`, (await me("DELETE", `/api/earnings/${o.id}`)).s === 404);
-  const oProj = other === "P2" ? S.p2.proj.id : S.def.proj.id;
+  const oProj = S[ok3].proj.id;
   const steal = await me("POST", "/api/earnings", { projectId: oProj, symbol: "ISOSTEAL", amount: 1, claimedAt: today });
   ok(`${tag}: cannot log earning on other's project`, steal.s === 404, String(steal.s));
   ok(`${tag}: claim watch on other's project rejected`, (await me("PUT", `/api/projects/${oProj}/checker`, { checker: { type: "manual", claimStatus: "open" } })).s === 404 && (await me("PATCH", `/api/projects/${oProj}/checker`, { claimStatus: "claimed" })).s === 404 && (await me("POST", `/api/projects/${oProj}/checker`)).s === 404);
   const rep = (await me("GET", `/api/reports?month=${today.slice(0, 7)}`)).j;
   ok(`${tag}: monthly report excludes other`, rep && !JSON.stringify(rep).includes(`ISO-${other}`) && !JSON.stringify(rep).includes(`ISO${other}`));
-  const csv = await fetch(B + `/api/reports?month=${today.slice(0, 7)}&format=csv`, { headers: { cookie: me === a ? A.cookie : P.cookie } }).then((r) => r.text());
+  const csv = await fetch(B + `/api/reports?month=${today.slice(0, 7)}&format=csv`, { headers: { cookie: me === a ? A.cookie : me === p ? P.cookie : Q.cookie } }).then((r) => r.text());
   ok(`${tag}: report CSV excludes other`, csv.includes("farmOS monthly report") && !csv.includes(`ISO-${other}`));
   const exp = (await me("GET", "/api/export")).j;
   ok(`${tag}: export excludes other's earnings`, !(exp.earnings ?? []).some((x) => x.id === o.id));
@@ -130,14 +143,15 @@ ok("own claim status set", cs.s === 200 && cs.j?.checker?.claimStatus === "open"
 
 // Watchlist: same coin in both profiles, isolated rows
 const WL = {};
-for (const [c, tag] of [[a, "DEF"], [p, "P2"]]) {
+for (const [c, , tag] of PROF) {
   const before = (await c("GET", "/api/watchlist")).j?.items ?? [];
   const had = before.find((x) => x.coinId === "ethereum");
   const r = await c("POST", "/api/watchlist", { coinId: "ethereum" });
   WL[tag] = { item: had ?? r.j?.item, created: !had && Boolean(r.j?.item) };
 }
-ok("watchlist rows in both profiles", Boolean(WL.DEF.item && WL.P2.item && WL.DEF.item.id !== WL.P2.item.id));
-for (const [me, tag, other] of [[a, "default", "P2"], [p, "p2", "DEF"]]) {
+ok("watchlist rows in all profiles", Boolean(WL.DEF.item && WL.P2.item && WL.P3.item && new Set([WL.DEF.item.id, WL.P2.item.id, WL.P3.item.id]).size === 3));
+for (const [[me, mn], [, , other]] of PAIRS) {
+  const tag = `${mn}~${other}`;
   const o = WL[other].item;
   const l = (await me("GET", "/api/watchlist")).j;
   ok(`${tag}: watchlist hides other`, !(l.items ?? []).some((x) => x.id === o.id));
@@ -147,12 +161,14 @@ for (const [me, tag, other] of [[a, "default", "P2"], [p, "p2", "DEF"]]) {
 }
 // --- Gas & capital ledger (costs) ------------------------------------------------------------
 const COST = {};
-for (const [tag, c, s] of [["DEF", a, S.def], ["P2", p, S.p2]]) {
-  const r = await c("POST", "/api/costs", { projectId: s.proj.id, type: "gas", symbol: "ETH", coinId: "ethereum", chain: "Base", amount: 0.01, valueAtEntry: 30, spentAt: today, note: `ISO-${tag}` });
-  COST[tag] = r.j?.cost;
+for (const [c, , tag, k] of PROF) {
+  const s = S[k];
+  const rr = await c("POST", "/api/costs", { projectId: s.proj.id, type: "gas", symbol: "ETH", coinId: "ethereum", chain: "Base", amount: 0.01, valueAtEntry: 30, spentAt: today, note: `ISO-${tag}` });
+  COST[tag] = rr.j?.cost;
 }
-ok("costs created in both profiles", Boolean(COST.DEF && COST.P2 && COST.DEF.profileId === "default" && COST.P2.profileId === "p2"));
-for (const [tag, me, o, oProj] of [["default vs p2", a, COST.P2, S.p2.proj.id], ["p2 vs default", p, COST.DEF, S.def.proj.id]]) {
+ok("costs created in all profiles", Boolean(COST.DEF && COST.P2 && COST.P3 && COST.DEF.profileId === "default" && COST.P2.profileId === "p2" && COST.P3.profileId === "p3"));
+for (const [[me, mn], [, , ot, ok3]] of PAIRS) {
+  const tag = `${mn} vs ${ot}`, o = COST[ot], oProj = S[ok3].proj.id;
   const list = (await me("GET", "/api/costs")).j?.costs ?? [];
   ok(`${tag}: list costs hides other`, !list.some((x) => x.id === o.id));
   ok(`${tag}: PATCH other cost -> 404`, (await me("PATCH", `/api/costs/${o.id}`, { note: "HACKED" })).s === 404);
@@ -170,6 +186,7 @@ const nw = (await a("POST", "/api/wallets", { address: "ISO-Test.near", label: "
 ok("NEAR named account saved as near", nw?.chain === "near" && nw?.address === "iso-test.near");
 const cw = (await a("POST", "/api/wallets", { address: "ISO-party::1220" + "ab".repeat(32), label: "ISO-CANTON" })).j?.wallet;
 ok("Canton party saved as canton", cw?.chain === "canton");
+ok("p3 wallets hide default NEAR/Canton", !((await r("GET", "/api/wallets")).j?.wallets ?? []).some((x) => x.id === nw?.id || x.id === cw?.id));
 ok("p2 wallets hide default NEAR/Canton", !((await p("GET", "/api/wallets")).j?.wallets ?? []).some((x) => x.id === nw?.id || x.id === cw?.id));
 for (const w of [nw, cw]) if (w) await a("DELETE", `/api/wallets/${w.id}`);
 ok("bio lookup on other's project -> 404", (await p("GET", `/api/projects/${S.def.proj.id}/bio`)).s === 404);
@@ -184,6 +201,9 @@ ok("bio lookup needs a link", (await a("GET", `/api/projects/${S.def.proj.id}/bi
   ok("p2 can't set default on default's wallet", (await p("PATCH", `/api/wallets/${S.def.wal.id}`, { isDefault: true })).s === 404);
   const p2prev = ((await p("GET", "/api/wallets")).j?.wallets ?? []).find((x) => x.isDefault)?.id ?? null;
   const p2d = (await p("PATCH", `/api/wallets/${S.p2.wal.id}`, { isDefault: true })).j?.wallet;
+  ok("p3 can't set default on others' wallets", (await r("PATCH", `/api/wallets/${S.def.wal.id}`, { isDefault: true })).s === 404 && (await r("PATCH", `/api/wallets/${S.p2.wal.id}`, { isDefault: true })).s === 404);
+  const p3d = (await r("PATCH", `/api/wallets/${S.p3.wal.id}`, { isDefault: true })).j?.wallet;
+  ok("p3 default is independent", p3d?.isDefault === true && ((await a("GET", "/api/wallets")).j?.wallets ?? []).some((x) => x.id === S.def.wal.id && x.isDefault));
   ok("p2 default is independent", p2d?.isDefault === true && ((await a("GET", "/api/wallets")).j?.wallets ?? []).some((x) => x.id === S.def.wal.id && x.isDefault));
   const cw = (await a("POST", "/api/costs", { projectId: S.def.proj.id, type: "gas", symbol: "ETH", amount: 0.001, spentAt: today, wallet: S.def.wal.address })).j?.cost;
   ok("cost keeps the picked wallet", cw?.wallet === S.def.wal.address);
@@ -198,7 +218,9 @@ ok("bio lookup needs a link", (await a("GET", `/api/projects/${S.def.proj.id}/bi
 const sv = (await p("POST", "/api/feed", { title: "ISO-P2 saved headline", url: "https://example.com/iso-p2", summary: "x", source: "ISO", category: "news" })).j;
 ok("p2 saved a wire item", Boolean(sv?.id));
 ok("default reading list hides p2 saved item", !((await a("GET", "/api/feed")).j?.items ?? []).some((x) => x.id === sv?.id));
+ok("p3 reading list hides p2 saved item", !((await r("GET", "/api/feed")).j?.items ?? []).some((x) => x.id === sv?.id));
 await a("DELETE", `/api/feed?id=${sv?.id}`);
+await r("DELETE", `/api/feed?id=${sv?.id}`);
 ok("default can't delete p2 saved item", ((await p("GET", "/api/feed")).j?.items ?? []).some((x) => x.id === sv?.id));
 await p("DELETE", `/api/feed?id=${sv?.id}`);
 // --- Research desk dashboard tools (probe; only with AI_TOOL_PROBE=1 locally) ------------------
@@ -206,7 +228,8 @@ const probe = (c) => (tool, args = {}) => c("POST", "/api/assistant/probe", { to
 if ((await probe(a)("listProjects")).s === 404) {
   console.log("SKIP  AI tool probe disabled (set AI_TOOL_PROBE=1 for next start)");
 } else {
-  for (const [tag, me, mine, other] of [["default", a, S.def, S.p2], ["p2", p, S.p2, S.def]]) {
+  for (const [[me, tag, , mk], [, , otag, ok3]] of PAIRS) {
+    const mine = S[mk], other = S[ok3];
     const pr = probe(me);
     const lp = (await pr("listProjects")).j?.out;
     ok(`tools/${tag}: listProjects has own, hides other`, lp?.projects?.some((x) => x.id === mine.proj.id) && !lp.projects.some((x) => x.id === other.proj.id));
@@ -223,7 +246,7 @@ if ((await probe(a)("listProjects")).s === 404) {
     const rc = JSON.stringify((await pr("recapCalendar", { days: 3 })).j?.out ?? {});
     ok(`tools/${tag}: recapCalendar hides other`, !rc.includes(other.proj.name) && !rc.includes(other.diary.title));
     const rl = JSON.stringify((await pr("readingList")).j?.out ?? {});
-    ok(`tools/${tag}: readingList scoped`, !rl.includes(`ISO-${tag === "default" ? "P2" : "DEF"}`));
+    ok(`tools/${tag}: readingList scoped`, !rl.includes(`ISO-${otag}`));
     const ul = JSON.stringify((await pr("untrackedLeads")).j?.out?.trackedNames ?? []);
     ok(`tools/${tag}: untrackedLeads tracked names scoped`, !ul.includes(other.proj.name.toLowerCase()));
     const pf = JSON.stringify((await pr("portfolio")).j?.out ?? {});
@@ -233,12 +256,12 @@ if ((await probe(a)("listProjects")).s === 404) {
   }
   ok("tools: unknown tool rejected", (await probe(a)("proposeProject")).s === 400);
 }
-const pr = (await a("GET", "/api/profile")).j, pr2 = (await p("GET", "/api/profile")).j;
-ok("default fiat: USD for both", pr.fiat === "usd" && pr2.fiat === "usd", `${pr.fiat}/${pr2.fiat}`);
+const pr = (await a("GET", "/api/profile")).j, pr2 = (await p("GET", "/api/profile")).j, pr3 = (await r("GET", "/api/profile")).j;
+ok("default fiat: USD for all", pr.fiat === "usd" && pr2.fiat === "usd" && pr3.fiat === "usd", `${pr.fiat}/${pr2.fiat}/${pr3.fiat}`);
 const px = (await a("GET", "/api/prices?ids=ethereum,tether")).j?.prices;
 ok("prices endpoint returns usd/idr/php/usdt", px?.ethereum && ["usd", "idr", "php", "usdt"].every((k) => px.ethereum[k] > 0));
 ok("prices endpoint needs a session", (await call("")("GET", "/api/prices?ids=ethereum")).s === 401);
-for (const tag of ["DEF", "P2"]) if (WL[tag].created) await (tag === "DEF" ? a : p)("DELETE", `/api/watchlist/${WL[tag].item.id}`);
+for (const [c, , tag] of PROF) if (WL[tag].created) await c("DELETE", `/api/watchlist/${WL[tag].item.id}`);
 
 // Import into p2 a backup that contains default's ids: must create fresh p2 rows, never overwrite default.
 const defExport = (await a("GET", "/api/export")).j;
@@ -252,14 +275,16 @@ ok("p2 imported rows got new ids", p2Proj.length > 0 && !p2Proj.some((x) => defA
 // Restore p2 to its pre-import state.
 const rest = await p("POST", "/api/import?confirm=1", p2Before);
 ok("p2 restored own backup", rest.s === 200);
+const p3Proj = (await r("GET", "/api/projects")).j.projects;
+ok("p3 untouched by p2 import", !p3Proj.some((x) => defAfter.includes(x.id) || p2Proj.some((y) => y.id === x.id)));
 
 // Settings name per profile
 await p("PUT", "/api/profile", { name: "Nadine Test" });
-ok("p2 name change isolated", (await a("GET", "/api/profile")).j.name !== "Nadine Test" && (await p("GET", "/api/profile")).j.name === "Nadine Test");
+ok("p2 name change isolated", (await a("GET", "/api/profile")).j.name !== "Nadine Test" && (await r("GET", "/api/profile")).j.name === "Rizka" && (await p("GET", "/api/profile")).j.name === "Nadine Test");
 await p("PUT", "/api/profile", { name: "Nadine" });
 
 // Cleanup
-for (const [c, s] of [[a, S.def], [p, S.p2]]) {
+for (const [c, s] of [[a, S.def], [p, S.p2], [r, S.p3]]) {
   await c("DELETE", `/api/wallets/${s.wal.id}`);
   if (s.mint) await c("DELETE", `/api/mints/${s.mint.slug}`);
   await c("DELETE", `/api/diary/${s.diary.id}`);
@@ -268,14 +293,16 @@ for (const [c, s] of [[a, S.def], [p, S.p2]]) {
   await c("DELETE", `/api/projects/${s.proj.id}`);
 }
 // The p2 restore re-created its rows under fresh ids, so also sweep by marker.
-for (const c of [a, p]) {
+for (const c of [a, p, r]) {
   for (const x of (await c("GET", "/api/projects")).j.projects.filter((x) => x.name.startsWith("ISO-"))) await c("DELETE", `/api/projects/${x.id}`);
   for (const x of (await c("GET", "/api/wallets")).j.wallets.filter((x) => (x.label ?? "").startsWith("ISO-"))) await c("DELETE", `/api/wallets/${x.id}`);
   for (const x of (await c("GET", "/api/diary")).j.entries.filter((x) => (x.title ?? "").startsWith("ISO-"))) await c("DELETE", `/api/diary/${x.id}`);
   for (const x of (await c("GET", "/api/tasks")).j.tasks.filter((x) => (x.title ?? "").startsWith("ISO-"))) await c("DELETE", `/api/tasks/${x.id}`);
   for (const x of ((await c("GET", "/api/mints")).j?.watch ?? []).filter((x) => String(x.slug).startsWith("iso-test-"))) await c("DELETE", `/api/mints/${x.slug}`);
 }
-const leftovers = [...(await a("GET", "/api/projects")).j.projects, ...(await p("GET", "/api/projects")).j.projects].filter((x) => x.name.startsWith("ISO-"));
+for (const [c, , tag] of PROF) for (const x of ((await c("GET", "/api/costs")).j?.costs ?? []).filter((x) => x.note === `ISO-${tag}`)) await c("DELETE", `/api/costs/${x.id}`);
+for (const [c, , tag] of PROF) for (const x of ((await c("GET", "/api/earnings")).j?.earnings ?? []).filter((x) => x.note === `ISO-${tag}`)) await c("DELETE", `/api/earnings/${x.id}`);
+const leftovers = [...(await a("GET", "/api/projects")).j.projects, ...(await p("GET", "/api/projects")).j.projects, ...(await r("GET", "/api/projects")).j.projects].filter((x) => x.name.startsWith("ISO-"));
 ok("test data cleaned up", leftovers.length === 0);
 const f = results.filter((r) => !r.pass).length;
 console.log(`\n${results.length - f}/${results.length} passed`);

@@ -34,7 +34,7 @@ export function weekStart(day: string): string {
 
 /**
  * The signed-in profile's zone, mirrored into a readable cookie at login so the very first
- * render already uses it (Iya: Asia/Jakarta, Nadine: Asia/Manila). Falls back to the device zone.
+ * render already uses it (Iya and Rizka: Asia/Jakarta, Nadine: Asia/Manila). Falls back to the device zone.
  */
 export function appTimeZone(): string | undefined {
   if (typeof document === "undefined") return undefined;

@@ -40,7 +40,7 @@ export const keys = {
 
 export type ProfileInfo = { id: string; name: string; tz: string; fiat: import("@/lib/fiat").Fiat };
 
-/** The signed-in profile (Iya's "default" or profile 2) and its display name. */
+/** The signed-in profile (Iya's "default", Nadine's p2 or Rizka's p3) and its display name. */
 export function useProfile() {
   return useQuery({ queryKey: keys.profile, queryFn: () => api<ProfileInfo>("/api/profile"), staleTime: 5 * 60_000 });
 }
