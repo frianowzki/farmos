@@ -12,7 +12,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { toast } from "@/lib/client/toast";
 
-import { Button, NativeSelect, Pill } from "@/components/ui";
+import { Button, Dialog, NativeSelect, Pill } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import { api, keys, useAiConfig, useCreateProject, useProjects } from "@/lib/client/api";
 
@@ -61,7 +61,7 @@ export function AssistantView() {
 
   const ready = !threadParam || thread.isFetched;
   return (
-    <div className="flex h-[calc(100dvh-48px)] md:h-dvh">
+    <div className="flex h-[calc(100dvh-48px-env(safe-area-inset-top))] md:h-dvh">
       <div className="flex min-w-0 flex-1 flex-col">
         {ready ? (
           <Chat
@@ -89,13 +89,39 @@ function Threads({ current, open, onClose, onNew }: { current: string; open: boo
   const qc = useQueryClient();
   const { data } = useQuery({ queryKey: keys.threads, queryFn: () => api<{ threads: { id: string; title: string; mode: string; updatedAt: string }[] }>("/api/threads") });
   const list = data?.threads ?? [];
+  const [confirm, setConfirm] = useState<{ id: string; title: string } | "all" | null>(null);
+  const [busy, setBusy] = useState(false);
+  const doDelete = async () => {
+    if (!confirm) return;
+    setBusy(true);
+    try {
+      if (confirm === "all") {
+        await api("/api/threads", { method: "DELETE" });
+        qc.removeQueries({ queryKey: ["thread"] });
+        onNew();
+        toast.success("History cleared");
+      } else {
+        await api(`/api/threads/${confirm.id}`, { method: "DELETE" });
+        qc.removeQueries({ queryKey: ["thread", confirm.id] });
+        if (confirm.id === current) onNew();
+        toast.success("Thread deleted");
+      }
+      qc.invalidateQueries({ queryKey: keys.threads });
+      setConfirm(null);
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
   useEffect(() => {
-    if (!open) return;
+    if (!open || confirm) return;
     const k = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", k);
     return () => window.removeEventListener("keydown", k);
-  }, [open, onClose]);
+  }, [open, onClose, confirm]);
   return (
+    <>
     <AnimatePresence initial={false}>
       {open && <motion.div key="scrim" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-40 bg-black/20 lg:hidden" onClick={onClose} />}
       {open && (
@@ -105,7 +131,7 @@ function Threads({ current, open, onClose, onNew }: { current: string; open: boo
         animate={{ width: 272, opacity: 1 }}
         exit={{ width: 0, opacity: 0 }}
         transition={{ type: "spring", stiffness: 420, damping: 40 }}
-        className="fixed inset-y-0 right-0 z-50 flex shrink-0 flex-col overflow-hidden border-l border-line bg-sidebar lg:static lg:z-auto"
+        className="fixed inset-y-0 right-0 z-50 flex shrink-0 flex-col overflow-hidden border-l border-line bg-sidebar pt-[env(safe-area-inset-top)] lg:static lg:z-auto lg:pt-0"
       >
         <div className="flex w-[272px] items-center justify-between gap-1 px-3 py-3">
           <span className="text-[12px] font-medium text-muted">Threads</span>
@@ -122,19 +148,40 @@ function Threads({ current, open, onClose, onNew }: { current: string; open: boo
                 <div className="truncate text-[13px] text-ink-2">{t.title}</div>
                 <div className="text-[11px] capitalize text-faint">{MODES.find((m) => m.id === t.mode)?.label ?? t.mode} · {new Date(t.updatedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</div>
               </Link>
+              {/* Always visible on touch screens; hover-reveal only where there is a mouse. */}
               <button
-                onClick={async () => { await api(`/api/threads/${t.id}`, { method: "DELETE" }); qc.invalidateQueries({ queryKey: keys.threads }); if (t.id === current) onNew(); }}
-                className="mr-1 rounded p-1 text-faint opacity-0 hover:text-neg group-hover:opacity-100"
-                aria-label="Delete thread"
+                type="button"
+                onClick={() => setConfirm({ id: t.id, title: t.title })}
+                className="mr-1 grid h-9 w-9 shrink-0 place-items-center rounded-md text-faint hover:bg-active hover:text-neg focus-visible:opacity-100 [@media(hover:hover)]:h-7 [@media(hover:hover)]:w-7 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100"
+                aria-label={`Delete thread “${t.title}”`}
               >
                 <Trash2 className="h-3.5 w-3.5" />
               </button>
             </div>
           ))}
         </div>
+        {list.length > 0 && (
+          <div className="w-[272px] border-t border-line px-2 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+            <Button size="sm" variant="danger" className="h-9 w-full justify-start sm:h-8" onClick={() => setConfirm("all")}>
+              <Trash2 className="h-3.5 w-3.5" /> Clear all history
+            </Button>
+          </div>
+        )}
       </motion.aside>
       )}
     </AnimatePresence>
+    <Dialog open={Boolean(confirm)} onClose={() => !busy && setConfirm(null)} title={confirm === "all" ? "Clear all history?" : "Delete thread?"} width={420}>
+      <p className="text-[13.5px] text-ink-2">
+        {confirm === "all" ? `All ${list.length} saved conversation${list.length === 1 ? "" : "s"} will be deleted. This can't be undone.` : <>“<span className="font-medium text-ink">{confirm?.title}</span>” will be deleted. This can&apos;t be undone.</>}
+      </p>
+      <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+        <Button className="h-10 sm:h-8" onClick={() => setConfirm(null)} disabled={busy}>Cancel</Button>
+        <Button variant="primary" className="h-10 bg-neg hover:not-disabled:bg-neg/90 sm:h-8" onClick={doDelete} disabled={busy}>
+          {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />} {confirm === "all" ? "Clear all" : "Delete"}
+        </Button>
+      </div>
+    </Dialog>
+    </>
   );
 }
 
@@ -316,7 +363,7 @@ function Chat({ id, initialMessages, initialMode, initialProject, initialQuery, 
             </motion.div>
           </div>
           {/* Suggestions sit right above the composer, which is pinned to the bottom like a chat app. */}
-          <div className="px-3 pb-3 pt-1 sm:px-6">
+          <div className="px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-1 sm:px-6">
             <div className="mx-auto max-w-[760px]">
               <div className="-mx-1 mb-2.5 flex gap-2 overflow-x-auto px-1 pb-0.5 [scrollbar-width:none] sm:grid sm:grid-cols-2 sm:overflow-visible">
                 {SUGGEST[mode](projectName).map((sug, i) => {
@@ -356,7 +403,7 @@ function Chat({ id, initialMessages, initialMode, initialProject, initialQuery, 
               {error && <div className="rounded-xl border border-line bg-panel p-3 text-[13px] text-neg">{error.message}</div>}
             </div>
           </div>
-          <div className="px-3 pb-3 pt-1 sm:px-6">
+          <div className="px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-1 sm:px-6">
             <div className="mx-auto max-w-[760px]">{composer()}</div>
             <p className="mx-auto mt-1.5 max-w-[760px] text-center text-[11px] text-faint">Research only. Never shares keys, never sends transactions. Verify before you ape.</p>
           </div>

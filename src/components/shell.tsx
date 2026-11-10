@@ -147,7 +147,7 @@ function SidebarBody() {
 
   return (
     <>
-      <AnimatedSidebarHeader className="gap-2 px-3 pb-1 pt-3">
+      <AnimatedSidebarHeader className="gap-2 px-3 pb-1 pt-[max(0.75rem,env(safe-area-inset-top))]">
         <div className={cn("flex items-center", collapsed ? "justify-center" : "justify-between")}>
           {!collapsed && (
             <Link href="/" className="rounded px-1">
@@ -218,7 +218,7 @@ function SidebarBody() {
           </AnimatedSidebarGroup>
         )}
       </AnimatedSidebarContent>
-      <AnimatedSidebarFooter className="gap-2 border-line p-2">
+      <AnimatedSidebarFooter className="gap-2 border-line p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
         <AnimatedSidebarMenu>
           <AnimatedSidebarMenuItem>
             <AnimatedSidebarMenuButton href="/settings" isActive={isActive("/settings")} icon={icon(Settings2)} className={btn}>Settings</AnimatedSidebarMenuButton>

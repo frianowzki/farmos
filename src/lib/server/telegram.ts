@@ -4,7 +4,8 @@ import { db, schema } from "@/db";
 import { addDays, diffDays } from "@/lib/dates";
 import { isDue, isSatisfied, taskStreak } from "@/lib/streak";
 import { getSetting, setSetting } from "./settings";
-import { dayIn, timeIn, APP_TZ } from "./tz";
+import { dayIn, timeIn } from "./tz";
+import { getProfileTz } from "./settings";
 
 export type NotifySettings = {
   chatId?: string | null;
@@ -91,12 +92,14 @@ export async function findStartChat(linkToken: string): Promise<{ chatId: string
 
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
-export type Digest = { sections: { title: string; lines: string[] }[]; empty: boolean };
+export type Digest = { sections: { title: string; lines: string[] }[]; empty: boolean; day: string; tz: string };
 
 /** Builds the daily digest from live data. Pure read. */
 export async function buildDigest(pid: string, n: NotifySettings, now = new Date()): Promise<Digest> {
   const d = db();
-  const today = dayIn(now);
+  // Day boundary, dates and times follow this profile's zone.
+  const tz = await getProfileTz(pid);
+  const today = dayIn(now, tz);
   const sections: Digest["sections"] = [];
   const appUrl = process.env.APP_URL || "";
 
@@ -108,7 +111,7 @@ export async function buildDigest(pid: string, n: NotifySettings, now = new Date
       .map((m) => {
         const h = Math.max(0, Math.round((+m.startTime! - +now) / 3600_000));
         const wl = m.manualStatus && m.manualStatus !== "unknown" ? ` · WL: ${esc(m.manualStatus)}` : "";
-        return `• <b>${esc(m.name || m.slug)}</b> in ~${h}h (${timeIn(m.startTime!)} ${tzLabel()})${wl}`;
+        return `• <b>${esc(m.name || m.slug)}</b> in ~${h}h (${timeIn(m.startTime!, tz)} ${tzLabel(tz)})${wl}`;
       });
     const projects = await d.select({ name: schema.projects.name, keyDates: schema.projects.keyDates, status: schema.projects.status }).from(schema.projects).where(eq(schema.projects.profileId, pid));
     for (const p of projects) {
@@ -166,15 +169,16 @@ export async function buildDigest(pid: string, n: NotifySettings, now = new Date
   }
 
   if (appUrl && sections.length) sections.push({ title: "", lines: [`<a href="${esc(appUrl)}">Open farmOS</a>`] });
-  return { sections, empty: sections.length === 0 };
+  return { sections, empty: sections.length === 0, day: today, tz };
 }
 
-function tzLabel() {
-  return APP_TZ === "Asia/Jakarta" ? "WIB" : APP_TZ;
+const ZONE_NAMES: Record<string, string> = { "Asia/Jakarta": "WIB", "Asia/Makassar": "WITA", "Asia/Jayapura": "WIT", "Asia/Manila": "PHT" };
+function tzLabel(tz: string) {
+  return ZONE_NAMES[tz] ?? tz;
 }
 
-export function renderDigest(dg: Digest, now = new Date()) {
-  const head = `<b>farmOS · ${dayIn(now)}</b>`;
+export function renderDigest(dg: Digest) {
+  const head = `<b>farmOS · ${dg.day}</b>`;
   if (dg.empty) return `${head}\nNothing due today. Clear desk.`;
   return [head, ...dg.sections.map((s) => (s.title ? `\n<b>${esc(s.title)}</b>\n` : "\n") + s.lines.join("\n"))].join("\n");
 }

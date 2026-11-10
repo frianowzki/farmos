@@ -3,7 +3,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, ChevronRight, ExternalLink, KeyRound, Monitor, Moon, RefreshCw, ShieldAlert, Sun, Trash2 } from "lucide-react";
 import { signIn } from "next-auth/react";
 import { useTheme } from "next-themes";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { dailyRunLabel } from "@/lib/dates";
 import { BrandIcon, type BrandId } from "@/components/brand";
 import { Marker } from "@/components/panelui/marker";
 import { toast } from "@/lib/client/toast";
@@ -43,7 +44,7 @@ export function SettingsView({ appUrl, allowedEmail }: { appUrl: string; allowed
           <a key={id} href={`#${id}`} className="shrink-0 rounded-md px-2.5 py-1 text-muted transition-colors hover:bg-hover hover:text-ink">{label}</a>
         ))}
       </nav>
-      {profile.data ? <ProfileForm key={profile.data.name} data={profile.data} /> : <Section id="profile" title="Profile"><div className="h-16 animate-pulse rounded-lg bg-hover" /></Section>}
+      {profile.data ? <ProfileForm key={`${profile.data.name}|${profile.data.tz}`} data={profile.data} /> : <Section id="profile" title="Profile"><div className="h-16 animate-pulse rounded-lg bg-hover" /></Section>}
       <Section id="appearance" title="Appearance" desc="Auto follows your system setting.">
         <div className="grid max-w-md grid-cols-3 gap-2">
           {[
@@ -103,13 +104,26 @@ function SoundSection() {
 function ProfileForm({ data }: { data: ProfileInfo }) {
   const qc = useQueryClient();
   const [name, setName] = useState(data.name);
+  const [tz, setTz] = useState(data.tz);
   const [busy, setBusy] = useState(false);
+  const zones = useMemo(() => {
+    const all = typeof Intl.supportedValuesOf === "function" ? Intl.supportedValuesOf("timeZone") : [];
+    return all.includes(data.tz) ? all : [data.tz, ...all];
+  }, [data.tz]);
+  const dirty = name.trim() !== data.name || tz !== data.tz;
   const save = async () => {
+    if (!dirty || !name.trim()) return;
     setBusy(true);
     try {
-      await api("/api/profile", { method: "PUT", body: { name } });
+      await api("/api/profile", { method: "PUT", body: { name, tz } });
+      if (tz !== data.tz) {
+        // "Today", streaks and the clock are computed client-side from the zone cookie: reload once.
+        sessionStorage.setItem("frio_tz_reload", tz);
+        window.location.reload();
+        return;
+      }
       qc.invalidateQueries({ queryKey: keys.profile });
-      toast.success("Name saved");
+      toast.success("Profile saved");
     } catch (e) {
       toast.error((e as Error).message);
     } finally {
@@ -117,10 +131,15 @@ function ProfileForm({ data }: { data: ProfileInfo }) {
     }
   };
   return (
-    <Section id="profile" title="Profile" desc="Your name in greetings. Each profile has its own projects, wallets, tasks and settings.">
-      <div className="flex max-w-md items-end gap-2">
-        <div className="flex-1"><Field label="Display name"><Input value={name} maxLength={40} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && save()} /></Field></div>
-        <Button variant="primary" onClick={save} disabled={busy || !name.trim() || name.trim() === data.name}>Save</Button>
+    <Section id="profile" title="Profile" desc="Your name in greetings and your time zone for the clock, “today”, streaks, recaps and the daily digest. Each profile has its own data.">
+      <div className="grid max-w-md gap-3">
+        <Field label="Display name"><Input value={name} maxLength={40} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && save()} /></Field>
+        <Field label="Time zone" hint={`Daily digest and backup run at ${dailyRunLabel(tz)}.`}>
+          <select value={tz} onChange={(e) => setTz(e.target.value)} className="num h-9 w-full rounded-md border border-line bg-panel px-2 text-[13.5px] text-ink focus:border-line-strong focus:outline-none focus:ring-2 focus:ring-[var(--ring)] sm:h-8">
+            {zones.map((z) => <option key={z} value={z}>{z.replace(/_/g, " ")}</option>)}
+          </select>
+        </Field>
+        <div><Button variant="primary" onClick={save} disabled={busy || !name.trim() || !dirty}>Save</Button></div>
       </div>
     </Section>
   );

@@ -32,6 +32,51 @@ export function weekStart(day: string): string {
   return addDays(day, -wd);
 }
 
+/**
+ * The signed-in profile's zone, mirrored into a readable cookie at login so the very first
+ * render already uses it (Iya: Asia/Jakarta, Nadine: Asia/Manila). Falls back to the device zone.
+ */
+export function appTimeZone(): string | undefined {
+  if (typeof document === "undefined") return undefined;
+  const m = document.cookie.match(/(?:^|; )frio_tz=([^;]+)/);
+  if (!m) return undefined;
+  const tz = decodeURIComponent(m[1]);
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: tz });
+    return tz;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Calendar day of an instant in the profile's zone. */
+export function dayInZone(d: Date, tz = appTimeZone()): string {
+  if (!tz) return toDay(d);
+  return new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" }).format(d);
+}
+
+/** Wall-clock parts of an instant in the profile's zone. */
+export function clockInZone(d: Date, tz = appTimeZone()) {
+  const f = new Intl.DateTimeFormat("en-US", { timeZone: tz, hourCycle: "h23", hour: "2-digit", minute: "2-digit", second: "2-digit", weekday: "long", month: "long", day: "numeric", year: "numeric", timeZoneName: "short" });
+  const p = Object.fromEntries(f.formatToParts(d).map((x) => [x.type, x.value]));
+  return { h: Number(p.hour) % 24, m: Number(p.minute), s: Number(p.second), weekday: p.weekday, month: p.month, day: p.day, year: Number(p.year), tzName: p.timeZoneName ?? "" };
+}
+
+/** Intl prints offsets like "GMT+8" for these; show the names people use locally. */
+const ZONE_NAMES: Record<string, string> = { "Asia/Jakarta": "WIB", "Asia/Pontianak": "WIB", "Asia/Makassar": "WITA", "Asia/Jayapura": "WIT", "Asia/Manila": "PHT" };
+export function zoneLabel(tz = appTimeZone(), fallback = ""): string {
+  if (tz && ZONE_NAMES[tz]) return ZONE_NAMES[tz];
+  if (fallback) return fallback;
+  return new Intl.DateTimeFormat("en-US", { timeZone: tz, timeZoneName: "short" }).formatToParts(new Date()).find((p) => p.type === "timeZoneName")?.value ?? "";
+}
+
+/** Local time of the daily 00:00 UTC cron (digest, backup) in a zone, e.g. "07:00 WIB" / "08:00 PHT". */
+export function dailyRunLabel(tz = appTimeZone()): string {
+  const at = new Date(Date.UTC(2026, 0, 15, 0, 0));
+  const t = new Intl.DateTimeFormat("en-GB", { timeZone: tz, hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(at);
+  return `${t} ${zoneLabel(tz)}`;
+}
+
 export function today(): string {
-  return toDay(new Date());
+  return dayInZone(new Date());
 }

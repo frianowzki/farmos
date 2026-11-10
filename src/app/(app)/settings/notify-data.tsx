@@ -1,5 +1,6 @@
 "use client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { dailyRunLabel } from "@/lib/dates";
 import { Archive, Bell, Download, FileUp, RefreshCw, Send, Unlink } from "lucide-react";
 import { useRef, useState } from "react";
 import { BrandIcon } from "@/components/brand";
@@ -43,7 +44,7 @@ export function NotifySection() {
   if (!data) return <Section id="notifications" title="Notifications"><div className="h-32 animate-pulse rounded-lg bg-hover" /></Section>;
 
   return (
-    <Section id="notifications" title="Notifications" desc={<>Daily Telegram digest at 07:00 WIB via {data.botUsername ? <span className="num">@{data.botUsername}</span> : "your bot"}. Read-only: the bot only sends you messages.</>}>
+    <Section id="notifications" title="Notifications" desc={<>Daily Telegram digest at {dailyRunLabel()} via {data.botUsername ? <span className="num">@{data.botUsername}</span> : "your bot"}. Read-only: the bot only sends you messages.</>}>
       {!data.configured ? (
         <div className="max-w-xl rounded-lg border border-dashed border-line px-4 py-4 text-[13px] text-muted">Set <span className="num">TELEGRAM_BOT_TOKEN</span> on Vercel to enable notifications.</div>
       ) : (
@@ -193,7 +194,7 @@ export function DataSection() {
           ) : !bk.configured ? (
             <div className="rounded-lg border border-dashed border-line px-3 py-3 text-[13px] text-muted">Blob storage is not set up.</div>
           ) : bk.backups.length === 0 ? (
-            <div className="rounded-lg border border-dashed border-line px-3 py-3 text-[13px] text-muted">No snapshots yet. One is saved every day at 07:00 WIB, newest {bk.keep} kept.</div>
+            <div className="rounded-lg border border-dashed border-line px-3 py-3 text-[13px] text-muted">No snapshots yet. One is saved every day at {dailyRunLabel()}, newest {bk.keep} kept.</div>
           ) : (
             <div className="divide-y divide-line rounded-lg border border-line bg-panel">
               {bk.backups.map((b) => (

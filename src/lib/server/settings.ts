@@ -3,7 +3,7 @@ import { and, eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { decrypt, encrypt } from "./crypto";
 import { maskSecret } from "./mask";
-import { DEFAULT_PROFILE_NAME, type ProfileId } from "@/lib/profiles";
+import { DEFAULT_PROFILE_NAME, DEFAULT_PROFILE_TZ, isProfileId, isTimeZone, type ProfileId } from "@/lib/profiles";
 
 type StoredAi = { baseUrl?: string; model?: string; apiKeyEnc?: string; tools?: boolean };
 
@@ -20,15 +20,32 @@ export async function setSetting(pid: string, key: string, value: unknown) {
     .onConflictDoUpdate({ target: [schema.settings.profileId, schema.settings.key], set: { value, updatedAt: new Date() } });
 }
 
+type StoredProfile = { name?: string; tz?: string };
+
 /** Display name of a profile (Settings → Profile). */
 export async function getProfileName(pid: ProfileId): Promise<string> {
-  const v = await getSetting<{ name?: string }>(pid, "profile");
-  return v?.name?.trim() || DEFAULT_PROFILE_NAME[pid];
+  return (await getProfileInfo(pid)).name;
 }
 
-export async function setProfileName(pid: ProfileId, name: string) {
-  await setSetting(pid, "profile", { name: name.trim().slice(0, 40) });
+/** Name + time zone of a profile, with per-profile defaults (Iya: Asia/Jakarta, Nadine: Asia/Manila). */
+export async function getProfileInfo(pid: ProfileId): Promise<{ name: string; tz: string }> {
+  const v = (await getSetting<StoredProfile>(pid, "profile")) ?? {};
+  return { name: v.name?.trim() || DEFAULT_PROFILE_NAME[pid], tz: isTimeZone(v.tz) ? v.tz : DEFAULT_PROFILE_TZ[pid] };
 }
+
+/** Zone used for a profile's day boundary on the server (digest, backups). */
+export async function getProfileTz(pid: string): Promise<string> {
+  return isProfileId(pid) ? (await getProfileInfo(pid)).tz : DEFAULT_PROFILE_TZ.default;
+}
+
+export async function saveProfileInfo(pid: ProfileId, patch: { name?: string; tz?: string }) {
+  const cur = (await getSetting<StoredProfile>(pid, "profile")) ?? {};
+  const next: StoredProfile = { ...cur };
+  if (patch.name !== undefined) next.name = patch.name.trim().slice(0, 40);
+  if (patch.tz !== undefined && isTimeZone(patch.tz)) next.tz = patch.tz;
+  await setSetting(pid, "profile", next);
+}
+
 
 export type AiConfig = { baseUrl: string; model: string; apiKey: string | null; source: "settings" | "env" | "none" };
 

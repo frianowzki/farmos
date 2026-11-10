@@ -10,7 +10,7 @@ import { Timeline, type TimelineEvent } from "@/components/motion/timeline";
 import { BarChart } from "@/components/panelui/bar-chart";
 import { EmptyState } from "@/components/panelui/empty-state";
 import { useDiary, useProjects, useTasks } from "@/lib/client/api";
-import { addDays, today } from "@/lib/dates";
+import { addDays, dayInZone, today } from "@/lib/dates";
 
 const fmtDay = (d: string, o: Intl.DateTimeFormatOptions = { weekday: "short", month: "short", day: "numeric" }) => new Date(`${d}T00:00:00`).toLocaleDateString(undefined, o);
 const plain = (html: string) => html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
@@ -45,7 +45,7 @@ export function RecapView() {
       if (slot) slot.diary.push({ id: e.id, title: e.title || "Untitled", text: plain(e.content).slice(0, 160), projects: e.projectIds.map((id) => projById.get(id)?.name ?? "").filter(Boolean) });
     }
     for (const p of projects.data?.projects ?? []) {
-      const d = new Date(p.createdAt).toLocaleDateString("en-CA");
+      const d = dayInZone(new Date(p.createdAt));
       per.get(d)?.created.push({ id: p.id, name: p.name, accent: p.accent ?? null });
     }
     return per;

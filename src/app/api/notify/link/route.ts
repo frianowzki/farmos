@@ -3,6 +3,8 @@ import { NextResponse } from "next/server";
 import { db, schema } from "@/db";
 import { and, eq } from "drizzle-orm";
 import { bad, readJson, requireProfile } from "@/lib/server/guard";
+import { getProfileTz } from "@/lib/server/settings";
+import { dailyRunLabel } from "@/lib/dates";
 import { findStartChat, getNotify, publicNotify, saveNotify, sendTelegram } from "@/lib/server/telegram";
 
 /** Step 1: mint a one-time token and return the t.me deep link. */
@@ -45,6 +47,6 @@ export async function PUT() {
   }
   if (!hit) return NextResponse.json({ ...publicNotify(n), waiting: true });
   const next = await saveNotify(pid, { chatId: hit.chatId, chatName: hit.name, linkToken: null });
-  await sendTelegram(hit.chatId, "farmOS notifications are linked to this chat. Daily digest arrives at 07:00 WIB.").catch(() => null);
+  await sendTelegram(hit.chatId, `farmOS notifications are linked to this chat. Daily digest arrives at ${dailyRunLabel(await getProfileTz(pid))}.`).catch(() => null);
   return NextResponse.json(publicNotify(next));
 }

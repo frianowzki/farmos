@@ -14,3 +14,11 @@ export async function GET() {
     .limit(100);
   return NextResponse.json({ threads });
 }
+
+/** Clear all chat history of the signed-in profile (never another profile's). */
+export async function DELETE() {
+  const pid = await requireProfile();
+  if (pid instanceof NextResponse) return pid;
+  const gone = await db().delete(schema.chatThreads).where(eq(schema.chatThreads.profileId, pid)).returning({ id: schema.chatThreads.id });
+  return NextResponse.json({ ok: true, deleted: gone.length });
+}

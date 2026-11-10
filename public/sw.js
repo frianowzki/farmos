@@ -1,5 +1,6 @@
-/* farmOS service worker: offline app shell only. API responses and pages with data are never cached. */
-const VERSION = "farmos-v1";
+/* farmOS service worker: offline app shell only. API responses and HTML pages are never cached. */
+// Bump on every SW change: activate deletes every other cache, so stale CSS/JS from old builds goes away.
+const VERSION = "farmos-v3";
 const SHELL = ["/offline.html", "/icon.svg", "/icons/icon-192.png", "/icons/icon-512.png"];
 
 self.addEventListener("install", (e) => {
@@ -12,6 +13,18 @@ self.addEventListener("activate", (e) => {
   );
 });
 
+self.addEventListener("message", (e) => {
+  if (e.data === "skipWaiting") self.skipWaiting();
+});
+
+const put = (req, res) => {
+  if (res.ok && res.type === "basic") {
+    const copy = res.clone();
+    caches.open(VERSION).then((c) => c.put(req, copy));
+  }
+  return res;
+};
+
 self.addEventListener("fetch", (e) => {
   const req = e.request;
   if (req.method !== "GET") return;
@@ -19,25 +32,18 @@ self.addEventListener("fetch", (e) => {
   if (url.origin !== self.location.origin) return;
   if (url.pathname.startsWith("/api/")) return; // private data: always network
 
-  // Navigations: network first, offline page when the network is gone.
+  // Navigations (HTML): always network, never cached. Offline page only when the network is gone.
   if (req.mode === "navigate") {
-    e.respondWith(fetch(req).catch(() => caches.match("/offline.html")));
+    e.respondWith(fetch(req, { cache: "no-store" }).catch(() => caches.match("/offline.html")));
     return;
   }
-  // Immutable build assets and icons: cache first.
-  if (url.pathname.startsWith("/_next/static/") || url.pathname.startsWith("/icons/") || url.pathname.startsWith("/brands/") || url.pathname === "/icon.svg") {
-    e.respondWith(
-      caches.match(req).then(
-        (hit) =>
-          hit ||
-          fetch(req).then((res) => {
-            if (res.ok) {
-              const copy = res.clone();
-              caches.open(VERSION).then((c) => c.put(req, copy));
-            }
-            return res;
-          }),
-      ),
-    );
+  // Content-hashed build assets are immutable: cache first is safe.
+  if (url.pathname.startsWith("/_next/static/")) {
+    e.respondWith(caches.match(req).then((hit) => hit || fetch(req).then((res) => put(req, res))));
+    return;
+  }
+  // Icons and brand marks are not hashed: network first, cache only as an offline fallback.
+  if (url.pathname.startsWith("/icons/") || url.pathname.startsWith("/brands/") || url.pathname === "/icon.svg") {
+    e.respondWith(fetch(req).then((res) => put(req, res)).catch(() => caches.match(req)));
   }
 });

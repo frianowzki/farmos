@@ -6,6 +6,7 @@ import type { PgColumn } from "drizzle-orm/pg-core";
 import type { PgTable } from "drizzle-orm/pg-core";
 import { db, schema } from "@/db";
 import { dayIn } from "./tz";
+import { getProfileTz } from "./settings";
 export { toCsv } from "@/lib/csv";
 
 /**
@@ -157,7 +158,7 @@ export const KEEP = 7;
 export async function snapshotToBlob(pid: string, now = new Date()) {
   if (!process.env.BLOB_READ_WRITE_TOKEN) throw new Error("BLOB_READ_WRITE_TOKEN missing");
   const b = await collectBackup(pid);
-  const name = `${backupPrefix(pid)}farmos-${dayIn(now)}.json`;
+  const name = `${backupPrefix(pid)}farmos-${dayIn(now, await getProfileTz(pid))}.json`;
   const blob = await put(name, JSON.stringify(b), { access: "private", contentType: "application/json", addRandomSuffix: false, allowOverwrite: true });
   const pruned = await pruneBackups(pid);
   return { pathname: blob.pathname, size: JSON.stringify(b).length, pruned, counts: summarize(b) };

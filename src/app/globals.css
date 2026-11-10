@@ -190,6 +190,19 @@ button, a, input, textarea, select, label, [role="button"] {
     -webkit-tap-highlight-color: transparent;
   }
 }
+/* Installed app (standalone PWA): no rubber-band overscroll revealing blank space under the
+   translucent status bar, and the page always fills the visible screen. */
+@media (display-mode: standalone) {
+  html,
+  body {
+    overscroll-behavior-y: none;
+  }
+  body {
+    min-height: 100dvh;
+    -webkit-touch-callout: none;
+  }
+}
+
 ::selection {
   background: var(--accent-soft);
 }

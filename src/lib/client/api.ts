@@ -38,7 +38,7 @@ export const keys = {
   profile: ["profile"] as QueryKey,
 };
 
-export type ProfileInfo = { id: string; name: string };
+export type ProfileInfo = { id: string; name: string; tz: string };
 
 /** The signed-in profile (Iya's "default" or profile 2) and its display name. */
 export function useProfile() {

@@ -81,9 +81,9 @@ const dialogVariants = tv({
   slots: {
     backdrop:
       'fixed inset-0 z-50 bg-black/40 transition-opacity duration-200 data-ending-style:opacity-0 data-starting-style:opacity-0 motion-reduce:transition-none',
-    viewport: 'fixed inset-0 z-50 grid place-items-center overflow-hidden p-4 max-sm:items-end max-sm:p-2',
+    viewport: 'fixed inset-0 z-50 grid place-items-center overflow-hidden p-4 max-sm:items-end max-sm:p-2 max-sm:pb-[max(0.5rem,env(safe-area-inset-bottom))] max-sm:pt-[max(0.5rem,env(safe-area-inset-top))]',
     shell: [
-      'relative flex max-h-[calc(100dvh-2rem)] w-full min-h-0 flex-col text-popover-foreground outline-none max-sm:max-h-[calc(100dvh-1rem)]',
+      'relative flex max-h-[calc(100dvh-2rem)] w-full min-h-0 flex-col text-popover-foreground outline-none max-sm:max-h-[calc(100dvh-1rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))]',
       // A dialog opened from this one steps it back, smaller and veiled, so
       // the depth can be counted.
       'origin-top scale-[calc(1-0.05*var(--nested-dialogs,0))] translate-y-[calc(-0.75rem*var(--nested-dialogs,0))]',

@@ -1,22 +1,40 @@
 import { NextResponse } from "next/server";
 import { bad, readJson, requireProfile } from "@/lib/server/guard";
-import { getProfileName, setProfileName } from "@/lib/server/settings";
+import { getProfileInfo, saveProfileInfo } from "@/lib/server/settings";
+import { isTimeZone, TZ_COOKIE } from "@/lib/profiles";
+import { SESSION_TTL_SECONDS } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 
-/** The signed-in profile and its display name (used in greetings). */
+/** Readable (non-secret) mirror of the profile's zone so the client renders "today" correctly on first paint. */
+const withTz = (res: NextResponse, tz: string) => {
+  res.cookies.set(TZ_COOKIE, tz, { path: "/", sameSite: "lax", secure: process.env.NODE_ENV === "production", maxAge: SESSION_TTL_SECONDS });
+  return res;
+};
+
+/** The signed-in profile, its display name (greetings) and time zone. */
 export async function GET() {
   const pid = await requireProfile();
   if (pid instanceof NextResponse) return pid;
-  return NextResponse.json({ id: pid, name: await getProfileName(pid) });
+  const info = await getProfileInfo(pid);
+  return withTz(NextResponse.json({ id: pid, ...info }), info.tz);
 }
 
 export async function PUT(req: Request) {
   const pid = await requireProfile();
   if (pid instanceof NextResponse) return pid;
-  const { name } = await readJson<{ name?: string }>(req);
-  const n = String(name ?? "").replace(/\s+/g, " ").trim();
-  if (!n || n.length > 40) return bad("Name must be 1 to 40 characters");
-  await setProfileName(pid, n);
-  return NextResponse.json({ id: pid, name: await getProfileName(pid) });
+  const { name, tz } = await readJson<{ name?: string; tz?: string }>(req);
+  const patch: { name?: string; tz?: string } = {};
+  if (name !== undefined) {
+    const n = String(name).replace(/\s+/g, " ").trim();
+    if (!n || n.length > 40) return bad("Name must be 1 to 40 characters");
+    patch.name = n;
+  }
+  if (tz !== undefined) {
+    if (!isTimeZone(tz)) return bad("Unknown time zone");
+    patch.tz = tz;
+  }
+  await saveProfileInfo(pid, patch);
+  const info = await getProfileInfo(pid);
+  return withTz(NextResponse.json({ id: pid, ...info }), info.tz);
 }

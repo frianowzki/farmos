@@ -2,6 +2,7 @@
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useSyncExternalStore } from "react";
 import { ChromaticTextReveal } from "@/components/motion/chromatic-text-reveal";
+import { clockInZone, zoneLabel } from "@/lib/dates";
 
 const subscribe = (cb: () => void) => {
   const t = setInterval(cb, 1000);
@@ -42,14 +43,16 @@ export function TodayHeader({ name, line }: { name: string; line: React.ReactNod
   const sec = useSyncExternalStore(subscribe, nowSec, () => 0);
   const now = sec ? new Date(sec * 1000) : null;
   if (!now) return <div className="mb-8 h-[148px]" />;
-  const weekday = now.toLocaleDateString("en-US", { weekday: "long" });
-  const date = now.toLocaleDateString("en-US", { month: "long", day: "numeric" });
-  const year = now.getFullYear();
-  const hh = String(now.getHours()).padStart(2, "0");
-  const mm = String(now.getMinutes()).padStart(2, "0");
-  const ss = String(now.getSeconds()).padStart(2, "0");
-  const tz = new Intl.DateTimeFormat("en-US", { timeZoneName: "short" }).formatToParts(now).find((p) => p.type === "timeZoneName")?.value ?? "";
-  const dayPct = ((now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds()) / 86400) * 100;
+  // Clock, date and greeting follow the profile's zone, not the device's.
+  const c = clockInZone(now);
+  const weekday = c.weekday;
+  const date = `${c.month} ${c.day}`;
+  const year = c.year;
+  const hh = String(c.h).padStart(2, "0");
+  const mm = String(c.m).padStart(2, "0");
+  const ss = String(c.s).padStart(2, "0");
+  const tz = zoneLabel(undefined, c.tzName);
+  const dayPct = ((c.h * 3600 + c.m * 60 + c.s) / 86400) * 100;
   const words = `${weekday}, ${date}`.split(" ");
 
   return (
@@ -71,7 +74,7 @@ export function TodayHeader({ name, line }: { name: string; line: React.ReactNod
           </h1>
           <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.25 }} className="mt-2 font-serif text-[22px] leading-tight text-ink-2 sm:text-[26px]">
             <ChromaticTextReveal
-              prefix={`${greeting(now.getHours())},`}
+              prefix={`${greeting(c.h)},`}
               words={[...(name ? [`${name}.`] : []), "stay early.", "farm smart.", "ship daily."]}
               colors={["#a3e635", "#34d399", "#22d3ee", "#818cf8", "#f472b6"]}
               foregroundColor="var(--ink-2)"
