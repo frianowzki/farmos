@@ -1,7 +1,7 @@
 "use client";
 import { ProjectMark } from "@/components/project-mark";
 import { useQueryClient } from "@tanstack/react-query";
-import { AtSign, BadgeCheck, Banknote, CalendarDays, CalendarPlus, CalendarRange, ChevronRight, CircleDot, Coins, Flag, Gauge, Layers, Link2, Mail, MoreHorizontal, Palette, Pin, PinOff, Plus, RefreshCw, ScanSearch, ShieldAlert, Sparkles, Star, Tag, Telescope, Trash2, Wallet as WalletIcon, Waypoints } from "lucide-react";
+import { AtSign, BadgeCheck, Banknote, CalendarDays, CalendarPlus, CalendarRange, ChevronRight, CircleDot, Coins, Flag, Gauge, Layers, Link2, Mail, MoreHorizontal, Palette, Pin, PinOff, Plus, RefreshCw, ScanSearch, ShieldAlert, Sparkles, Star, Tag, Telescope, Trash2, Wallet as WalletIcon, Waypoints, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, type ReactNode } from "react";
@@ -12,7 +12,8 @@ import { Page } from "@/components/shell";
 import { ChainLabel } from "@/components/chain-logo";
 import { LinkIcon } from "@/components/icons/brand-glyphs";
 import { AddTask, TaskRow, useTaskModel } from "@/components/tasks";
-import { Button, Dialog, Empty, InlineText, Popover, SelectPill, Skeleton, TagInput } from "@/components/ui";
+import { Button, DateField, Dialog, Empty, InlineText, Popover, SelectPill, Skeleton, TagInput } from "@/components/ui";
+import { DeleteProjectDialog } from "@/components/delete-project";
 import { ColorSelector, ColorSelectorItem, ColorSelectorList } from "@/components/motion/color-selector";
 import { WheelPicker } from "@/components/motion/wheel-picker";
 import { Attachments } from "@/components/panelui/attachment";
@@ -138,6 +139,7 @@ function ProjectActions({ p }: { p: Project }) {
   const g = useGoogleStatus();
   const [open, setOpen] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [del, setDel] = useState(false);
   const [btn, setBtn] = useState<HTMLButtonElement | null>(null);
   const sync = async () => {
     setSyncing(true);
@@ -169,17 +171,12 @@ function ProjectActions({ p }: { p: Project }) {
         <MenuItem
           icon={<Trash2 className="h-4 w-4" />}
           danger
-          onClick={async () => {
-            if (!confirm(`Delete “${p.name}”? Positions and tasks go with it.`)) return;
-            await api(`/api/projects/${p.id}`, { method: "DELETE" });
-            qc.invalidateQueries({ queryKey: keys.projects });
-            qc.invalidateQueries({ queryKey: keys.tasks });
-            router.push("/projects");
-          }}
+          onClick={() => { setOpen(false); setDel(true); }}
         >
           Delete project
         </MenuItem>
       </Popover>
+      <DeleteProjectDialog project={p} open={del} onClose={() => setDel(false)} onDeleted={() => router.push("/projects")} />
     </div>
   );
 }
@@ -279,7 +276,7 @@ function Properties({ p, set, today }: { p: Project; set: (patch: Partial<Projec
 function DateCell({ value, onSave, today }: { value: string | null | undefined; onSave: (v: string | null) => void; today: string }) {
   return (
     <div className="flex items-center gap-2">
-      <div className="w-[150px]"><InlineText type="date" value={value ?? ""} onSave={(v) => onSave(v || null)} mono className="text-[13px]" /></div>
+      <div className="w-[186px]"><DateField value={value} onSave={onSave} className="text-[13px]" /></div>
       {value && <span className="text-[12px] text-faint">{relDay(value, today)}</span>}
     </div>
   );
@@ -617,13 +614,20 @@ function CampaignCell({ start, end, today, onSave }: { start: string | null; end
   const days = start && end ? Math.round((new Date(end).getTime() - new Date(start).getTime()) / 86_400_000) : null;
   return (
     <>
-      <button onClick={() => { setA(start ?? today); setB(end ?? addDays(start ?? today, 30)); setOpen(true); }} className="rounded px-1.5 py-1 text-left text-[13px] hover:bg-hover">
+      <div className="flex items-center gap-0.5">
+      <button onClick={() => { setA(start ?? today); setB(end ?? addDays(start ?? today, 30)); setOpen(true); }} className="min-h-[28px] rounded px-1.5 py-1 text-left text-[13px] hover:bg-hover">
         {start || end ? (
           <span className="num text-ink-2">{start ? fmtShort(start) : "…"} → {end ? fmtShort(end) : "…"}{days != null && <span className="ml-2 text-faint">{days}d</span>}</span>
         ) : (
           <span className="text-faint">Empty</span>
         )}
       </button>
+      {(start || end) && (
+        <button type="button" onClick={() => onSave(null, null)} className="grid h-9 w-9 shrink-0 place-items-center rounded-md text-faint hover:bg-hover hover:text-ink [@media(hover:hover)]:h-7 [@media(hover:hover)]:w-7" aria-label="Clear campaign dates" title="Clear dates">
+          <X className="h-3.5 w-3.5" />
+        </button>
+      )}
+      </div>
       <Dialog open={open} onClose={() => setOpen(false)} title="Campaign window" width={520}>
         <div className="grid grid-cols-2 gap-4">
           <div>

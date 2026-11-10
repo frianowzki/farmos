@@ -3,12 +3,13 @@ import { Checkbox } from "@/components/motion/checkbox";
 import { ProjectMark } from "@/components/project-mark";
 import { ChainLabel } from "@/components/chain-logo";
 import { AnimatePresence, motion } from "motion/react";
-import { ArrowUpRight, BadgeCheck, CalendarClock, ChevronDown, Columns3, Filter, LayoutList, Plus, Rows3, Search, SlidersHorizontal } from "lucide-react";
+import { ArrowUpRight, BadgeCheck, Trash2, CalendarClock, ChevronDown, Columns3, Filter, LayoutList, Plus, Rows3, Search, SlidersHorizontal } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
 import { Page, PageHeader, useShell } from "@/components/shell";
-import { Button, Empty, InlineText, NativeSelect, Pill, Popover, SelectPill, Skeleton } from "@/components/ui";
+import { Button, DateField, Empty, InlineText, NativeSelect, Pill, Popover, SelectPill, Skeleton } from "@/components/ui";
+import { DeleteProjectDialog } from "@/components/delete-project";
 import { cn } from "@/lib/cn";
 import { CATEGORIES, STATUSES } from "@/lib/constants";
 import { today as todayFn } from "@/lib/dates";
@@ -226,7 +227,7 @@ function TableView({ projects, pnl, today, showCat, onNew }: ViewProps & { onNew
                 <td className={td}><SelectPill value={p.tier} options={TIER_OPTS} onChange={(v) => set(p.id, { tier: v })} dot={false} /></td>
                 <td className={cn(td, "px-2")}><Rating value={p.rating} onChange={(v) => set(p.id, { rating: v })} size={12} /></td>
                 <td className={td}><SelectPill value={p.risk} options={RISK_OPTS} onChange={(v) => set(p.id, { risk: v })} /></td>
-                <td className={cn(td, "w-[130px]")}><InlineText type="date" value={p.deadline} onSave={(v) => set(p.id, { deadline: v || null })} mono className="text-[12.5px]" /></td>
+                <td className={cn(td, "w-[160px]")}><DateField value={p.deadline} onSave={(v) => set(p.id, { deadline: v })} className="text-[12.5px]" /></td>
                 <td className={cn(td, "num pr-2 text-right text-[13px] text-ink-2")}>{r.invested ? usd(r.invested, { compact: true }) : <span className="text-faint">—</span>}</td>
                 <td className={cn(td, "num pr-2 text-right text-[13px]", tone(r.net))}>{r.invested || r.realized ? usd(r.net, { sign: true, compact: true }) : <span className="text-faint">—</span>}</td>
                 <td className={cn(td, "num pr-3 text-right text-[13px]", tone(r.roi))}>{pct(r.roi)}</td>
@@ -251,8 +252,10 @@ function TableView({ projects, pnl, today, showCat, onNew }: ViewProps & { onNew
 /** Phones: no sideways table. Each project is a card; tap the chevron to unfold every field, stacked. */
 function MobileCards({ projects, pnl, today, showCat, set, onNew }: ViewProps & { set: (id: string, patch: Partial<Project>) => void; onNew: () => void }) {
   const [open, setOpen] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<{ id: string; name: string } | null>(null);
   return (
     <div className="space-y-2 md:hidden">
+      {deleting && <DeleteProjectDialog project={deleting} open onClose={() => setDeleting(null)} onDeleted={() => setOpen(null)} />}
       {projects.map((p) => {
         const r = pnl(p);
         const nd = nextDate(p, today);
@@ -290,11 +293,16 @@ function MobileCards({ projects, pnl, today, showCat, set, onNew }: ViewProps & 
                     {row("Tier", <SelectPill value={p.tier} options={TIER_OPTS} onChange={(v) => set(p.id, { tier: v })} dot={false} />)}
                     {row("Rating", <Rating value={p.rating} onChange={(v) => set(p.id, { rating: v })} size={14} />)}
                     {row("Risk", <SelectPill value={p.risk} options={RISK_OPTS} onChange={(v) => set(p.id, { risk: v })} />)}
-                    {row("Deadline", <InlineText type="date" value={p.deadline} onSave={(v) => set(p.id, { deadline: v || null })} mono className="text-right text-[12.5px]" />)}
+                    {row("Deadline", <DateField value={p.deadline} onSave={(v) => set(p.id, { deadline: v })} className="text-right text-[12.5px]" align="end" />)}
                     {row("Invested", <span className="num text-[13px] text-ink-2">{r.invested ? usd(r.invested, { compact: true }) : "—"}</span>)}
                     {row("Net PnL", <span className={cn("num text-[13px]", tone(r.net))}>{r.invested || r.realized ? usd(r.net, { sign: true, compact: true }) : "—"}</span>)}
                     {row("ROI", <span className={cn("num text-[13px]", tone(r.roi))}>{pct(r.roi)}</span>)}
-                    <Link href={`/projects/${p.id}`} className="mt-1.5 flex h-9 items-center justify-center gap-1 rounded-lg bg-hover text-[13px] font-medium text-ink">Open project <ArrowUpRight className="h-3.5 w-3.5" /></Link>
+                    <div className="mt-1.5 flex gap-2">
+                      <Link href={`/projects/${p.id}`} className="flex h-10 flex-1 items-center justify-center gap-1 rounded-lg bg-hover text-[13px] font-medium text-ink">Open project <ArrowUpRight className="h-3.5 w-3.5" /></Link>
+                      <button type="button" onClick={() => setDeleting({ id: p.id, name: p.name })} className="flex h-10 items-center justify-center gap-1.5 rounded-lg px-3 text-[13px] font-medium text-neg hover:bg-[var(--t-red-bg)]" aria-label={`Delete ${p.name}`}>
+                        <Trash2 className="h-3.5 w-3.5" /> Delete
+                      </button>
+                    </div>
                   </div>
                 </motion.div>
               )}

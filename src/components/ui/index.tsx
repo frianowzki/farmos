@@ -214,6 +214,26 @@ export function TagInput({ value, onChange, suggestions = [], placeholder = "Add
   );
 }
 
+/** Click-to-edit date with an always-visible clear button (touch screens have no reliable native "clear"). */
+export function DateField({ value, onSave, className, placeholder = "Empty", align }: { value: string | null | undefined; onSave: (v: string | null) => void; className?: string; placeholder?: string; align?: "end" }) {
+  return (
+    <div className={cn("flex min-w-0 items-center gap-0.5", align === "end" && "justify-end")}>
+      <div className="min-w-0 flex-1"><InlineText type="date" value={value ?? ""} onSave={(v) => onSave(v || null)} placeholder={placeholder} mono className={className} /></div>
+      {value ? (
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); onSave(null); }}
+          className="grid h-9 w-9 shrink-0 place-items-center rounded-md text-faint hover:bg-hover hover:text-ink [@media(hover:hover)]:h-7 [@media(hover:hover)]:w-7"
+          aria-label="Clear date"
+          title="Clear date"
+        >
+          <X className="h-3.5 w-3.5" />
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
 /** Click-to-edit text cell. */
 export function InlineText({ value, onSave, placeholder = "Empty", className, inputClassName, type = "text", mono }: { value: string | number | null | undefined; onSave: (v: string) => void; placeholder?: string; className?: string; inputClassName?: string; type?: string; mono?: boolean }) {
   const [editing, setEditing] = useState(false);

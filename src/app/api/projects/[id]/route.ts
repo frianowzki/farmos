@@ -45,6 +45,7 @@ export async function DELETE(_: Request, ctx: Ctx) {
   if (pid instanceof NextResponse) return pid;
   const { id } = await ctx.params;
   if (!isUuid(id)) return bad("not found", 404);
-  await db().delete(schema.projects).where(and(eq(schema.projects.profileId, pid), eq(schema.projects.id, id)));
+  const gone = await db().delete(schema.projects).where(and(eq(schema.projects.profileId, pid), eq(schema.projects.id, id))).returning({ id: schema.projects.id });
+  if (!gone.length) return bad("not found", 404);
   return NextResponse.json({ ok: true });
 }
