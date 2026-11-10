@@ -9,9 +9,10 @@ export type PickedCoin = Pick<CoinHit, "id" | "name" | "symbol" | "thumb">;
 
 export function CoinGlyph({ coin, size = 20 }: { coin: Pick<CoinHit, "symbol" | "thumb"> & { image?: string | null }; size?: number }) {
   const src = coin.thumb ?? coin.image ?? null;
-  if (src)
+  const [broken, setBroken] = useState<string | null>(null);
+  if (src && broken !== src)
     // eslint-disable-next-line @next/next/no-img-element
-    return <img src={src} alt="" width={size} height={size} className="shrink-0 rounded-full" style={{ width: size, height: size }} />;
+    return <img src={src} alt="" width={size} height={size} className="shrink-0 rounded-full bg-hover" style={{ width: size, height: size }} loading="lazy" referrerPolicy="no-referrer" onError={() => setBroken(src)} />;
   return (
     <span className="grid shrink-0 place-items-center rounded-full bg-hover font-label text-[9px] font-semibold text-muted" style={{ width: size, height: size }}>
       {coin.symbol.slice(0, 3)}

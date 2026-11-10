@@ -105,7 +105,7 @@ function ProfileForm({ data }: { data: ProfileInfo }) {
   const qc = useQueryClient();
   const [name, setName] = useState(data.name);
   const [tz, setTz] = useState(data.tz);
-  const [fiat, setFiat] = useState<string>(data.fiat ?? "idr");
+  const [fiat, setFiat] = useState<string>(data.fiat ?? "usd");
   const [busy, setBusy] = useState(false);
   const zones = useMemo(() => {
     const all = typeof Intl.supportedValuesOf === "function" ? Intl.supportedValuesOf("timeZone") : [];
@@ -140,8 +140,8 @@ function ProfileForm({ data }: { data: ProfileInfo }) {
             {zones.map((z) => <option key={z} value={z}>{z.replace(/_/g, " ")}</option>)}
           </select>
         </Field>
-        <Field label="Default currency" hint="Converter, watchlist and earnings show prices in this currency first.">
-          <NativeSelect value={fiat} onChange={setFiat} options={[{ id: "idr", label: "IDR · Rupiah" }, { id: "php", label: "PHP · Peso" }, { id: "usdt", label: "USDT" }, { id: "usd", label: "USD" }]} />
+        <Field label="Default currency" hint="The Convert card and earnings show this currency first.">
+          <NativeSelect value={fiat} onChange={setFiat} options={[{ id: "usd", label: "USD" }, { id: "usdt", label: "USDT" }, { id: "idr", label: "IDR · Rupiah" }, { id: "php", label: "PHP · Peso" }]} />
         </Field>
         <div><Button variant="primary" onClick={save} disabled={busy || !name.trim() || !dirty}>Save</Button></div>
       </div>

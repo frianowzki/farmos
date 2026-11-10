@@ -1,11 +1,11 @@
 "use client";
-import { ArrowRightLeft, ArrowUpRight, RefreshCw } from "lucide-react";
-import Link from "next/link";
+import { ArrowRightLeft, RefreshCw } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useMemo, useState } from "react";
 import { cn } from "@/lib/cn";
 import { FIAT_META, money, type Fiat } from "@/lib/fiat";
-import { useProfile } from "@/lib/client/api";
+import { api, useProfile } from "@/lib/client/api";
+import { useQuery } from "@tanstack/react-query";
 import { fmtInput, parseAmount, usePrices } from "@/lib/client/prices";
 import { CoinGlyph, TokenPicker, type PickedCoin } from "@/components/token-picker";
 import { Skeleton } from "@/components/ui";
@@ -28,7 +28,7 @@ type Src = { field: "token" | Fiat; raw: string };
 export function Converter({ compact }: { compact?: boolean }) {
   const profile = useProfile();
   const pid = profile.data?.id ?? "default";
-  const def: Fiat = profile.data?.fiat ?? (pid === "p2" ? "php" : "idr");
+  const def: Fiat = profile.data?.fiat ?? "usd";
   const [coin, setCoin] = useState<PickedCoin>(ETH);
   const [src, setSrc] = useState<Src>({ field: "token", raw: "1" });
   const [loaded, setLoaded] = useState(false);
@@ -46,6 +46,17 @@ export function Converter({ compact }: { compact?: boolean }) {
     if (loaded) localStorage.setItem(STORE(pid), JSON.stringify({ coin }));
   }, [coin, pid, loaded]);
 
+  // Coins restored from an older session may lack a logo: look it up once by id.
+  const logo = useQuery({
+    queryKey: ["coin-logo", coin.id],
+    queryFn: () => api<{ coins: { id: string; thumb: string | null }[] }>(`/api/prices/search?q=${encodeURIComponent(coin.id)}`).then((r) => r.coins.find((c) => c.id === coin.id)?.thumb ?? null),
+    enabled: !coin.thumb,
+    staleTime: Infinity,
+  });
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- fill the logo once it's known
+    if (!coin.thumb && logo.data) setCoin((c) => (c.id === coin.id ? { ...c, thumb: logo.data } : c));
+  }, [logo.data, coin.id, coin.thumb]);
   const prices = usePrices([coin.id]);
   const q = prices.data?.[coin.id];
   const fiats = compact ? [def] : fiatOrder(def);
@@ -106,7 +117,6 @@ export function Converter({ compact }: { compact?: boolean }) {
         <span className="flex items-center gap-2">
           {!compact && q && <span className="num">{new Date(q.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} · {q.source === "coingecko" ? "CoinGecko" : "DefiLlama"}</span>}
           <button type="button" onClick={() => prices.refetch()} className="rounded p-0.5 hover:text-ink" aria-label="Refresh price"><RefreshCw className={cn("h-3 w-3", prices.isFetching && "animate-spin")} /></button>
-          {compact && <Link href="/prices" className="flex items-center gap-0.5 hover:text-ink">Open <ArrowUpRight className="h-3 w-3" /></Link>}
         </span>
       </div>
     </div>

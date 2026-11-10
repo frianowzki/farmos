@@ -190,7 +190,7 @@ function ExportMenu() {
 function EarningsCard({ projects }: { projects: { id: string; name: string; accent?: string | null }[] }) {
   const { data, isLoading } = useEarnings();
   const profile = useProfile();
-  const fiat = profile.data?.fiat ?? "idr";
+  const fiat = profile.data?.fiat ?? "usd";
   const fx = useFx();
   if (isLoading) return <Skeleton className="mb-8 h-28" />;
   const rows = data ?? [];
@@ -203,7 +203,7 @@ function EarningsCard({ projects }: { projects: { id: string; name: string; acce
       <div className="rounded-xl border border-line bg-panel p-4">
         <SectionTitle>Earned</SectionTitle>
         <div className="num text-[26px] leading-tight">{usd(t.now)}</div>
-        <div className="num text-[12px] text-faint">{money(fx.toFiat(t.now, fiat), fiat)} now · {usd(t.claim)} at claim</div>
+        <div className="num text-[12px] text-faint">{fiat !== "usd" && <>{money(fx.toFiat(t.now, fiat), fiat)} now · </>}{usd(t.claim)} at claim</div>
         <div className={cn("num mt-2 text-[13px]", tone(t.now - t.claim))}>{usd(t.now - t.claim, { sign: true })} {t.claim ? `· ${pct((t.now - t.claim) / t.claim)}` : ""} since claim</div>
         <div className="mt-1 text-[12px] text-muted">{rows.length} claim{rows.length === 1 ? "" : "s"} across {t.byProject.size} project{t.byProject.size === 1 ? "" : "s"}</div>
       </div>

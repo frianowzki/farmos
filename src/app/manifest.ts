@@ -22,7 +22,6 @@ export default function manifest(): MetadataRoute.Manifest {
     shortcuts: [
       { name: "Today", url: "/", icons: [{ src: "/icons/icon-192.png", sizes: "192x192" }] },
       { name: "Daily tasks", url: "/tasks", icons: [{ src: "/icons/icon-192.png", sizes: "192x192" }] },
-      { name: "Prices", url: "/prices", icons: [{ src: "/icons/icon-192.png", sizes: "192x192" }] },
       { name: "Upcoming mints", url: "/mints", icons: [{ src: "/icons/icon-192.png", sizes: "192x192" }] },
     ],
   };

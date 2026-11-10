@@ -146,7 +146,7 @@ for (const [me, tag, other] of [[a, "default", "P2"], [p, "p2", "DEF"]]) {
   ok(`${tag}: DELETE other watch -> 404`, (await me("DELETE", `/api/watchlist/${o.id}`)).s === 404);
 }
 const pr = (await a("GET", "/api/profile")).j, pr2 = (await p("GET", "/api/profile")).j;
-ok("default fiat: Iya IDR, Nadine PHP", pr.fiat === "idr" && pr2.fiat === "php", `${pr.fiat}/${pr2.fiat}`);
+ok("default fiat: USD for both", pr.fiat === "usd" && pr2.fiat === "usd", `${pr.fiat}/${pr2.fiat}`);
 const px = (await a("GET", "/api/prices?ids=ethereum,tether")).j?.prices;
 ok("prices endpoint returns usd/idr/php/usdt", px?.ethereum && ["usd", "idr", "php", "usdt"].every((k) => px.ethereum[k] > 0));
 ok("prices endpoint needs a session", (await call("")("GET", "/api/prices?ids=ethereum")).s === 401);

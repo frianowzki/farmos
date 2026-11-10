@@ -119,10 +119,24 @@ const POPULAR: CoinHit[] = [
   ["hyperliquid", "Hyperliquid", "HYPE"], ["arbitrum", "Arbitrum", "ARB"], ["optimism", "Optimism", "OP"], ["polygon-ecosystem-token", "POL", "POL"],
 ].map(([id, name, symbol], i) => ({ id, name, symbol, thumb: null, rank: i + 1 }));
 
+let topMem: { at: number; hits: CoinHit[] } | null = null;
+/** Top coins by market cap with logos (cached 10 min); static list without logos if CoinGecko is down. */
+async function popular(): Promise<CoinHit[]> {
+  if (topMem && Date.now() - topMem.at < 10 * 60_000) return topMem.hits;
+  try {
+    const j = await getJson<{ id: string; name: string; symbol: string; image?: string; market_cap_rank?: number | null }[]>("https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=20&page=1&sparkline=false");
+    const hits = j.map((c) => ({ id: c.id, name: c.name, symbol: c.symbol.toUpperCase(), thumb: c.image ?? null, rank: c.market_cap_rank ?? null }));
+    if (hits.length) topMem = { at: Date.now(), hits };
+    return hits.length ? hits : POPULAR;
+  } catch {
+    return topMem?.hits ?? POPULAR;
+  }
+}
+
 /** CoinGecko search, cached 10 min per query. Empty query → popular coins. */
 export async function searchCoins(q: string): Promise<CoinHit[]> {
   const query = q.trim().toLowerCase().slice(0, 60);
-  if (!query) return POPULAR;
+  if (!query) return popular();
   const hit = searchMem.get(query);
   if (hit && Date.now() - hit.at < 10 * 60_000) return hit.hits;
   try {

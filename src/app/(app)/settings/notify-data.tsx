@@ -17,7 +17,6 @@ type Notify = {
 
 const ALERTS: { id: keyof Notify; label: string; hint: string }[] = [
   { id: "claims", label: "Claim alerts", hint: "A watched claim page goes live or a wallet becomes eligible" },
-  { id: "prices", label: "Price alerts", hint: "A watchlist token crosses your above/below price" },
 ];
 
 const TOGGLES: { id: keyof Notify; label: string; hint: string }[] = [
@@ -139,7 +138,7 @@ export function NotifySection() {
   );
 }
 
-const CSV_TABLES = ["projects", "positions", "earnings", "tasks", "completions", "diary", "wallets", "watchlist", "mints", "feed", "attachments", "threads"] as const;
+const CSV_TABLES = ["projects", "positions", "earnings", "tasks", "completions", "diary", "wallets", "mints", "feed", "attachments", "threads"] as const;
 
 type Backups = { configured: boolean; keep: number; backups: { pathname: string; size: number; uploadedAt: string }[] };
 type DryRun = { dryRun: true; exportedAt: string | null; counts: Record<string, number> };

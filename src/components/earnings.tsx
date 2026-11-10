@@ -40,7 +40,7 @@ export function ProjectEarnings({ projectId }: { projectId: string }) {
   const { data, isLoading } = useEarnings();
   const qc = useQueryClient();
   const profile = useProfile();
-  const fiat = profile.data?.fiat ?? "idr";
+  const fiat = profile.data?.fiat ?? "usd";
   const fx = useFx();
   const rows = (data ?? []).filter((r) => r.projectId === projectId);
   const t = earningTotals(rows);
@@ -57,8 +57,8 @@ export function ProjectEarnings({ projectId }: { projectId: string }) {
     <div className="space-y-3">
       {rows.length > 0 && (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-          <Stat label="At claim" value={usd(t.claim)} sub={money(fx.toFiat(t.claim, fiat), fiat, { compact: true })} />
-          <Stat label="Now" value={usd(t.now)} sub={money(fx.toFiat(t.now, fiat), fiat, { compact: true })} />
+          <Stat label="At claim" value={usd(t.claim)} sub={fiat === "usd" ? undefined : money(fx.toFiat(t.claim, fiat), fiat, { compact: true })} />
+          <Stat label="Now" value={usd(t.now)} sub={fiat === "usd" ? undefined : money(fx.toFiat(t.now, fiat), fiat, { compact: true })} />
           <Stat label="Change" value={usd(t.now - t.claim, { sign: true })} cls={tone(t.now - t.claim)} sub={t.claim ? pct((t.now - t.claim) / t.claim) : undefined} />
         </div>
       )}

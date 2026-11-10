@@ -26,16 +26,15 @@ export async function buildMonthlyReport(pid: string, month: string) {
   const end = addDays(addDays(start, 32).slice(0, 8) + "01", -1); // last day of the month
   const until = diffDays(end, today) > 0 ? today : end; // don't count future days as missed
   const d = db();
-  const [projects, positions, tasks, comps, earnings, watch, track] = await Promise.all([
+  const [projects, positions, tasks, comps, earnings, track] = await Promise.all([
     d.select().from(schema.projects).where(eq(schema.projects.profileId, pid)),
     d.select().from(schema.positions).where(eq(schema.positions.profileId, pid)),
     d.select().from(schema.tasks).where(eq(schema.tasks.profileId, pid)),
     d.select().from(schema.taskCompletions).where(and(eq(schema.taskCompletions.profileId, pid), gte(schema.taskCompletions.day, addDays(start, -7)), lte(schema.taskCompletions.day, end))),
     earningsWithValue(pid),
-    d.select().from(schema.watchlist).where(eq(schema.watchlist.profileId, pid)),
     getCachedTrack(pid).catch(() => null),
   ]);
-  const px = await getPrices(["tether", ...watch.map((w) => w.coinId)]).catch(() => ({}) as Awaited<ReturnType<typeof getPrices>>);
+  const px = await getPrices(["tether"]).catch(() => ({}) as Awaited<ReturnType<typeof getPrices>>);
   const t = px.tether;
   const fiat: Fiat = info.fiat;
   const usdTo = fiat === "usd" ? 1 : t ? (fiat === "usdt" ? 1 / t.usdt : t[fiat] / t.usd) : null;
@@ -100,7 +99,6 @@ export async function buildMonthlyReport(pid: string, month: string) {
     portfolio,
     earnings: monthEarnings.map((e) => ({ date: e.claimedAt, project: pname.get(e.projectId) ?? "", symbol: e.symbol, amount: e.amount, valueAtClaimUsd: e.valueAtClaim, currentUsd: e.currentUsd, wallet: e.wallet ?? "", note: e.note ?? "" })),
     tasks: taskRows,
-    watchlist: watch.map((w) => ({ symbol: w.symbol, name: w.name, usd: px[w.coinId]?.usd ?? null, change24h: px[w.coinId]?.change24h ?? null })),
   };
 }
 
@@ -122,6 +120,5 @@ export function reportCsv(r: MonthlyReport) {
   blocks.push("Earnings this month\r\n" + toCsv(r.earnings, ["date", "project", "symbol", "amount", "valueAtClaimUsd", "currentUsd", "wallet", "note"]));
   blocks.push("Tasks\r\n" + toCsv(r.tasks, ["task", "project", "cadence", "active", "due", "done", "completions", "rate"]));
   if (r.wallets.length) blocks.push("Wallets\r\n" + toCsv(r.wallets, ["label", "address", "usd"]));
-  if (r.watchlist.length) blocks.push("Watchlist\r\n" + toCsv(r.watchlist, ["symbol", "name", "usd", "change24h"]));
   return blocks.join("\r\n");
 }

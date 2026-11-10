@@ -123,7 +123,7 @@ export async function checkWatchlist(pid: string) {
     if (changed) updates.push({ id: r.id, state: st });
   }
   let sent = false;
-  if (msgs.length) sent = await tg.send(`<b>farmOS price alerts</b>\n\n${msgs.join("\n")}` + appLink("/prices")).catch(() => false);
+  if (msgs.length) sent = await tg.send(`<b>farmOS price alerts</b>\n\n${msgs.join("\n")}` + appLink("/")).catch(() => false);
   // Fired flags only stick when delivered; re-arm flags always apply.
   for (const u of updates) {
     const row = armed.find((r) => r.id === u.id)!;

@@ -91,11 +91,6 @@ export function ReportView() {
                 <Table head={["Label", "Address", "Balance"]} align="r" rows={r.wallets.map((w) => [w.label || "—", <span key="a" className="num">{shortAddr(w.address)}</span>, usd(w.usd)])} />
               </Block>
             )}
-            {r.watchlist.length > 0 && (
-              <Block title="Watchlist">
-                <Table head={["Token", "Price", "24h"]} align="rr" rows={r.watchlist.map((w) => [`${w.symbol} · ${w.name}`, usd(w.usd), w.change24h == null ? "—" : `${w.change24h >= 0 ? "+" : "−"}${Math.abs(w.change24h).toFixed(2)}%`])} />
-              </Block>
-            )}
             <p className="mt-8 text-[11px] text-faint">Values in USD{r.fx.usdTo && r.fx.fiat !== "usd" ? `; 1 USD ≈ ${money(r.fx.usdTo, r.fx.fiat)} at generation` : ""}. Wallet balances are the last cached snapshot.</p>
           </article>
         )}

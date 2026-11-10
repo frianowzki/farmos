@@ -17,9 +17,9 @@ describe("parseAmount", () => {
 });
 
 describe("money + profile fiat", () => {
-  it("defaults: Iya IDR, Nadine PHP", () => {
-    expect(profileFiat("default")).toBe("idr");
-    expect(profileFiat("p2")).toBe("php");
+  it("defaults: USD for both profiles", () => {
+    expect(profileFiat("default")).toBe("usd");
+    expect(profileFiat("p2")).toBe("usd");
   });
   it("formats", () => {
     expect(money(1500000, "idr")).toBe("Rp 1.500.000");
