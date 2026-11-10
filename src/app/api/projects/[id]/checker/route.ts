@@ -1,9 +1,9 @@
 import { and, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
-import { isAddress } from "viem";
 import { db, schema } from "@/db";
 import type { AirdropChecker } from "@/db/schema";
-import { runChecker, validateChecker } from "@/lib/server/airdrop-check";
+import { validateChecker } from "@/lib/server/airdrop-check";
+import { checkClaims } from "@/lib/server/alerts";
 import { bad, readJson, requireProfile } from "@/lib/server/guard";
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -38,6 +38,10 @@ export async function PUT(req: Request, ctx: Ctx) {
     fn: c.fn?.trim() || undefined,
     decimals: typeof c.decimals === "number" && c.decimals >= 0 && c.decimals <= 36 ? c.decimals : undefined,
     claimUrl: c.claimUrl?.trim() && /^https:\/\//.test(c.claimUrl.trim()) ? c.claimUrl.trim() : undefined,
+    match: c.type === "page" ? c.match?.trim().slice(0, 120) || undefined : undefined,
+    claimStatus: c.claimStatus ?? "unknown",
+    autoCheck: c.autoCheck !== false,
+    alerts: null,
     lastRun: null,
   };
   const [row] = await db().update(schema.projects).set({ checker: clean, updatedAt: new Date() }).where(and(eq(schema.projects.profileId, pid), eq(schema.projects.id, id))).returning();
@@ -45,7 +49,27 @@ export async function PUT(req: Request, ctx: Ctx) {
   return NextResponse.json({ checker: row.checker });
 }
 
-/** Run the check for the project's wallets (or all linked EVM wallets if none are tagged). */
+/** Quick edits without resetting the check: { claimStatus } and/or { autoCheck }. */
+export async function PATCH(req: Request, ctx: Ctx) {
+  const pid = await requireProfile();
+  if (pid instanceof NextResponse) return pid;
+  const { id } = await ctx.params;
+  if (!isUuid(id)) return bad("not found", 404);
+  const b = await readJson<{ claimStatus?: string; autoCheck?: boolean }>(req);
+  const p = await load(pid, id);
+  if (!p) return bad("not found", 404);
+  const cur: AirdropChecker = p.checker ?? { type: "manual", claimStatus: "unknown", autoCheck: false };
+  const next: AirdropChecker = { ...cur };
+  if (b.claimStatus !== undefined) {
+    if (!["unknown", "upcoming", "open", "claimed", "closed"].includes(b.claimStatus)) return bad("Unknown claim status");
+    next.claimStatus = b.claimStatus as AirdropChecker["claimStatus"];
+  }
+  if (typeof b.autoCheck === "boolean") next.autoCheck = b.autoCheck;
+  await db().update(schema.projects).set({ checker: next, updatedAt: new Date() }).where(and(eq(schema.projects.profileId, pid), eq(schema.projects.id, id)));
+  return NextResponse.json({ checker: next });
+}
+
+/** Run the check now (same as the cron, incl. Telegram alert on a new event) for this project. */
 export async function POST(_: Request, ctx: Ctx) {
   const pid = await requireProfile();
   if (pid instanceof NextResponse) return pid;
@@ -54,14 +78,10 @@ export async function POST(_: Request, ctx: Ctx) {
   const p = await load(pid, id);
   if (!p) return bad("not found", 404);
   if (!p.checker) return bad("No checker configured", 412);
-  let wallets = p.wallets.filter((w) => isAddress(w));
-  if (!wallets.length) wallets = (await db().select().from(schema.wallets).where(eq(schema.wallets.profileId, pid))).map((w) => w.address).filter((a) => isAddress(a));
-  if (!wallets.length) return bad("Link an EVM wallet first", 412);
-  const results = await runChecker(p.checker, wallets);
-  const checker: AirdropChecker = { ...p.checker, lastRun: { at: new Date().toISOString(), results } };
-  // The checker's verdict also fills the project's Eligibility field (any wallet eligible wins).
-  const ok = results.filter((r) => r.status !== "error");
-  const eligibility = ok.some((r) => r.status === "eligible") ? "eligible" : ok.length && ok.length === results.length ? "not_eligible" : p.eligibility;
-  await db().update(schema.projects).set({ checker, eligibility }).where(and(eq(schema.projects.profileId, pid), eq(schema.projects.id, id)));
-  return NextResponse.json({ checker });
+  if (p.checker.type === "manual") return bad("Manual status only, nothing to check", 412);
+  const r = await checkClaims(pid, { projectId: id });
+  const after = await load(pid, id);
+  const err = after?.checker?.lastRun?.results.find((x) => x.wallet === "check" && x.status === "error");
+  if (err) return bad(err.detail ?? "Check failed", 412);
+  return NextResponse.json({ checker: after?.checker ?? null, alerts: r.alerts });
 }

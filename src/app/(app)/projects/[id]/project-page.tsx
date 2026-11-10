@@ -12,12 +12,14 @@ import { Page } from "@/components/shell";
 import { ChainLabel } from "@/components/chain-logo";
 import { LinkIcon } from "@/components/icons/brand-glyphs";
 import { AddTask, TaskRow, useTaskModel } from "@/components/tasks";
-import { Button, DateField, Dialog, Empty, InlineText, Popover, SelectPill, Skeleton, TagInput } from "@/components/ui";
+import { Button, DateField, Dialog, Empty, InlineText, Pill, Popover, SelectPill, Skeleton, TagInput } from "@/components/ui";
 import { DeleteProjectDialog } from "@/components/delete-project";
 import { ColorSelector, ColorSelectorItem, ColorSelectorList } from "@/components/motion/color-selector";
 import { WheelPicker } from "@/components/motion/wheel-picker";
 import { Attachments } from "@/components/panelui/attachment";
 import { AirdropCheckerPanel } from "@/components/airdrop-checker";
+import { ProjectEarnings } from "@/components/earnings";
+import { claimBadge } from "@/lib/claim";
 import { AiReviewPanel } from "@/components/ai-review";
 import type { AiReview } from "@/db/schema";
 import { Questionnaire } from "@/components/panelui/questionnaire";
@@ -39,7 +41,8 @@ const TABS = [
   { id: "diary", label: "Diary" },
   { id: "mail", label: "Mail" },
   { id: "files", label: "Files" },
-  { id: "eligibility", label: "Eligibility" },
+  { id: "earnings", label: "Earnings" },
+  { id: "claim", label: "Claim" },
 ];
 
 export function ProjectPage({ id }: { id: string }) {
@@ -83,6 +86,7 @@ export function ProjectPage({ id }: { id: string }) {
         </div>
       </div>
 
+      <ClaimLine p={p} today={today} onOpen={() => setTab("claim")} />
       <Properties p={p} set={set} today={today} />
       <MoneyStrip p={p} money={money} set={set} />
 
@@ -103,7 +107,8 @@ export function ProjectPage({ id }: { id: string }) {
       {tab === "tasks" && <ProjectTasks projectId={id} />}
       {tab === "diary" && <ProjectDiary projectId={id} entries={data.diary} />}
       {tab === "mail" && <MailList projectId={id} />}
-      {tab === "eligibility" && <AirdropCheckerPanel projectId={id} checker={p.checker ?? null} wallets={p.wallets} />}
+      {tab === "earnings" && <ProjectEarnings projectId={id} />}
+      {tab === "claim" && <AirdropCheckerPanel projectId={id} checker={p.checker ?? null} wallets={p.wallets} />}
       {tab === "files" && (
         <Attachments
           items={data.attachments}
@@ -116,6 +121,18 @@ export function ProjectPage({ id }: { id: string }) {
         />
       )}
     </Page>
+  );
+}
+
+function ClaimLine({ p, today, onOpen }: { p: Project; today: string; onOpen: () => void }) {
+  const b = claimBadge(p, today);
+  if (!b) return null;
+  const at = p.checker?.lastRun?.at;
+  return (
+    <button type="button" onClick={onOpen} className="mt-3 inline-flex items-center gap-2 rounded-md px-1 py-0.5 text-[12px] text-faint hover:bg-hover">
+      <Pill tone={b.tone} dot>{b.label}</Pill>
+      {at && <span>checked {new Date(at).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</span>}
+    </button>
   );
 }
 

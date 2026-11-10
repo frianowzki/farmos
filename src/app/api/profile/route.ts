@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { bad, readJson, requireProfile } from "@/lib/server/guard";
 import { getProfileInfo, saveProfileInfo } from "@/lib/server/settings";
 import { isTimeZone, TZ_COOKIE } from "@/lib/profiles";
+import { isFiat, type Fiat } from "@/lib/fiat";
 import { SESSION_TTL_SECONDS } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
@@ -23,8 +24,12 @@ export async function GET() {
 export async function PUT(req: Request) {
   const pid = await requireProfile();
   if (pid instanceof NextResponse) return pid;
-  const { name, tz } = await readJson<{ name?: string; tz?: string }>(req);
-  const patch: { name?: string; tz?: string } = {};
+  const { name, tz, fiat } = await readJson<{ name?: string; tz?: string; fiat?: string }>(req);
+  const patch: { name?: string; tz?: string; fiat?: Fiat } = {};
+  if (fiat !== undefined) {
+    if (!isFiat(fiat)) return bad("Unknown currency");
+    patch.fiat = fiat;
+  }
   if (name !== undefined) {
     const n = String(name).replace(/\s+/g, " ").trim();
     if (!n || n.length > 40) return bad("Name must be 1 to 40 characters");

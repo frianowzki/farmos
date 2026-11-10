@@ -3,6 +3,7 @@ import { and, eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { decrypt, encrypt } from "./crypto";
 import { maskSecret } from "./mask";
+import { isFiat, profileFiat, type Fiat } from "@/lib/fiat";
 import { DEFAULT_PROFILE_NAME, DEFAULT_PROFILE_TZ, isProfileId, isTimeZone, type ProfileId } from "@/lib/profiles";
 
 type StoredAi = { baseUrl?: string; model?: string; apiKeyEnc?: string; tools?: boolean };
@@ -20,7 +21,7 @@ export async function setSetting(pid: string, key: string, value: unknown) {
     .onConflictDoUpdate({ target: [schema.settings.profileId, schema.settings.key], set: { value, updatedAt: new Date() } });
 }
 
-type StoredProfile = { name?: string; tz?: string };
+type StoredProfile = { name?: string; tz?: string; fiat?: string };
 
 /** Display name of a profile (Settings → Profile). */
 export async function getProfileName(pid: ProfileId): Promise<string> {
@@ -28,9 +29,9 @@ export async function getProfileName(pid: ProfileId): Promise<string> {
 }
 
 /** Name + time zone of a profile, with per-profile defaults (Iya: Asia/Jakarta, Nadine: Asia/Manila). */
-export async function getProfileInfo(pid: ProfileId): Promise<{ name: string; tz: string }> {
+export async function getProfileInfo(pid: ProfileId): Promise<{ name: string; tz: string; fiat: Fiat }> {
   const v = (await getSetting<StoredProfile>(pid, "profile")) ?? {};
-  return { name: v.name?.trim() || DEFAULT_PROFILE_NAME[pid], tz: isTimeZone(v.tz) ? v.tz : DEFAULT_PROFILE_TZ[pid] };
+  return { name: v.name?.trim() || DEFAULT_PROFILE_NAME[pid], tz: isTimeZone(v.tz) ? v.tz : DEFAULT_PROFILE_TZ[pid], fiat: isFiat(v.fiat) ? v.fiat : profileFiat(pid) };
 }
 
 /** Zone used for a profile's day boundary on the server (digest, backups). */
@@ -38,11 +39,17 @@ export async function getProfileTz(pid: string): Promise<string> {
   return isProfileId(pid) ? (await getProfileInfo(pid)).tz : DEFAULT_PROFILE_TZ.default;
 }
 
-export async function saveProfileInfo(pid: ProfileId, patch: { name?: string; tz?: string }) {
+/** Default display currency of a profile (IDR for Iya, PHP for Nadine unless changed). */
+export async function getProfileFiat(pid: string): Promise<Fiat> {
+  return isProfileId(pid) ? (await getProfileInfo(pid)).fiat : "idr";
+}
+
+export async function saveProfileInfo(pid: ProfileId, patch: { name?: string; tz?: string; fiat?: Fiat }) {
   const cur = (await getSetting<StoredProfile>(pid, "profile")) ?? {};
   const next: StoredProfile = { ...cur };
   if (patch.name !== undefined) next.name = patch.name.trim().slice(0, 40);
   if (patch.tz !== undefined && isTimeZone(patch.tz)) next.tz = patch.tz;
+  if (patch.fiat !== undefined && isFiat(patch.fiat)) next.fiat = patch.fiat;
   await setSetting(pid, "profile", next);
 }
 

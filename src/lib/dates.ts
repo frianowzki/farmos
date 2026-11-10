@@ -71,6 +71,12 @@ export function zoneLabel(tz = appTimeZone(), fallback = ""): string {
 }
 
 /** Local time of the daily 00:00 UTC cron (digest, backup) in a zone, e.g. "07:00 WIB" / "08:00 PHT". */
+/** The alert cron runs at 00:00 and 12:00 UTC: "07:00 and 19:00 WIB" in the profile's zone. */
+export function alertRunsLabel(tz = appTimeZone()): string {
+  const f = (h: number) => new Intl.DateTimeFormat("en-GB", { timeZone: tz, hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date(Date.UTC(2026, 0, 15, h, 0)));
+  return `${f(0)} and ${f(12)} ${zoneLabel(tz)}`;
+}
+
 export function dailyRunLabel(tz = appTimeZone()): string {
   const at = new Date(Date.UTC(2026, 0, 15, 0, 0));
   const t = new Intl.DateTimeFormat("en-GB", { timeZone: tz, hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(at);

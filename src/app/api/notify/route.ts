@@ -14,7 +14,7 @@ export async function PATCH(req: Request) {
   if (pid instanceof NextResponse) return pid;
   const b = await readJson<Record<string, unknown>>(req);
   const patch: Record<string, unknown> = {};
-  for (const k of ["enabled", "mints", "deadlines", "tasks", "streaks"]) if (typeof b[k] === "boolean") patch[k] = b[k];
+  for (const k of ["enabled", "mints", "deadlines", "tasks", "streaks", "claims", "prices"]) if (typeof b[k] === "boolean") patch[k] = b[k];
   if (b.unlink === true) Object.assign(patch, { chatId: null, chatName: null, linkToken: null });
   return NextResponse.json(publicNotify(await saveNotify(pid, patch)));
 }

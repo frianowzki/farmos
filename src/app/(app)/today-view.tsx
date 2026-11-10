@@ -1,6 +1,6 @@
 "use client";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowUpRight, CalendarDays, Check, Flame, ListChecks, NotebookPen, Plus, Telescope, Wallet } from "lucide-react";
+import { ArrowRightLeft, ArrowUpRight, CalendarDays, Check, Flame, ListChecks, NotebookPen, Plus, Telescope, Wallet } from "lucide-react";
 import Link from "next/link";
 import { LayoutGroup, motion } from "motion/react";
 import { useMemo } from "react";
@@ -17,6 +17,8 @@ import { api, useDiary, useGoogleStatus, useProfile, useProjects, type Project }
 import { Grid, GridItem } from "@/components/panelui/grid-item";
 import { catTone } from "@/lib/options";
 import { sumPnl } from "@/lib/pnl";
+import { Converter } from "@/components/converter";
+import { earningTotals, useEarnings } from "@/components/earnings";
 import { pnlFor, projectDates } from "@/lib/project-utils";
 
 export function TodayView() {
@@ -133,6 +135,11 @@ export function TodayView() {
               </div>
               <div className="mt-1 text-[12px] text-faint">Active {weekRate(model.allDays, today)} of the last 7 days</div>
               <div className="mt-4"><Heatmap heat={model.heat} today={today} /></div>
+            </div>
+
+            <div className="rounded-xl border border-line bg-panel p-4">
+              <div className="mb-3 flex items-center justify-between text-[12px] font-medium text-muted">Convert <ArrowRightLeft className="h-3.5 w-3.5" /></div>
+              <Converter compact />
             </div>
 
             <Link href="/portfolio" className="block rounded-xl border border-line bg-panel p-4 transition-colors hover:border-line-strong">
@@ -258,13 +265,18 @@ function DiaryNudge({ today }: { today: string }) {
 
 function TodayKpis({ projects, today }: { projects: Project[]; today: string }) {
   const live = projects.filter((p) => p.status !== "dropped");
-  const paid = projects.filter((p) => p.rewardsReceived > 0);
-  const paidSum = paid.reduce((a, p) => a + p.rewardsReceived, 0);
+  const earn = useEarnings();
+  const et = earningTotals(earn.data ?? []);
+  // Logged earnings win; projects with only the old "rewards received" number still count.
+  const legacy = projects.filter((p) => p.rewardsReceived > 0 && !et.byProject.has(p.id));
+  const paidSum = et.claim + legacy.reduce((a, p) => a + p.rewardsReceived, 0);
+  const nowSum = et.now + legacy.reduce((a, p) => a + p.rewardsReceived, 0);
+  const paidCount = et.byProject.size + legacy.length;
   const tba = live.filter((p) => p.status !== "done" && !p.keyDates?.tge && !p.deadline);
   const incoming = live.filter((p) => p.status === "claimable" || [p.keyDates?.tge, p.keyDates?.snapshot, p.keyDates?.mint, p.deadline].some((d) => d && diffDays(d, today) >= 0 && diffDays(d, today) <= 30));
   const items = [
     { k: "Projects", v: String(live.length), sub: `${projects.filter((p) => p.status === "active").length} active`, href: "/projects" },
-    { k: "Paid out / claimed", v: usd(paidSum, { compact: true }), sub: `${paid.length} project${paid.length === 1 ? "" : "s"}`, href: "/portfolio" },
+    { k: "Earned", v: usd(paidSum, { compact: true }), sub: paidCount ? `now ${usd(nowSum, { compact: true })} · ${paidCount} project${paidCount === 1 ? "" : "s"}` : "log claims on a project", href: "/portfolio#earnings" },
     { k: "TBA", v: String(tba.length), sub: "no TGE or deadline yet", href: "/projects" },
     { k: "Incoming", v: String(incoming.length), sub: "claimable or due in 30d", href: "/projects" },
   ];

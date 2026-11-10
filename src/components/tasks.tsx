@@ -1,7 +1,7 @@
 "use client";
 import { Checkbox } from "@/components/motion/checkbox";
 import { useQueryClient } from "@tanstack/react-query";
-import { ExternalLink, Flame, Plus, Trash2 } from "lucide-react";
+import { Bell, BellOff, ExternalLink, Flame, Plus, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { AnimatePresence, motion } from "motion/react";
 import { useMemo, useState } from "react";
@@ -109,12 +109,36 @@ export function TaskRow({ row, showProject = true, onDelete }: { row: ReturnType
           </motion.span>
         </AnimatePresence>
       </span>
+      {onDelete && <RemindToggle task={row.task} />}
       {onDelete && (
-        <button onClick={onDelete} className="rounded p-1 text-faint opacity-0 hover:text-neg group-hover:opacity-100" aria-label="Delete task">
+        <button onClick={onDelete} className="rounded p-1 text-faint hover:text-neg [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100" aria-label="Delete task">
           <Trash2 className="h-3.5 w-3.5" />
         </button>
       )}
     </div>
+  );
+}
+
+/** Per-task switch: include this task in the Telegram digest while it's still open. */
+function RemindToggle({ task }: { task: Task }) {
+  const qc = useQueryClient();
+  const on = task.remind !== false;
+  const flip = async () => {
+    const prev = qc.getQueryData<{ tasks: Task[]; completions: { taskId: string; day: string }[] }>(keys.tasks);
+    if (prev) qc.setQueryData(keys.tasks, { ...prev, tasks: prev.tasks.map((t) => (t.id === task.id ? { ...t, remind: !on } : t)) });
+    try {
+      await api(`/api/tasks/${task.id}`, { method: "PATCH", body: { remind: !on } });
+      toast.success(!on ? "In the Telegram digest" : "Left out of the digest");
+    } catch (e) {
+      if (prev) qc.setQueryData(keys.tasks, prev);
+      toast.error((e as Error).message);
+    }
+    qc.invalidateQueries({ queryKey: keys.tasks });
+  };
+  return (
+    <button onClick={flip} className={cn("rounded p-1 hover:text-ink", on ? "text-faint [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100" : "text-faint/60")} aria-label={on ? "Remove from Telegram digest" : "Remind in Telegram digest"} aria-pressed={on} title={on ? "Reminded in the Telegram digest" : "Not in the digest"}>
+      {on ? <Bell className="h-3.5 w-3.5" /> : <BellOff className="h-3.5 w-3.5" />}
+    </button>
   );
 }
 

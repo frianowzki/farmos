@@ -15,6 +15,9 @@ export type NotifySettings = {
   deadlines: boolean;
   tasks: boolean;
   streaks: boolean;
+  /** Instant alerts (sent by the cron checks, not part of the digest). */
+  claims: boolean;
+  prices: boolean;
   /** one-time /start token for the deep-link flow */
   linkToken?: string | null;
   linkTokenAt?: string | null;
@@ -22,7 +25,7 @@ export type NotifySettings = {
   lastResult?: string | null;
 };
 
-const DEFAULTS: NotifySettings = { enabled: true, mints: true, deadlines: true, tasks: true, streaks: true };
+const DEFAULTS: NotifySettings = { enabled: true, mints: true, deadlines: true, tasks: true, streaks: true, claims: true, prices: true };
 
 export async function getNotify(pid: string): Promise<NotifySettings> {
   return { ...DEFAULTS, ...((await getSetting<NotifySettings>(pid, "notify")) ?? {}) };
@@ -44,6 +47,8 @@ export function publicNotify(n: NotifySettings) {
     deadlines: n.deadlines,
     tasks: n.tasks,
     streaks: n.streaks,
+    claims: n.claims,
+    prices: n.prices,
     lastSentAt: n.lastSentAt ?? null,
     lastResult: n.lastResult ?? null,
     configured: Boolean(process.env.TELEGRAM_BOT_TOKEN),
@@ -90,7 +95,7 @@ export async function findStartChat(linkToken: string): Promise<{ chatId: string
   return { chatId: String(c.id), name: c.username ? `@${c.username}` : c.first_name || c.title || String(c.id) };
 }
 
-const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+export const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
 export type Digest = { sections: { title: string; lines: string[] }[]; empty: boolean; day: string; tz: string };
 
@@ -156,6 +161,7 @@ export async function buildDigest(pid: string, n: NotifySettings, now = new Date
     const open: string[] = [];
     const risk: string[] = [];
     for (const t of tasks) {
+      if (t.remind === false) continue;
       if (!isDue(t, today)) continue;
       const days = byTask.get(t.id) ?? [];
       if (isSatisfied(t, today, new Set(days))) continue;

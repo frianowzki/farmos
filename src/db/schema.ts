@@ -55,8 +55,19 @@ export type ProjectAudit = {
 };
 
 /** Read-only airdrop eligibility checker configured per project. */
+export type ClaimStatus = "unknown" | "upcoming" | "open" | "claimed" | "closed";
+
 export type AirdropChecker = {
-  type: "api" | "contract" | "merkle";
+  /** page: a claim/checker page watched for going live; manual: status set by hand only. */
+  type: "api" | "contract" | "merkle" | "page" | "manual";
+  /** page: optional text that must appear on the page for the claim to count as open. */
+  match?: string;
+  /** Manual claim status (any type). "open"/"claimed"/"closed" override what the checks infer. */
+  claimStatus?: ClaimStatus;
+  /** Let the cron run this check and alert on Telegram (default on). */
+  autoCheck?: boolean;
+  /** Alert state so each event is sent once: when the page went live, wallets already announced. */
+  alerts?: { openAt?: string | null; eligible?: string[] } | null;
   /** api: https URL with {address}; merkle: https URL of a JSON claims list */
   url?: string;
   /** api/merkle: dot path to the amount or eligibility field, e.g. "amount" or "data.eligible" */
@@ -154,6 +165,8 @@ export const tasks = pgTable("tasks", {
   startDate: date("start_date").notNull(),
   url: text("url"),
   active: boolean("active").notNull().default(true),
+  /** Include in the Telegram digest when still open (per task). */
+  remind: boolean("remind").notNull().default(true),
   sortOrder: integer("sort_order").notNull().default(0),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
@@ -329,6 +342,55 @@ export const mintWatch = pgTable("mint_watch", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [primaryKey({ columns: [t.profileId, t.slug] })]);
 
+/** Tokens received from a project (airdrop claims, rewards). Current value comes from live prices. */
+export const earnings = pgTable(
+  "earnings",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    /** Which farmOS profile owns the row ("default" = Iya). Always set explicitly; scoped in every query. */
+    profileId: text("profile_id").notNull(),
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    symbol: text("symbol").notNull(),
+    /** CoinGecko id for live pricing (optional). */
+    coinId: text("coin_id"),
+    amount: doublePrecision("amount").notNull().default(0),
+    /** Total USD value of the tokens at claim time. */
+    valueAtClaim: doublePrecision("value_at_claim"),
+    claimedAt: date("claimed_at").notNull(),
+    wallet: text("wallet"),
+    note: text("note"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("earnings_profile_idx").on(t.profileId), index("earnings_project_idx").on(t.projectId)],
+);
+
+/** Tokens the user watches, with optional above/below price alerts (in alert_currency). */
+export const watchlist = pgTable(
+  "watchlist",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    /** Which farmOS profile owns the row ("default" = Iya). Always set explicitly; scoped in every query. */
+    profileId: text("profile_id").notNull(),
+    coinId: text("coin_id").notNull(),
+    symbol: text("symbol").notNull().default(""),
+    name: text("name").notNull().default(""),
+    image: text("image"),
+    above: doublePrecision("above"),
+    below: doublePrecision("below"),
+    /** usd | idr | php | usdt */
+    alertCurrency: text("alert_currency").notNull().default("usd"),
+    /** Which alerts already fired (re-armed when the price moves back). */
+    alertState: jsonb("alert_state").$type<{ above?: string | null; below?: string | null }>().notNull().default({}),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("watchlist_profile_coin_idx").on(t.profileId, t.coinId)],
+);
+
+export type Earning = typeof earnings.$inferSelect;
+export type WatchItem = typeof watchlist.$inferSelect;
 export type Project = typeof projects.$inferSelect;
 export type MintWatch = typeof mintWatch.$inferSelect;
 export type Attachment = typeof attachments.$inferSelect;

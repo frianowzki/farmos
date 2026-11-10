@@ -1,7 +1,7 @@
 "use client";
 import { Command } from "cmdk";
 import {
-  ArrowRight, CalendarRange, Flame, FlaskConical, Gift, Image as ImageIcon, Layers, ListChecks, Lock, Mail, Menu, Monitor, Moon, Newspaper, NotebookPen,
+  ArrowRight, ArrowRightLeft, CalendarRange, Flame, FlaskConical, Gift, Image as ImageIcon, Layers, ListChecks, Lock, Mail, Menu, Monitor, Moon, Newspaper, NotebookPen,
   PanelLeftClose, PanelLeftOpen, Plus, Search, Settings2, Sparkles, Sun, SunMedium, Telescope, Wallet, ChartNoAxesColumn,
 } from "lucide-react";
 import { useTheme } from "next-themes";
@@ -44,6 +44,7 @@ const NAV = [
   { href: "/tasks", label: "Daily tasks", icon: ListChecks },
   { href: "/diary", label: "Diary", icon: NotebookPen },
   { href: "/portfolio", label: "Portfolio", icon: ChartNoAxesColumn },
+  { href: "/prices", label: "Prices", icon: ArrowRightLeft },
   { href: "/mints", label: "Upcoming mints", icon: Sparkles },
   { href: "/mail", label: "Mail", icon: Mail },
   { href: "/assistant", label: "Research desk", icon: Telescope },

@@ -188,3 +188,12 @@ Current: free `*.vercel.app`: `farmos-os.vercel.app` (canonical) and `frioos-iot
 | `CRON_SECRET` | yes for cron | random secret, Production + Preview (sensitive); Vercel sends it as `Authorization: Bearer` to `/api/cron/daily` |
 | `APP_TZ` | optional | day boundary for digest/backups, default `Asia/Jakarta` |
 | `ALIAS_HOSTS` | optional | comma-separated hosts that redirect to `APP_URL`, default `frioos-iota.vercel.app` |
+
+## Prices, watchlist, earnings, claim alerts, reports
+
+- **Prices** (`/prices`, plus the Convert card on Today): CoinGecko simple price with USD/IDR/PHP; USDT = USD ÷ Tether. Shared cache in `settings(_global, price_cache)` (3 min fresh), falling back to DefiLlama coins + open.er-api FX, then the last known price marked “cached”. Optional `COINGECKO_API_KEY` (demo key) raises the rate limit.
+- **Default currency** per profile: Iya IDR, Nadine PHP (Settings → Profile can change it).
+- **Watchlist alerts** and **claim watches** run in both crons: `/api/cron/daily` (00:00 UTC) and `/api/cron/alerts` (12:00 UTC). Vercel Hobby allows one run per cron per day, so alerts land twice a day; "Check now" / "Check alerts" run them on demand. Telegram toggles: Settings → Notifications → Instant alerts.
+- **Claim watch types**: claim page goes live (HTTP 2xx + optional match text), checker API, claim contract view, Merkle claims list, or status only. Read-only; never signs or sends.
+- **Earnings**: project → Earnings tab. **Reports**: `/report` (print → PDF) and `/api/reports?month=YYYY-MM&format=csv`.
+- Migration: `node scripts/migrate-0001.mjs --apply` (backs up every table to /workspace/backups first, verifies row counts).

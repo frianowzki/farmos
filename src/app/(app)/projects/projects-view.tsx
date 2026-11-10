@@ -18,6 +18,12 @@ import { useProjects, useUpdateProject, type Project } from "@/lib/client/api";
 import { CATEGORY_OPTS, ELIGIBILITY_OPTS, PRIORITY_OPTS, RISK_OPTS, STATUS_OPTS, TIER_OPTS, catTone } from "@/lib/options";
 import { Rating } from "@/components/panelui/rating";
 import { SORTS, nextDate, pnlFor, sortProjects } from "@/lib/project-utils";
+import { claimBadge } from "@/lib/claim";
+
+function ClaimPill({ p, today, className }: { p: Project; today: string; className?: string }) {
+  const b = claimBadge(p, today);
+  return b && b.id !== "watching" ? <Pill tone={b.tone} dot className={className}>{b.label}</Pill> : null;
+}
 
 const VIEWS = [
   { id: "table", label: "Table", icon: Rows3 },
@@ -288,6 +294,7 @@ function MobileCards({ projects, pnl, today, showCat, set, onNew }: ViewProps & 
                     {showCat && row("Category", <SelectPill value={p.category} options={CATEGORY_OPTS} onChange={(v) => set(p.id, { category: v })} dot={false} />)}
                     {row("Status", <SelectPill value={p.status} options={STATUS_OPTS} onChange={(v) => set(p.id, { status: v })} />)}
                     {row("Eligibility", <SelectPill value={p.eligibility ?? "unknown"} options={ELIGIBILITY_OPTS} onChange={(v) => set(p.id, { eligibility: v })} />)}
+                    {claimBadge(p, today) && row("Claim", <ClaimPill p={p} today={today} />)}
                     {row("Chains", p.chains.length ? <div className="flex flex-wrap justify-end gap-1">{p.chains.map((c) => <Pill key={c}><ChainLabel chain={c} size={13} /></Pill>)}</div> : <span className="text-[13px] text-faint">None</span>)}
                     {row("Priority", <SelectPill value={p.priority} options={PRIORITY_OPTS} onChange={(v) => set(p.id, { priority: v })} dot={false} />)}
                     {row("Tier", <SelectPill value={p.tier} options={TIER_OPTS} onChange={(v) => set(p.id, { tier: v })} dot={false} />)}
@@ -365,6 +372,7 @@ function Board({ projects, pnl, today, showCat }: ViewProps) {
                         {showCat && <Pill tone={catTone(p.category)}>{CATEGORY_OPTS.find((c) => c.id === p.category)?.label}</Pill>}
                         {p.chains.slice(0, 2).map((c) => <Pill key={c}><ChainLabel chain={c} size={13} /></Pill>)}
                         {p.eligibility && p.eligibility !== "unknown" && (() => { const e = ELIGIBILITY_OPTS.find((x) => x.id === p.eligibility); return e ? <Pill tone={e.tone} dot>{e.label}</Pill> : null; })()}
+                        <ClaimPill p={p} today={today} />
                       </div>
                       {(nd || r.invested > 0) && (
                         <div className="mt-2 flex items-center justify-between text-[11.5px] text-muted">
@@ -406,6 +414,7 @@ function ListView({ projects, pnl, today }: ViewProps) {
             <div className="hidden text-right text-[12px] text-muted sm:block">{nd ? <>{nd.label}<div className="num text-ink-2">{relDay(nd.day, today)}</div></> : null}</div>
             <div className={cn("num hidden w-[90px] text-right text-[13px] md:block", tone(r.net))}>{r.invested ? usd(r.net, { sign: true, compact: true }) : ""}</div>
             {p.eligibility && p.eligibility !== "unknown" && (() => { const e = ELIGIBILITY_OPTS.find((x) => x.id === p.eligibility); return e ? <Pill tone={e.tone} dot className="hidden sm:inline-flex">{e.label}</Pill> : null; })()}
+            <ClaimPill p={p} today={today} className="hidden sm:inline-flex" />
             <Pill tone={st.tone} dot>{st.label}</Pill>
           </Link>
         );

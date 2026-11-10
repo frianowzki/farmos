@@ -13,7 +13,7 @@ import { Page, PageHeader } from "@/components/shell";
 import { Checkbox } from "@/components/motion/checkbox";
 import { Switch } from "@/components/motion/switch";
 import { playUi, setSoundEnabled, useSoundEnabled } from "@/lib/client/sound";
-import { Button, Field, Input, Kbd, Pill } from "@/components/ui";
+import { Button, Field, Input, Kbd, NativeSelect, Pill } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import { api, keys, useAiConfig, useGoogleStatus, useProfile, type AiPublic, type ProfileInfo } from "@/lib/client/api";
 import { useMounted } from "@/lib/client/use-mounted";
@@ -44,7 +44,7 @@ export function SettingsView({ appUrl, allowedEmail }: { appUrl: string; allowed
           <a key={id} href={`#${id}`} className="shrink-0 rounded-md px-2.5 py-1 text-muted transition-colors hover:bg-hover hover:text-ink">{label}</a>
         ))}
       </nav>
-      {profile.data ? <ProfileForm key={`${profile.data.name}|${profile.data.tz}`} data={profile.data} /> : <Section id="profile" title="Profile"><div className="h-16 animate-pulse rounded-lg bg-hover" /></Section>}
+      {profile.data ? <ProfileForm key={`${profile.data.name}|${profile.data.tz}|${profile.data.fiat}`} data={profile.data} /> : <Section id="profile" title="Profile"><div className="h-16 animate-pulse rounded-lg bg-hover" /></Section>}
       <Section id="appearance" title="Appearance" desc="Auto follows your system setting.">
         <div className="grid max-w-md grid-cols-3 gap-2">
           {[
@@ -105,17 +105,18 @@ function ProfileForm({ data }: { data: ProfileInfo }) {
   const qc = useQueryClient();
   const [name, setName] = useState(data.name);
   const [tz, setTz] = useState(data.tz);
+  const [fiat, setFiat] = useState<string>(data.fiat ?? "idr");
   const [busy, setBusy] = useState(false);
   const zones = useMemo(() => {
     const all = typeof Intl.supportedValuesOf === "function" ? Intl.supportedValuesOf("timeZone") : [];
     return all.includes(data.tz) ? all : [data.tz, ...all];
   }, [data.tz]);
-  const dirty = name.trim() !== data.name || tz !== data.tz;
+  const dirty = name.trim() !== data.name || tz !== data.tz || fiat !== data.fiat;
   const save = async () => {
     if (!dirty || !name.trim()) return;
     setBusy(true);
     try {
-      await api("/api/profile", { method: "PUT", body: { name, tz } });
+      await api("/api/profile", { method: "PUT", body: { name, tz, fiat } });
       if (tz !== data.tz) {
         // "Today", streaks and the clock are computed client-side from the zone cookie: reload once.
         sessionStorage.setItem("frio_tz_reload", tz);
@@ -138,6 +139,9 @@ function ProfileForm({ data }: { data: ProfileInfo }) {
           <select value={tz} onChange={(e) => setTz(e.target.value)} className="num h-9 w-full rounded-md border border-line bg-panel px-2 text-[13.5px] text-ink focus:border-line-strong focus:outline-none focus:ring-2 focus:ring-[var(--ring)] sm:h-8">
             {zones.map((z) => <option key={z} value={z}>{z.replace(/_/g, " ")}</option>)}
           </select>
+        </Field>
+        <Field label="Default currency" hint="Converter, watchlist and earnings show prices in this currency first.">
+          <NativeSelect value={fiat} onChange={setFiat} options={[{ id: "idr", label: "IDR · Rupiah" }, { id: "php", label: "PHP · Peso" }, { id: "usdt", label: "USDT" }, { id: "usd", label: "USD" }]} />
         </Field>
         <div><Button variant="primary" onClick={save} disabled={busy || !name.trim() || !dirty}>Save</Button></div>
       </div>

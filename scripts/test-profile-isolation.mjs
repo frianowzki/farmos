@@ -97,6 +97,61 @@ async function intact(c, s, tag) {
 await intact(p, S.p2, "P2");
 await intact(a, S.def, "DEF");
 
+// --- New tables: earnings, watchlist; claim watch; reports -----------------------------------
+const EARN = {};
+for (const [c, s, tag] of [[a, S.def, "DEF"], [p, S.p2, "P2"]]) {
+  const e = await c("POST", "/api/earnings", { projectId: s.proj.id, symbol: `ISO${tag}`, coinId: "ethereum", amount: 1, valueAtClaim: 100, claimedAt: today, note: `ISO-${tag}` });
+  EARN[tag] = e.j?.earning;
+}
+ok("earnings created in both profiles", Boolean(EARN.DEF && EARN.P2));
+for (const [me, tag, other] of [[a, "default", "P2"], [p, "p2", "DEF"]]) {
+  const o = EARN[other];
+  const list = (await me("GET", "/api/earnings")).j?.earnings ?? [];
+  ok(`${tag}: list earnings hides other`, !list.some((x) => x.id === o.id));
+  ok(`${tag}: PATCH other earning -> 404`, (await me("PATCH", `/api/earnings/${o.id}`, { note: "HACKED" })).s === 404);
+  ok(`${tag}: DELETE other earning -> 404`, (await me("DELETE", `/api/earnings/${o.id}`)).s === 404);
+  const oProj = other === "P2" ? S.p2.proj.id : S.def.proj.id;
+  const steal = await me("POST", "/api/earnings", { projectId: oProj, symbol: "ISOSTEAL", amount: 1, claimedAt: today });
+  ok(`${tag}: cannot log earning on other's project`, steal.s === 404, String(steal.s));
+  ok(`${tag}: claim watch on other's project rejected`, (await me("PUT", `/api/projects/${oProj}/checker`, { checker: { type: "manual", claimStatus: "open" } })).s === 404 && (await me("PATCH", `/api/projects/${oProj}/checker`, { claimStatus: "claimed" })).s === 404 && (await me("POST", `/api/projects/${oProj}/checker`)).s === 404);
+  const rep = (await me("GET", `/api/reports?month=${today.slice(0, 7)}`)).j;
+  ok(`${tag}: monthly report excludes other`, rep && !JSON.stringify(rep).includes(`ISO-${other}`) && !JSON.stringify(rep).includes(`ISO${other}`));
+  const csv = await fetch(B + `/api/reports?month=${today.slice(0, 7)}&format=csv`, { headers: { cookie: me === a ? A.cookie : P.cookie } }).then((r) => r.text());
+  ok(`${tag}: report CSV excludes other`, csv.includes("farmOS monthly report") && !csv.includes(`ISO-${other}`));
+  const exp = (await me("GET", "/api/export")).j;
+  ok(`${tag}: export excludes other's earnings`, !(exp.earnings ?? []).some((x) => x.id === o.id));
+}
+const mineE = (await a("GET", "/api/earnings")).j.earnings.find((x) => x.id === EARN.DEF.id);
+ok("own earning intact after attacks", mineE?.note === "ISO-DEF");
+ok("earning has live current value", typeof mineE?.currentUsd === "number" && mineE.currentUsd > 0, String(mineE?.currentUsd));
+// claim status badge flow on own project
+const cs = await a("PATCH", `/api/projects/${S.def.proj.id}/checker`, { claimStatus: "open" });
+ok("own claim status set", cs.s === 200 && cs.j?.checker?.claimStatus === "open");
+
+// Watchlist: same coin in both profiles, isolated rows
+const WL = {};
+for (const [c, tag] of [[a, "DEF"], [p, "P2"]]) {
+  const before = (await c("GET", "/api/watchlist")).j?.items ?? [];
+  const had = before.find((x) => x.coinId === "ethereum");
+  const r = await c("POST", "/api/watchlist", { coinId: "ethereum" });
+  WL[tag] = { item: had ?? r.j?.item, created: !had && Boolean(r.j?.item) };
+}
+ok("watchlist rows in both profiles", Boolean(WL.DEF.item && WL.P2.item && WL.DEF.item.id !== WL.P2.item.id));
+for (const [me, tag, other] of [[a, "default", "P2"], [p, "p2", "DEF"]]) {
+  const o = WL[other].item;
+  const l = (await me("GET", "/api/watchlist")).j;
+  ok(`${tag}: watchlist hides other`, !(l.items ?? []).some((x) => x.id === o.id));
+  ok(`${tag}: watchlist has live price`, typeof l.prices?.ethereum?.usd === "number");
+  ok(`${tag}: PATCH other watch -> 404`, (await me("PATCH", `/api/watchlist/${o.id}`, { above: 1 })).s === 404);
+  ok(`${tag}: DELETE other watch -> 404`, (await me("DELETE", `/api/watchlist/${o.id}`)).s === 404);
+}
+const pr = (await a("GET", "/api/profile")).j, pr2 = (await p("GET", "/api/profile")).j;
+ok("default fiat: Iya IDR, Nadine PHP", pr.fiat === "idr" && pr2.fiat === "php", `${pr.fiat}/${pr2.fiat}`);
+const px = (await a("GET", "/api/prices?ids=ethereum,tether")).j?.prices;
+ok("prices endpoint returns usd/idr/php/usdt", px?.ethereum && ["usd", "idr", "php", "usdt"].every((k) => px.ethereum[k] > 0));
+ok("prices endpoint needs a session", (await call("")("GET", "/api/prices?ids=ethereum")).s === 401);
+for (const tag of ["DEF", "P2"]) if (WL[tag].created) await (tag === "DEF" ? a : p)("DELETE", `/api/watchlist/${WL[tag].item.id}`);
+
 // Import into p2 a backup that contains default's ids: must create fresh p2 rows, never overwrite default.
 const defExport = (await a("GET", "/api/export")).j;
 const p2Before = (await p("GET", "/api/export")).j;

@@ -2,16 +2,19 @@
 import { ProjectMark } from "@/components/project-mark";
 import { NftHoldingsCard, WalletBalancesCard } from "@/components/wallet-forms";
 import { useQueryClient } from "@tanstack/react-query";
-import { RefreshCw } from "lucide-react";
+import { Download, FileSpreadsheet, Printer, RefreshCw } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { toast } from "@/lib/client/toast";
 import { Page, PageHeader } from "@/components/shell";
-import { Button, Empty, Pill, SectionTitle, Skeleton } from "@/components/ui";
+import { Button, Empty, Pill, Popover, SectionTitle, Skeleton } from "@/components/ui";
+import { earningTotals, useEarnings } from "@/components/earnings";
+import { money } from "@/lib/fiat";
+import { useFx } from "@/lib/client/prices";
 import { cn } from "@/lib/cn";
 import { CATEGORIES } from "@/lib/constants";
 import { num, pct, tone, usd } from "@/lib/format";
-import { api, keys, useProjects } from "@/lib/client/api";
+import { api, keys, useProfile, useProjects } from "@/lib/client/api";
 import { catTone } from "@/lib/options";
 import { positionPnl, sumPnl } from "@/lib/pnl";
 import { pnlFor } from "@/lib/project-utils";
@@ -43,9 +46,10 @@ export function PortfolioView() {
 
   return (
     <Page wide>
-      <PageHeader title="Portfolio" subtitle="Wallet balances, capital, gas, rewards and positions across every project." right={<Button size="sm" variant="ghost" onClick={refresh} disabled={busy}><RefreshCw className={cn("h-3.5 w-3.5", busy && "animate-spin")} /> Refresh prices</Button>} />
+      <PageHeader title="Portfolio" subtitle="Wallet balances, capital, gas, rewards and positions across every project." right={<><ExportMenu /><Button size="sm" variant="ghost" onClick={refresh} disabled={busy}><RefreshCw className={cn("h-3.5 w-3.5", busy && "animate-spin")} /> Refresh prices</Button></>} />
       <WalletBalancesCard />
       <NftHoldingsCard />
+      <EarningsCard projects={projects} />
       {isLoading ? (
         <Skeleton className="h-40" />
       ) : rows.length === 0 ? (
@@ -165,6 +169,60 @@ export function PortfolioView() {
         </>
       )}
     </Page>
+  );
+}
+
+function ExportMenu() {
+  const [open, setOpen] = useState(false);
+  const [btn, setBtn] = useState<HTMLButtonElement | null>(null);
+  return (
+    <>
+      <Button ref={setBtn} size="sm" variant="ghost" onClick={() => setOpen((o) => !o)} aria-haspopup="menu" aria-expanded={open}><Download className="h-3.5 w-3.5" /> Export</Button>
+      <Popover anchor={btn} open={open} onClose={() => setOpen(false)} align="end" width={230}>
+        <a href="/api/reports?format=csv" onClick={() => setOpen(false)} className="flex items-center gap-2 rounded-md px-2 py-1.5 text-[13px] hover:bg-hover"><FileSpreadsheet className="h-3.5 w-3.5 text-muted" /> This month as CSV</a>
+        <Link href="/report" onClick={() => setOpen(false)} className="flex items-center gap-2 rounded-md px-2 py-1.5 text-[13px] hover:bg-hover"><Printer className="h-3.5 w-3.5 text-muted" /> Printable report / PDF</Link>
+      </Popover>
+    </>
+  );
+}
+
+/** Tokens received across projects: totals then vs now, and the best-paying projects. */
+function EarningsCard({ projects }: { projects: { id: string; name: string; accent?: string | null }[] }) {
+  const { data, isLoading } = useEarnings();
+  const profile = useProfile();
+  const fiat = profile.data?.fiat ?? "idr";
+  const fx = useFx();
+  if (isLoading) return <Skeleton className="mb-8 h-28" />;
+  const rows = data ?? [];
+  if (!rows.length) return null;
+  const t = earningTotals(rows);
+  const best = [...t.byProject.entries()].sort((a, b) => b[1].now - a[1].now).slice(0, 5);
+  const max = Math.max(1, ...best.map(([, v]) => v.now));
+  return (
+    <section id="earnings" className="mb-8 grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
+      <div className="rounded-xl border border-line bg-panel p-4">
+        <SectionTitle>Earned</SectionTitle>
+        <div className="num text-[26px] leading-tight">{usd(t.now)}</div>
+        <div className="num text-[12px] text-faint">{money(fx.toFiat(t.now, fiat), fiat)} now · {usd(t.claim)} at claim</div>
+        <div className={cn("num mt-2 text-[13px]", tone(t.now - t.claim))}>{usd(t.now - t.claim, { sign: true })} {t.claim ? `· ${pct((t.now - t.claim) / t.claim)}` : ""} since claim</div>
+        <div className="mt-1 text-[12px] text-muted">{rows.length} claim{rows.length === 1 ? "" : "s"} across {t.byProject.size} project{t.byProject.size === 1 ? "" : "s"}</div>
+      </div>
+      <div className="rounded-xl border border-line bg-panel p-4">
+        <SectionTitle>Best projects</SectionTitle>
+        <div className="space-y-2.5">
+          {best.map(([pid, v]) => {
+            const p = projects.find((x) => x.id === pid);
+            return (
+              <Link key={pid} href={`/projects/${pid}`} className="grid grid-cols-[minmax(0,140px)_1fr_90px] items-center gap-3 text-[13px] hover:text-ink">
+                <span className="flex min-w-0 items-center gap-2 truncate text-ink-2">{p && <ProjectMark p={p} size={16} />}<span className="truncate">{p?.name ?? "Deleted"}</span></span>
+                <div className="h-3 overflow-hidden rounded-sm bg-hover"><div className="h-full rounded-sm bg-accent/80 transition-all duration-500" style={{ width: `${(v.now / max) * 100}%` }} /></div>
+                <span className="num text-right">{usd(v.now, { compact: true })}</span>
+              </Link>
+            );
+          })}
+        </div>
+      </div>
+    </section>
   );
 }
 

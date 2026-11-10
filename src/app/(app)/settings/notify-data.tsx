@@ -1,7 +1,7 @@
 "use client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { dailyRunLabel } from "@/lib/dates";
-import { Archive, Bell, Download, FileUp, RefreshCw, Send, Unlink } from "lucide-react";
+import { alertRunsLabel, dailyRunLabel } from "@/lib/dates";
+import { Archive, Bell, Download, FileText, FileUp, RefreshCw, Send, Unlink } from "lucide-react";
 import { useRef, useState } from "react";
 import { BrandIcon } from "@/components/brand";
 import { Switch } from "@/components/motion/switch";
@@ -11,14 +11,19 @@ import { toast } from "@/lib/client/toast";
 import { Section } from "./section";
 
 type Notify = {
-  linked: boolean; chatName: string | null; enabled: boolean; mints: boolean; deadlines: boolean; tasks: boolean; streaks: boolean;
+  linked: boolean; chatName: string | null; enabled: boolean; mints: boolean; deadlines: boolean; tasks: boolean; streaks: boolean; claims: boolean; prices: boolean;
   lastSentAt: string | null; lastResult: string | null; configured: boolean; botUsername: string | null; waiting?: boolean;
 };
+
+const ALERTS: { id: keyof Notify; label: string; hint: string }[] = [
+  { id: "claims", label: "Claim alerts", hint: "A watched claim page goes live or a wallet becomes eligible" },
+  { id: "prices", label: "Price alerts", hint: "A watchlist token crosses your above/below price" },
+];
 
 const TOGGLES: { id: keyof Notify; label: string; hint: string }[] = [
   { id: "mints", label: "Mint countdowns", hint: "Watched mints starting within 24h" },
   { id: "deadlines", label: "Campaign deadlines", hint: "Deadlines, snapshots, TGE and claim windows in the next 3 days" },
-  { id: "tasks", label: "Today's tasks", hint: "Open tasks due today" },
+  { id: "tasks", label: "Today's tasks", hint: "Open tasks due today (turn single tasks off with the bell on Daily tasks)" },
   { id: "streaks", label: "Streaks at risk", hint: "Due today with a streak of 2 or more" },
 ];
 
@@ -116,13 +121,25 @@ export function NotifySection() {
               </label>
             ))}
           </div>
+          <div className="mt-3 divide-y divide-line rounded-lg border border-line bg-panel text-[13.5px]">
+            <div className="px-3 py-2.5 font-medium">Instant alerts <span className="font-normal text-muted">· checked at {alertRunsLabel()}</span></div>
+            {ALERTS.map((t) => (
+              <label key={t.id} className="flex items-center justify-between gap-3 px-3 py-2.5">
+                <span>
+                  <span className="text-ink-2">{t.label}</span>
+                  <span className="block text-[12px] text-muted">{t.hint}</span>
+                </span>
+                <Switch checked={data[t.id] !== false} onCheckedChange={(v) => patch({ [t.id]: v })} ariaLabel={t.label} />
+              </label>
+            ))}
+          </div>
         </div>
       )}
     </Section>
   );
 }
 
-const CSV_TABLES = ["projects", "positions", "tasks", "completions", "diary", "wallets", "mints", "feed", "attachments", "threads"] as const;
+const CSV_TABLES = ["projects", "positions", "earnings", "tasks", "completions", "diary", "wallets", "watchlist", "mints", "feed", "attachments", "threads"] as const;
 
 type Backups = { configured: boolean; keep: number; backups: { pathname: string; size: number; uploadedAt: string }[] };
 type DryRun = { dryRun: true; exportedAt: string | null; counts: Record<string, number> };
@@ -161,6 +178,8 @@ export function DataSection() {
           <div className="mb-2 text-[12px] font-medium uppercase tracking-wide text-muted">Export</div>
           <div className="flex flex-wrap gap-2">
             <a href="/api/export"><Button><Download className="h-3.5 w-3.5" /> JSON backup</Button></a>
+            <a href="/api/reports?format=csv"><Button><Download className="h-3.5 w-3.5" /> Monthly report CSV</Button></a>
+            <a href="/report"><Button><FileText className="h-3.5 w-3.5" /> Printable report</Button></a>
           </div>
           <div className="mt-2 flex flex-wrap gap-1.5">
             {CSV_TABLES.map((t) => (

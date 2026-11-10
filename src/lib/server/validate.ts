@@ -93,6 +93,7 @@ export const taskInput = z
     startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
     url: z.string().max(500).nullable(),
     active: z.boolean(),
+    remind: z.boolean(),
     sortOrder: z.number().int(),
   })
   .partial();
@@ -109,3 +110,32 @@ export const diaryInput = z
 export function clean<T extends Record<string, unknown>>(o: T): T {
   return Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined)) as T;
 }
+
+const coinId = z.string().trim().toLowerCase().regex(/^[a-z0-9][a-z0-9-]{0,80}$/, "Invalid CoinGecko id");
+const finite = z.coerce.number().refine((n) => Number.isFinite(n), "Must be a number");
+
+export const earningInput = z
+  .object({
+    projectId: z.string().uuid(),
+    symbol: z.string().trim().min(1).max(20),
+    coinId: coinId.nullable(),
+    amount: finite.refine((n) => n >= 0, "Amount can't be negative"),
+    valueAtClaim: finite.refine((n) => n >= 0, "Value can't be negative").nullable(),
+    claimedAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    wallet: z.string().trim().max(120).nullable(),
+    note: z.string().max(2000).nullable(),
+  })
+  .partial();
+
+const threshold = finite.refine((n) => n > 0, "Alert price must be above 0").nullable();
+export const watchInput = z
+  .object({
+    coinId,
+    above: threshold,
+    below: threshold,
+    alertCurrency: z.enum(["usd", "idr", "php", "usdt"]),
+    sortOrder: z.number().int(),
+  })
+  .partial();
+
+export const isUuid = (s: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);

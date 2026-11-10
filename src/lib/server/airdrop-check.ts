@@ -44,7 +44,18 @@ async function getJson(url: string) {
 }
 
 export function validateChecker(c: Partial<AirdropChecker>): string | null {
-  if (!c.type || !["api", "contract", "merkle"].includes(c.type)) return "Pick a checker type";
+  if (!c.type || !["api", "contract", "merkle", "page", "manual"].includes(c.type)) return "Pick a checker type";
+  if (c.claimStatus && !["unknown", "upcoming", "open", "claimed", "closed"].includes(c.claimStatus)) return "Unknown claim status";
+  if (c.type === "manual") return null;
+  if (c.type === "page") {
+    try {
+      if (new URL(c.url ?? "").protocol !== "https:") return "URL must be https";
+    } catch {
+      return "Enter the claim or checker page URL";
+    }
+    if ((c.match ?? "").length > 120) return "Match text is too long";
+    return null;
+  }
   if (c.type === "api" || c.type === "merkle") {
     try {
       const u = new URL((c.url ?? "").replace("{address}", "0x0000000000000000000000000000000000000000"));
@@ -78,6 +89,7 @@ function abiFn(sig: string): AbiFunction | null {
 
 /** Runs the configured read-only check for each EVM wallet. Never signs or sends anything. */
 export async function runChecker(c: AirdropChecker, wallets: string[]): Promise<Result[]> {
+  if (c.type === "page" || c.type === "manual") return [];
   const evm = [...new Set(wallets.filter((w) => isAddress(w)).map((w) => getAddress(w)))];
   if (!evm.length) return [];
   if (c.type === "api") {

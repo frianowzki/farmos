@@ -4,11 +4,12 @@ import { snapshotToBlob } from "@/lib/server/backup";
 import { sendDigest } from "@/lib/server/telegram";
 import { getTrack } from "@/lib/server/wallet-track";
 import { PROFILE_IDS } from "@/lib/profiles";
+import { checkClaims, checkWatchlist } from "@/lib/server/alerts";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-/** Vercel Cron, daily 00:00 UTC (07:00 WIB): backup snapshot, wallet refresh, Telegram digest. */
+/** Vercel Cron, daily 00:00 UTC (07:00 WIB / 08:00 PHT): backup, wallet refresh, claim + price alerts, Telegram digest. */
 export async function GET(req: Request) {
   const secret = process.env.CRON_SECRET;
   const auth = req.headers.get("authorization") ?? "";
@@ -33,6 +34,16 @@ async function runFor(pid: (typeof PROFILE_IDS)[number]) {
     out.wallets = { ok: true, count: t.wallets.length };
   } catch (e) {
     out.wallets = { ok: false, error: (e as Error).message.slice(0, 160) };
+  }
+  try {
+    out.claims = await checkClaims(pid);
+  } catch (e) {
+    out.claims = { ok: false, error: (e as Error).message.slice(0, 160) };
+  }
+  try {
+    out.watchlist = await checkWatchlist(pid);
+  } catch (e) {
+    out.watchlist = { ok: false, error: (e as Error).message.slice(0, 160) };
   }
   try {
     out.digest = await sendDigest(pid);
