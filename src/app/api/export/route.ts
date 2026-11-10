@@ -1,21 +1,21 @@
-import { db, schema } from "@/db";
-import { requireSession } from "@/lib/server/guard";
+import { bad, requireSession } from "@/lib/server/guard";
+import { collectBackup, columnsOf, TABLE_NAMES, toCsv, type TableName } from "@/lib/server/backup";
 
-export async function GET() {
+/** GET /api/export → full JSON backup. GET /api/export?format=csv&table=projects → one table as CSV. */
+export async function GET(req: Request) {
   const denied = await requireSession();
   if (denied) return denied;
-  const d = db();
-  const [projects, positions, tasks, completions, diary, wallets, threads] = await Promise.all([
-    d.select().from(schema.projects),
-    d.select().from(schema.positions),
-    d.select().from(schema.tasks),
-    d.select().from(schema.taskCompletions),
-    d.select().from(schema.diaryEntries),
-    d.select().from(schema.wallets),
-    d.select().from(schema.chatThreads),
-  ]);
-  const body = JSON.stringify({ exportedAt: new Date().toISOString(), projects, positions, tasks, completions, diary, wallets, threads }, null, 2);
-  return new Response(body, {
-    headers: { "content-type": "application/json", "content-disposition": `attachment; filename="farmos-backup-${new Date().toISOString().slice(0, 10)}.json"` },
+  const u = new URL(req.url);
+  const day = new Date().toISOString().slice(0, 10);
+  const b = await collectBackup();
+  if (u.searchParams.get("format") === "csv") {
+    const t = u.searchParams.get("table") as TableName | null;
+    if (!t || !TABLE_NAMES.includes(t)) return bad(`table must be one of: ${TABLE_NAMES.join(", ")}`);
+    return new Response(toCsv(b[t], columnsOf(t)), {
+      headers: { "content-type": "text/csv; charset=utf-8", "content-disposition": `attachment; filename="farmos-${t}-${day}.csv"`, "cache-control": "no-store" },
+    });
+  }
+  return new Response(JSON.stringify(b, null, 2), {
+    headers: { "content-type": "application/json", "content-disposition": `attachment; filename="farmos-backup-${day}.json"`, "cache-control": "no-store" },
   });
 }
