@@ -16,6 +16,7 @@ import { Button, Dialog, Empty, InlineText, Popover, SelectPill, Skeleton, TagIn
 import { ColorSelector, ColorSelectorItem, ColorSelectorList } from "@/components/motion/color-selector";
 import { WheelPicker } from "@/components/motion/wheel-picker";
 import { Attachments } from "@/components/panelui/attachment";
+import { AirdropCheckerPanel } from "@/components/airdrop-checker";
 import { Questionnaire } from "@/components/panelui/questionnaire";
 import { Rating } from "@/components/panelui/rating";
 import { AUDIT, auditScore, scoreToRating } from "@/lib/audit";
@@ -35,6 +36,7 @@ const TABS = [
   { id: "diary", label: "Diary" },
   { id: "mail", label: "Mail" },
   { id: "files", label: "Files" },
+  { id: "eligibility", label: "Eligibility" },
 ];
 
 export function ProjectPage({ id }: { id: string }) {
@@ -98,6 +100,7 @@ export function ProjectPage({ id }: { id: string }) {
       {tab === "tasks" && <ProjectTasks projectId={id} />}
       {tab === "diary" && <ProjectDiary projectId={id} entries={data.diary} />}
       {tab === "mail" && <MailList projectId={id} />}
+      {tab === "eligibility" && <AirdropCheckerPanel projectId={id} checker={p.checker ?? null} wallets={p.wallets} />}
       {tab === "files" && (
         <Attachments
           items={data.attachments}

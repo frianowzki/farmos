@@ -38,6 +38,25 @@ export type ProjectAudit = {
   updatedAt: string;
 };
 
+/** Read-only airdrop eligibility checker configured per project. */
+export type AirdropChecker = {
+  type: "api" | "contract" | "merkle";
+  /** api: https URL with {address}; merkle: https URL of a JSON claims list */
+  url?: string;
+  /** api/merkle: dot path to the amount or eligibility field, e.g. "amount" or "data.eligible" */
+  path?: string;
+  /** contract: chain key (see lib/chains) + address + view signature taking one address, e.g. "claimable(address) returns (uint256)" */
+  chain?: string;
+  address?: string;
+  fn?: string;
+  decimals?: number;
+  claimUrl?: string;
+  lastRun?: {
+    at: string;
+    results: { wallet: string; status: "eligible" | "not_eligible" | "error"; amount?: string | null; detail?: string }[];
+  } | null;
+};
+
 export const projects = pgTable(
   "projects",
   {
@@ -69,6 +88,7 @@ export const projects = pgTable(
     campaignStart: date("campaign_start"),
     campaignEnd: date("campaign_end"),
     audit: jsonb("audit").$type<ProjectAudit | null>(),
+    checker: jsonb("checker").$type<AirdropChecker | null>(),
     sortOrder: integer("sort_order").notNull().default(0),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
