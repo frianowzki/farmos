@@ -121,7 +121,7 @@ The private Blob store `frioos-files` is linked to the project, which provides `
 | `APP_PASSCODE` | yes | passcode gate |
 | `AUTH_SECRET` | yes | signs sessions, encrypts stored secrets |
 | `APP_URL` | yes | `https://frioos-iota.vercel.app` |
-| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `ALLOWED_EMAIL` | optional | enables Google |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `ALLOWED_EMAIL` | optional | enables Google (Gmail, Calendar, and Google sign-in unlock); set on Production + Preview |
 | `AI_BASE_URL`, `AI_API_KEY`, `AI_MODEL` | optional | or configure in Settings |
 | `ETHERSCAN_API_KEY` | optional | richer audits + full-history SeaDrop allowlists; set on Production + Preview |
 | `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` | optional | WalletConnect; public by design; set on Production + Preview |
