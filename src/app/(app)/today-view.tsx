@@ -64,7 +64,7 @@ export function TodayView() {
       {fresh ? (
         <Onboarding onNew={() => newProject()} />
       ) : (
-        <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_340px]">
+        <div className="grid grid-cols-[minmax(0,1fr)] gap-8 lg:grid-cols-[minmax(0,1fr)_340px]">
           <div className="min-w-0 space-y-8">
             <section>
               <SectionTitle right={<Link href="/tasks" className="text-[12px] text-muted hover:text-ink">Manage</Link>}>Today</SectionTitle>
@@ -121,7 +121,7 @@ export function TodayView() {
             <CalendarSection />
           </div>
 
-          <aside className="space-y-6">
+          <aside className="min-w-0 space-y-6">
             <div className="rounded-xl border border-line bg-panel p-4">
               <div className="flex items-start justify-between">
                 <div>
