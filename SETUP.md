@@ -1,6 +1,6 @@
 # farmOS setup
 
-Production: https://frioos-iota.vercel.app (Vercel project `frioos`, team frianowzkis-projects).
+Production: https://farmos-os.vercel.app and https://frioos-iota.vercel.app (Vercel project `frioos`, team frianowzkis-projects).
 
 ## 0. Unlock
 - The app is behind a passcode gate (`APP_PASSCODE`, kept in an httpOnly signed cookie for 30 days).
@@ -123,8 +123,8 @@ The private Blob store `frioos-files` is linked to the project, which provides `
 | `APP_URL` | yes | `https://frioos-iota.vercel.app` |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `ALLOWED_EMAIL` | optional | enables Google |
 | `AI_BASE_URL`, `AI_API_KEY`, `AI_MODEL` | optional | or configure in Settings |
-| `ETHERSCAN_API_KEY` | optional | richer audits |
-| `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` | optional | WalletConnect; public by design |
+| `ETHERSCAN_API_KEY` | optional | richer audits + full-history SeaDrop allowlists; set on Production + Preview |
+| `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` | optional | WalletConnect; public by design; set on Production + Preview |
 | `OPENSEA_API_KEY` | optional | Upcoming mints + live-stage WL check |
 | `BLOB_READ_WRITE_TOKEN` | optional | attachments (set by the Blob integration) |
 | `X_CLIENT_ID`, `X_CLIENT_SECRET` | optional | X connection + Feed timeline |
