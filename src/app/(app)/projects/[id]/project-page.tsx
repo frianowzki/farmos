@@ -9,7 +9,7 @@ import { toast } from "@/lib/client/toast";
 import { Editor } from "@/components/editor";
 import { MailList } from "@/components/mail";
 import { Page } from "@/components/shell";
-import { ChainLabel } from "@/components/chain-logo";
+import { ChainLabel, ChainLogo } from "@/components/chain-logo";
 import { LinkIcon } from "@/components/icons/brand-glyphs";
 import { AddTask, TaskRow, useTaskModel } from "@/components/tasks";
 import { Button, DateField, Dialog, Empty, InlineText, Pill, Popover, SelectPill, Skeleton, TagInput } from "@/components/ui";
@@ -444,7 +444,7 @@ function Positions({ projectId, positions }: { projectId: string; positions: Pos
                     <InlineText value={x.token} onSave={(v) => v && patch(x.id, { token: v })} className="font-medium" />
                     <InlineText value={x.tokenAddress} onSave={(v) => patch(x.id, { tokenAddress: v || null })} placeholder="token address" mono className="h-5 min-h-0 text-[11px] text-faint" />
                   </td>
-                  <td className={td}><InlineText value={x.chain} onSave={(v) => patch(x.id, { chain: v || null })} placeholder="—" /></td>
+                  <td className={td}><span className="flex items-center gap-1.5">{x.chain && <ChainLogo chain={x.chain} size={14} fallback />}<InlineText value={x.chain} onSave={(v) => patch(x.id, { chain: v || null })} placeholder="—" /></span></td>
                   <td className={cn(td, "text-right")}><InlineText mono value={x.size} onSave={(v) => patch(x.id, { size: n(v) ?? 0 })} className="justify-end" /></td>
                   <td className={cn(td, "text-right")}><InlineText mono value={x.entryPrice} onSave={(v) => patch(x.id, { entryPrice: n(v) ?? 0 })} className="justify-end" /></td>
                   <td className={cn(td, "text-right")}>

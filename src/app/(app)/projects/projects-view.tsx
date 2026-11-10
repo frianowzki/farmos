@@ -1,7 +1,7 @@
 "use client";
 import { Checkbox } from "@/components/motion/checkbox";
 import { ProjectMark } from "@/components/project-mark";
-import { ChainLabel } from "@/components/chain-logo";
+import { ChainInline, ChainLabel } from "@/components/chain-logo";
 import { AnimatePresence, motion } from "motion/react";
 import { ArrowUpRight, BadgeCheck, Trash2, CalendarClock, ChevronDown, Columns3, Filter, LayoutList, Plus, Rows3, Search, SlidersHorizontal } from "lucide-react";
 import Link from "next/link";
@@ -227,7 +227,7 @@ function TableView({ projects, pnl, today, showCat, onNew }: ViewProps & { onNew
                 <td className={td}><SelectPill value={p.status} options={STATUS_OPTS} onChange={(v) => set(p.id, { status: v })} /></td>
                 <td className={td}><SelectPill value={p.eligibility ?? "unknown"} options={ELIGIBILITY_OPTS} onChange={(v) => set(p.id, { eligibility: v })} /></td>
                 <td className={cn(td, "max-w-[180px]")}>
-                  <div className="flex gap-1 overflow-hidden px-1">{p.chains.slice(0, 3).map((c) => <Pill key={c}><ChainLabel chain={c} size={13} /></Pill>)}{p.chains.length > 3 && <span className="text-[12px] text-faint">+{p.chains.length - 3}</span>}</div>
+                  <div className="flex gap-1 overflow-hidden px-1">{p.chains.slice(0, 3).map((c) => <Pill key={c}><ChainLabel chain={c} size={14} /></Pill>)}{p.chains.length > 3 && <span className="text-[12px] text-faint">+{p.chains.length - 3}</span>}</div>
                 </td>
                 <td className={td}><SelectPill value={p.priority} options={PRIORITY_OPTS} onChange={(v) => set(p.id, { priority: v })} dot={false} /></td>
                 <td className={td}><SelectPill value={p.tier} options={TIER_OPTS} onChange={(v) => set(p.id, { tier: v })} dot={false} /></td>
@@ -280,7 +280,7 @@ function MobileCards({ projects, pnl, today, showCat, set, onNew }: ViewProps & 
               <div className="min-w-0 flex-1">
                 <div className="truncate text-[14px] font-medium text-ink">{p.name}</div>
                 <div className="mt-0.5 flex items-center gap-1.5 text-[11.5px] text-muted">
-                  {nd ? <><CalendarClock className="h-3 w-3 shrink-0" /><span className="truncate">{nd.label} {relDay(nd.day, today)}</span></> : <span className="truncate">{p.chains.slice(0, 2).join(" · ") || "No dates"}</span>}
+                  {nd ? <><CalendarClock className="h-3 w-3 shrink-0" /><span className="truncate">{nd.label} {relDay(nd.day, today)}</span></> : (p.chains.length ? <ChainInline chains={p.chains} /> : <span className="truncate">No dates</span>)}
                   {r.invested > 0 && <span className={cn("num ml-auto shrink-0", tone(r.net))}>{usd(r.net, { sign: true, compact: true })}</span>}
                 </div>
               </div>
@@ -295,7 +295,7 @@ function MobileCards({ projects, pnl, today, showCat, set, onNew }: ViewProps & 
                     {row("Status", <SelectPill value={p.status} options={STATUS_OPTS} onChange={(v) => set(p.id, { status: v })} />)}
                     {row("Eligibility", <SelectPill value={p.eligibility ?? "unknown"} options={ELIGIBILITY_OPTS} onChange={(v) => set(p.id, { eligibility: v })} />)}
                     {claimBadge(p, today) && row("Claim", <ClaimPill p={p} today={today} />)}
-                    {row("Chains", p.chains.length ? <div className="flex flex-wrap justify-end gap-1">{p.chains.map((c) => <Pill key={c}><ChainLabel chain={c} size={13} /></Pill>)}</div> : <span className="text-[13px] text-faint">None</span>)}
+                    {row("Chains", p.chains.length ? <div className="flex flex-wrap justify-end gap-1">{p.chains.map((c) => <Pill key={c}><ChainLabel chain={c} size={14} /></Pill>)}</div> : <span className="text-[13px] text-faint">None</span>)}
                     {row("Priority", <SelectPill value={p.priority} options={PRIORITY_OPTS} onChange={(v) => set(p.id, { priority: v })} dot={false} />)}
                     {row("Tier", <SelectPill value={p.tier} options={TIER_OPTS} onChange={(v) => set(p.id, { tier: v })} dot={false} />)}
                     {row("Rating", <Rating value={p.rating} onChange={(v) => set(p.id, { rating: v })} size={14} />)}
@@ -370,7 +370,7 @@ function Board({ projects, pnl, today, showCat }: ViewProps) {
                       {p.summary && <p className="mt-1 line-clamp-2 text-[12.5px] text-muted">{p.summary}</p>}
                       <div className="mt-2 flex flex-wrap items-center gap-1">
                         {showCat && <Pill tone={catTone(p.category)}>{CATEGORY_OPTS.find((c) => c.id === p.category)?.label}</Pill>}
-                        {p.chains.slice(0, 2).map((c) => <Pill key={c}><ChainLabel chain={c} size={13} /></Pill>)}
+                        {p.chains.slice(0, 2).map((c) => <Pill key={c}><ChainLabel chain={c} size={14} /></Pill>)}
                         {p.eligibility && p.eligibility !== "unknown" && (() => { const e = ELIGIBILITY_OPTS.find((x) => x.id === p.eligibility); return e ? <Pill tone={e.tone} dot>{e.label}</Pill> : null; })()}
                         <ClaimPill p={p} today={today} />
                       </div>
@@ -409,7 +409,7 @@ function ListView({ projects, pnl, today }: ViewProps) {
                 <span className="truncate text-[14px] font-medium">{p.name}</span>
                 <span className="text-[12px] capitalize text-faint">{p.category}</span>
               </div>
-              <div className="truncate text-[12.5px] text-muted">{p.summary || p.chains.join(" · ") || "No summary yet"}</div>
+              <div className="flex min-w-0 text-[12.5px] text-muted">{p.summary ? <span className="truncate">{p.summary}</span> : p.chains.length ? <ChainInline chains={p.chains} max={3} /> : <span className="truncate">No summary yet</span>}</div>
             </div>
             <div className="hidden text-right text-[12px] text-muted sm:block">{nd ? <>{nd.label}<div className="num text-ink-2">{relDay(nd.day, today)}</div></> : null}</div>
             <div className={cn("num hidden w-[90px] text-right text-[13px] md:block", tone(r.net))}>{r.invested ? usd(r.net, { sign: true, compact: true }) : ""}</div>
