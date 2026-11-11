@@ -23,6 +23,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/motion/tabs";
 import { Fab } from "@/components/panelui/fab";
 import { ChainLabel } from "@/components/chain-logo";
 import { AddTask } from "@/components/tasks";
+import { ShortcutHelp } from "@/components/shortcut-help";
 import { cn } from "@/lib/cn";
 import { CHAIN_SUGGESTIONS, CATEGORIES } from "@/lib/constants";
 import { api, useCreateProject, useProjects, useWallets } from "@/lib/client/api";
@@ -442,7 +443,9 @@ function Palette({ open, onClose }: { open: boolean; onClose: () => void }) {
 }
 
 export function AppShell({ children }: { children: ReactNode }) {
+  const router = useRouter();
   const [palette, setPalette] = useState(false);
+  const [help, setHelp] = useState(false);
   const [quick, setQuick] = useState<{ view: QuickView; cat?: string }>({ view: null });
   const [sidebarOpen, setSidebarOpen] = useSidebarPref();
 
@@ -451,6 +454,24 @@ export function AppShell({ children }: { children: ReactNode }) {
   const openQuick = useCallback(() => setQuick({ view: "menu" }), []);
 
   useEffect(() => {
+    // Two-key navigation: press `g`, then a letter. The window between the keys is short enough that a
+    // stray `g` while reading does nothing, and any other key cancels the sequence.
+    const GO: Record<string, string> = {
+      t: "/",
+      p: "/projects",
+      k: "/tasks",
+      d: "/diary",
+      o: "/portfolio",
+      m: "/mints",
+      w: "/wallets",
+      a: "/assistant",
+      r: "/recap",
+      s: "/settings",
+      c: "/feed",
+    };
+    let armed = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement;
       const typing = t.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(t.tagName);
@@ -460,6 +481,23 @@ export function AppShell({ children }: { children: ReactNode }) {
         return;
       }
       if (typing || e.metaKey || e.ctrlKey || e.altKey) return;
+
+      if (armed) {
+        armed = false;
+        clearTimeout(timer);
+        const dest = GO[e.key.toLowerCase()];
+        if (dest) {
+          e.preventDefault();
+          router.push(dest);
+          return;
+        }
+      }
+
+      if (e.key === "g" || e.key === "G") {
+        armed = true;
+        timer = setTimeout(() => { armed = false; }, 1400);
+        return;
+      }
       if (e.key === "n" || e.key === "N") {
         e.preventDefault();
         const cat = new URLSearchParams(window.location.search).get("cat") ?? undefined;
@@ -469,13 +507,21 @@ export function AppShell({ children }: { children: ReactNode }) {
         e.preventDefault();
         setPalette(true);
       }
+      if (e.key === "?") {
+        e.preventDefault();
+        setHelp((h) => !h);
+      }
     };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [newProject]);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      clearTimeout(timer);
+    };
+  }, [newProject, router]);
 
   return (
     <Ctx.Provider value={{ newProject, openPalette, openQuick }}>
+      <ShortcutHelp open={help} onClose={() => setHelp(false)} />
       <AnimatedSidebarProvider open={sidebarOpen} onOpenChange={setSidebarOpen} className="bg-bg" style={{ "--sidebar-width": "15.5rem", "--sidebar-width-icon": "3.75rem" } as never}>
         <AnimatedSidebar ariaLabel="farmOS" collapsible="icon" panelClassName="bg-sidebar border-line" className="[&_[data-slot=sidebar-menu-button]]:rounded-lg">
           <Suspense fallback={null}>

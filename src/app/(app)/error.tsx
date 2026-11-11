@@ -22,11 +22,8 @@ export default function AppError({ error, reset }: { error: Error & { digest?: s
       </p>
       {error.digest && <p className="num mt-3 text-[11px] text-faint">ref {error.digest}</p>}
       <div className="mt-6 flex items-center gap-2">
-        <Button variant="primary" onClick={reset} className="h-9 gap-1.5 text-[13.5px]">
+        <Button onClick={reset} variant="primary" className="h-9 gap-1.5 text-[13.5px]">
           <RotateCcw className="h-3.5 w-3.5" /> Try again
-        </Button>
-        <Button onClick={() => { window.location.href = "/"; }} className="h-9 text-[13.5px]">
-          Back to Today
         </Button>
       </div>
     </div>

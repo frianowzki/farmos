@@ -35,8 +35,10 @@ import { pct, relDay, relWhen, shortAddr, tone, usd } from "@/lib/format";
 import { api, keys, useGoogleStatus, useProject, useUpdateProject, useWallets, type Position, type Project } from "@/lib/client/api";
 import { CATEGORY_OPTS, ELIGIBILITY_OPTS, PRIORITY_OPTS, RISK_OPTS, STATUS_OPTS, TIER_OPTS } from "@/lib/options";
 import { positionPnl, projectPnl } from "@/lib/pnl";
+import { ProjectTimeline } from "@/components/project-timeline";
 
 const TABS = [
+  { id: "timeline", label: "Timeline" },
   { id: "notes", label: "Notes" },
   { id: "positions", label: "Positions & PnL" },
   { id: "tasks", label: "Tasks" },
@@ -108,6 +110,7 @@ export function ProjectPage({ id }: { id: string }) {
         ))}
       </div>
 
+      {tab === "timeline" && <ProjectTimeline project={p} detail={data} />}
       {tab === "notes" && <Editor value={p.notes} onSave={(html) => update.mutateAsync({ id, patch: { notes: html } }).then(() => undefined)} />}
       {tab === "positions" && <Positions projectId={id} positions={data.positions} />}
       {tab === "tasks" && <ProjectTasks projectId={id} />}
