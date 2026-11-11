@@ -21,6 +21,7 @@ import { Converter } from "@/components/converter";
 import { earningTotals, useEarnings } from "@/components/earnings";
 import { costTotals, ledgerRoi, useCosts } from "@/components/costs";
 import { pnlFor, projectDates } from "@/lib/project-utils";
+import { Watchlist, firedAlerts, useWatchlist } from "@/components/watchlist";
 
 export function TodayView() {
   const { data, isLoading } = useProjects();
@@ -46,6 +47,8 @@ export function TodayView() {
   const totals = useMemo(() => sumPnl(projects.map((p) => pnlFor(p, data?.positions ?? []))), [projects, data]);
   const claimable = projects.filter((p) => p.status === "claimable");
   const activeCount = projects.filter((p) => p.status !== "done" && p.status !== "dropped").length;
+  const watch = useWatchlist();
+  const alertsFired = firedAlerts(watch.data?.items ?? [], watch.data?.prices ?? {}).length;
   const fresh = !isLoading && projects.length === 0 && model.rows.length === 0;
 
   return (
@@ -57,6 +60,7 @@ export function TodayView() {
             {open.length ? `${open.length} task${open.length > 1 ? "s" : ""} left today` : model.rows.length ? "All of today's tasks are done" : "No recurring tasks yet"}
             {upcoming.length > 0 && ` · ${upcoming.filter((u) => diffDays(u.day, today) <= 7 && diffDays(u.day, today) >= 0).length} dates this week`}
             {claimable.length > 0 && ` · ${claimable.length} claimable`}
+            {alertsFired > 0 && ` · ${alertsFired} price alert${alertsFired > 1 ? "s" : ""} fired`}
           </>
         )}
       />
@@ -141,6 +145,10 @@ export function TodayView() {
             <div className="rounded-xl border border-line bg-panel p-4">
               <div className="mb-3 flex items-center justify-between text-[12px] font-medium text-muted">Convert <ArrowRightLeft className="h-3.5 w-3.5" /></div>
               <Converter compact />
+            </div>
+
+            <div className="rounded-xl border border-line bg-panel p-4">
+              <Watchlist />
             </div>
 
             <Link href="/portfolio" className="block rounded-xl border border-line bg-panel p-4 transition-colors hover:border-line-strong">

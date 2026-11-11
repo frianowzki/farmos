@@ -25,7 +25,8 @@ import { ChainLabel } from "@/components/chain-logo";
 import { AddTask } from "@/components/tasks";
 import { cn } from "@/lib/cn";
 import { CHAIN_SUGGESTIONS, CATEGORIES } from "@/lib/constants";
-import { api, useCreateProject, useProjects } from "@/lib/client/api";
+import { api, useCreateProject, useProjects, useWallets } from "@/lib/client/api";
+import { shortAddr } from "@/lib/format";
 import { CATEGORY_OPTS } from "@/lib/options";
 
 type ShellCtx = { newProject: (category?: string) => void; openPalette: () => void; openQuick: () => void };
@@ -361,6 +362,7 @@ function Palette({ open, onClose }: { open: boolean; onClose: () => void }) {
   const router = useRouter();
   const { setTheme } = useTheme();
   const { data } = useProjects();
+  const wallets = useWallets().data?.wallets;
   const { newProject } = useShell();
   const go = (href: string) => {
     onClose();
@@ -398,6 +400,17 @@ function Palette({ open, onClose }: { open: boolean; onClose: () => void }) {
                 <Command.Item key={p.id} value={`${p.name} ${p.category} ${p.tags.join(" ")}`} className={itemCls} onSelect={() => go(`/projects/${p.id}`)}>
                   <ProjectMark p={p} size={18} /> {p.name}
                   <span className="ml-auto text-[12px] capitalize text-faint">{p.category}</span>
+                </Command.Item>
+              ))}
+            </Command.Group>
+          )}
+          {(wallets?.length ?? 0) > 0 && (
+            <Command.Group heading="Wallets" className={group}>
+              {wallets!.map((w) => (
+                <Command.Item key={w.id} value={`${w.label} ${w.address} ${w.chain} ${w.provider}`} className={itemCls} onSelect={() => go(`/wallets?w=${w.id}`)}>
+                  <Wallet className="h-4 w-4 text-muted" />
+                  <span className="truncate">{w.label || shortAddr(w.address)}</span>
+                  <span className="num ml-auto shrink-0 text-[11.5px] text-faint">{w.chain || "evm"}</span>
                 </Command.Item>
               ))}
             </Command.Group>

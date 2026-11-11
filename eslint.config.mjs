@@ -17,6 +17,13 @@ const eslintConfig = defineConfig([
       "@typescript-eslint/no-empty-object-type": "off",
     },
   },
+  // Node-side tooling: CommonJS by design (run with `node`, not bundled), so require() is expected.
+  {
+    files: ["scripts/**/*.cjs", "scripts/**/*.js"],
+    rules: {
+      "@typescript-eslint/no-require-imports": "off",
+    },
+  },
   // Override default ignores of eslint-config-next.
   globalIgnores([
     // Default ignores of eslint-config-next:
