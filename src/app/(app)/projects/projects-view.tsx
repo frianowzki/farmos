@@ -16,6 +16,7 @@ import { nowMinInZone, today as todayFn } from "@/lib/dates";
 import { pct, relWhen, tone, usd } from "@/lib/format";
 import { useProjects, useUpdateProject, type Project } from "@/lib/client/api";
 import { CATEGORY_OPTS, ELIGIBILITY_OPTS, PRIORITY_OPTS, RISK_OPTS, STATUS_OPTS, TIER_OPTS, catTone } from "@/lib/options";
+import { BulkBar, useSelection } from "@/components/bulk-projects";
 import { Rating } from "@/components/panelui/rating";
 import { SORTS, nextDate, pnlFor, sortProjects } from "@/lib/project-utils";
 import { claimBadge } from "@/lib/claim";
@@ -192,16 +193,26 @@ type ViewProps = { projects: Project[]; pnl: (p: Project) => ReturnType<typeof p
 function TableView({ projects, pnl, today, showCat, onNew }: ViewProps & { onNew: () => void }) {
   const update = useUpdateProject();
   const set = (id: string, patch: Partial<Project>) => update.mutate({ id, patch });
+  const sel = useSelection();
+  const visibleIds = projects.map((p) => p.id);
+  const allSelected = visibleIds.length > 0 && visibleIds.every((id) => sel.ids.has(id));
   const th = "h-8 whitespace-nowrap px-2 text-left text-[12px] font-medium text-muted";
   const td = "h-10 border-t border-line px-1 align-middle";
   return (
     <>
     <MobileCards projects={projects} pnl={pnl} today={today} showCat={showCat} set={set} onNew={onNew} />
     <div className="hidden overflow-x-auto rounded-lg border border-line bg-panel md:block">
-      <table className="w-full min-w-[1080px] border-collapse">
+      <table className="w-full min-w-[1120px] border-collapse">
         <thead>
           <tr>
-            <th className={cn(th, "w-[260px] pl-3")}>Name</th>
+            <th className={cn(th, "w-9 pl-3")}>
+              <Checkbox
+                aria-label="Select all"
+                checked={allSelected}
+                onCheckedChange={() => sel.toggleAll(visibleIds)}
+              />
+            </th>
+            <th className={cn(th, "w-[260px]")}>Name</th>
             {showCat && <th className={th}>Category</th>}
             <th className={th}>Status</th>
             <th className={th}>Eligibility</th>
@@ -221,7 +232,10 @@ function TableView({ projects, pnl, today, showCat, onNew }: ViewProps & { onNew
             const r = pnl(p);
             const nd = nextDate(p, today);
             return (
-              <tr key={p.id} className="group transition-colors hover:bg-[color-mix(in_oklab,var(--hover)_55%,transparent)]">
+              <tr key={p.id} className={cn("group transition-colors hover:bg-[color-mix(in_oklab,var(--hover)_55%,transparent)]", sel.ids.has(p.id) && "bg-active/60")}>
+                <td className={cn(td, "pl-3")}>
+                  <Checkbox aria-label={`Select ${p.name}`} checked={sel.ids.has(p.id)} onCheckedChange={() => sel.toggle(p.id)} />
+                </td>
                 <td className={cn(td, "pl-2")}>
                   <Link href={`/projects/${p.id}`} className="flex items-center gap-2 rounded-md px-1.5 py-1 hover:bg-hover">
                     <ProjectMark p={p} />
@@ -257,6 +271,7 @@ function TableView({ projects, pnl, today, showCat, onNew }: ViewProps & { onNew
       </table>
       {projects.length === 0 && <div className="border-t border-line px-3 py-6 text-center text-[13px] text-muted">No projects match these filters.</div>}
     </div>
+    <BulkBar ids={[...sel.ids]} onClear={sel.clear} />
     </>
   );
 }
