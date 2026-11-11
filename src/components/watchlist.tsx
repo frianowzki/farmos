@@ -126,10 +126,11 @@ export function Watchlist() {
                 {fired && <BellRing className="h-3 w-3 shrink-0 text-warning" aria-label="Alert fired" />}
                 <button
                   onClick={() => remove.mutate(r.id)}
-                  className="shrink-0 text-faint opacity-0 transition-opacity hover:text-neg group-hover:opacity-100"
-                  aria-label={`Stop watching ${r.symbol || r.coinId}`}
+                  className="shrink-0 rounded p-1 text-faint transition-colors hover:bg-hover hover:text-neg focus-visible:text-neg"
+                  aria-label={`Remove ${r.symbol || r.coinId} from the watchlist`}
+                  title="Remove from watchlist"
                 >
-                  <X className="h-3 w-3" />
+                  <X className="h-3.5 w-3.5" />
                 </button>
               </li>
             );
