@@ -1,7 +1,7 @@
 /* farmOS service worker: offline app shell only. API responses and HTML pages are never cached. */
 // Bump on every SW change: activate deletes every other cache, so stale CSS/JS from old builds goes away.
-const VERSION = "farmos-v4"; // v4: sprout brand icons
-const SHELL = ["/offline.html", "/icon.svg", "/icons/icon-192.png", "/icons/icon-512.png", "/brand/farmos-logo.svg", "/brand/farmos-logo-dark.svg"];
+const VERSION = "farmos-v5"; // v5: sprout brand marks
+const SHELL = ["/offline.html", "/icon.svg", "/icons/icon-192.png", "/icons/icon-512.png", "/brand/farmos-logo.svg", "/brand/farmos-logo-dark.svg", "/brand/farmos-sprout.svg", "/brand/farmos-sprout-dark.svg"];
 
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(VERSION).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));
@@ -43,7 +43,7 @@ self.addEventListener("fetch", (e) => {
     return;
   }
   // Icons and brand marks are not hashed: network first, cache only as an offline fallback.
-  if (url.pathname.startsWith("/icons/") || url.pathname.startsWith("/brands/") || url.pathname === "/icon.svg") {
+  if (url.pathname.startsWith("/icons/") || url.pathname.startsWith("/brand/") || url.pathname.startsWith("/brands/") || url.pathname === "/icon.svg") {
     e.respondWith(fetch(req).then((res) => put(req, res)).catch(() => caches.match(req)));
   }
 });
