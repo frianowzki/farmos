@@ -24,6 +24,7 @@ const TOGGLES: { id: keyof Notify; label: string; hint: string }[] = [
   { id: "deadlines", label: "Campaign deadlines", hint: "Deadlines, snapshots, TGE and claim windows in the next 3 days" },
   { id: "tasks", label: "Today's tasks", hint: "Open tasks due today (turn single tasks off with the bell on Daily tasks)" },
   { id: "streaks", label: "Streaks at risk", hint: "Due today with a streak of 2 or more" },
+  { id: "prices", label: "Price alerts", hint: "A watched token crosses an above/below threshold on your watchlist" },
 ];
 
 export function NotifySection() {

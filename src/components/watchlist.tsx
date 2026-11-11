@@ -6,6 +6,7 @@ import { Button, Input } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import { api } from "@/lib/client/api";
 import { pct, usd } from "@/lib/format";
+import { firedAlerts } from "@/lib/watch-alerts";
 
 export type WatchRow = {
   id: string;
@@ -33,7 +34,7 @@ export function useWatchlist() {
   });
 }
 
-function useWatchMutations() {
+export function useWatchMutations() {
   const qc = useQueryClient();
   const done = () => qc.invalidateQueries({ queryKey: WATCH_KEY });
   const add = useMutation({
@@ -41,7 +42,7 @@ function useWatchMutations() {
     onSuccess: done,
   });
   const patch = useMutation({
-    mutationFn: ({ id, ...body }: { id: string; above?: number | null; below?: number | null }) =>
+    mutationFn: ({ id, ...body }: { id: string; above?: number | null; below?: number | null; alertCurrency?: string }) =>
       api(`/api/watchlist/${id}`, { method: "PATCH", body }),
     onSuccess: done,
   });
@@ -53,15 +54,7 @@ function useWatchMutations() {
 }
 
 /** A row whose threshold has already fired and not been re-armed — the ones worth surfacing first. */
-export function firedAlerts(rows: WatchRow[], prices: Record<string, Price>) {
-  return rows.filter((r) => {
-    const p = prices[r.coinId]?.usd;
-    if (p == null) return false;
-    if (r.above != null && p >= r.above && !r.alertState?.above) return true;
-    if (r.below != null && p <= r.below && !r.alertState?.below) return true;
-    return false;
-  });
-}
+export { firedAlerts } from "@/lib/watch-alerts";
 
 export function Watchlist() {
   const { data, isLoading } = useWatchlist();

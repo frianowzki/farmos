@@ -4,7 +4,7 @@ import { snapshotToBlob } from "@/lib/server/backup";
 import { sendDigest } from "@/lib/server/telegram";
 import { getTrack } from "@/lib/server/wallet-track";
 import { PROFILE_IDS } from "@/lib/profiles";
-import { checkClaims } from "@/lib/server/alerts";
+import { checkClaims, checkWatchlist } from "@/lib/server/alerts";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -39,6 +39,13 @@ async function runFor(pid: (typeof PROFILE_IDS)[number]) {
     out.claims = await checkClaims(pid);
   } catch (e) {
     out.claims = { ok: false, error: (e as Error).message.slice(0, 160) };
+  }
+  try {
+    // Watchlist price alerts. Runs here because Hobby only allows one run per cron job per day,
+    // and this job already owns the 00:00 UTC slot with the digest.
+    out.prices = await checkWatchlist(pid);
+  } catch (e) {
+    out.prices = { ok: false, error: (e as Error).message.slice(0, 160) };
   }
   try {
     out.digest = await sendDigest(pid);
