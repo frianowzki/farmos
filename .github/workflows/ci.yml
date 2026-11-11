@@ -20,7 +20,9 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          # Matches production: the Vercel project runs on Node 26.x, and the lockfile is resolved
+          # with npm 11. Pinning a different major makes `npm ci` disagree with the lock.
+          node-version: 26
           cache: npm
 
       - name: Install
