@@ -3,6 +3,7 @@ import { useState } from "react";
 import { ArrowDownRight, ArrowUpRight, BellRing, BellOff, Minus, Plus, Trash2 } from "lucide-react";
 import { PageHeader } from "@/components/shell";
 import { Button, Empty, Input, Pill, SelectPill, Skeleton } from "@/components/ui";
+import { TokenPicker, type PickedCoin } from "@/components/token-picker";
 import { cn } from "@/lib/cn";
 import { pct, usd } from "@/lib/format";
 import { firedAlerts, useWatchlist, useWatchMutations, type WatchRow } from "@/components/watchlist";
@@ -18,16 +19,15 @@ export function WatchlistView() {
   const { data, isLoading, error } = useWatchlist();
   const { add, patch, remove } = useWatchMutations();
   const [adding, setAdding] = useState(false);
-  const [coin, setCoin] = useState("");
+  const [coin, setCoin] = useState<PickedCoin | null>(null);
 
   const rows = data?.items ?? [];
   const prices = data?.prices ?? {};
   const fired = firedAlerts(rows, prices);
 
   const submit = () => {
-    const v = coin.trim().toLowerCase();
-    if (!v) return setAdding(false);
-    add.mutate(v, { onSettled: () => { setCoin(""); setAdding(false); } });
+    if (!coin) return setAdding(false);
+    add.mutate(coin.id, { onSettled: () => { setCoin(null); setAdding(false); } });
   };
 
   return (
@@ -47,15 +47,11 @@ export function WatchlistView() {
       />
 
       {adding && (
-        <div className="mb-4 flex max-w-md gap-2">
-          <Input
-            autoFocus
-            value={coin}
-            onChange={(e) => setCoin(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter") submit(); if (e.key === "Escape") { setAdding(false); setCoin(""); } }}
-            placeholder="CoinGecko id — ethereum, solana, arbitrum…"
-          />
-          <Button onClick={submit} disabled={add.isPending}>{add.isPending ? "Adding…" : "Add"}</Button>
+        <div className="mb-4 flex max-w-md items-center gap-2">
+          <TokenPicker value={coin} onChange={setCoin} className="flex-1" />
+          <Button onClick={submit} disabled={!coin || add.isPending}>
+            {add.isPending ? "Adding…" : "Add"}
+          </Button>
         </div>
       )}
 
