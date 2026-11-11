@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient, type QueryKey } from "@tanstack/
 import { ArrowDownRight, ArrowUpRight, BellRing, Minus, Plus, X } from "lucide-react";
 import { useState } from "react";
 import { Button, Input } from "@/components/ui";
+import { TokenPicker, type PickedCoin } from "@/components/token-picker";
 import { cn } from "@/lib/cn";
 import { api } from "@/lib/client/api";
 import { pct, usd } from "@/lib/format";
@@ -60,14 +61,13 @@ export function Watchlist() {
   const { data, isLoading } = useWatchlist();
   const { add, patch, remove } = useWatchMutations();
   const [adding, setAdding] = useState(false);
-  const [val, setVal] = useState("");
+  const [coin, setCoin] = useState<PickedCoin | null>(null);
   const rows = data?.items ?? [];
   const prices = data?.prices ?? {};
 
   const submit = () => {
-    const v = val.trim();
-    if (!v) return setAdding(false);
-    add.mutate(v.toLowerCase(), { onSettled: () => { setVal(""); setAdding(false); } });
+    if (!coin) return setAdding(false);
+    add.mutate(coin.id, { onSettled: () => { setCoin(null); setAdding(false); } });
   };
 
   return (
@@ -86,16 +86,9 @@ export function Watchlist() {
       </div>
 
       {adding && (
-        <div className="mb-2 flex gap-1.5">
-          <Input
-            autoFocus
-            value={val}
-            onChange={(e) => setVal(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter") submit(); if (e.key === "Escape") { setAdding(false); setVal(""); } }}
-            placeholder="coingecko id — ethereum, solana…"
-            className="h-8 text-[12.5px]"
-          />
-          <Button onClick={submit} disabled={add.isPending} className="h-8 shrink-0 text-[12px]">Add</Button>
+        <div className="mb-2 flex items-center gap-1.5">
+          <TokenPicker value={coin} onChange={setCoin} className="h-8 flex-1 text-[12.5px]" compact />
+          <Button onClick={submit} disabled={!coin || add.isPending} className="h-8 shrink-0 text-[12px]">Add</Button>
         </div>
       )}
 
