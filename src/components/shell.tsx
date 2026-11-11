@@ -2,7 +2,7 @@
 import { Command } from "cmdk";
 import {
   ArrowRight, CalendarRange, Flame, FlaskConical, Gift, Image as ImageIcon, Layers, ListChecks, Lock, Mail, Menu, Monitor, Moon, Newspaper, NotebookPen,
-  PanelLeftClose, PanelLeftOpen, Plus, Search, Settings2, Sparkles, Sun, SunMedium, Telescope, Wallet, ChartNoAxesColumn,
+  PanelLeftClose, PanelLeftOpen, Plus, Search, Settings2, Sparkles, Sun, SunMedium, Telescope, Wallet, ChartNoAxesColumn, BellRing, Coins,
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import Link from "next/link";
@@ -46,7 +46,9 @@ const NAV = [
   { href: "/tasks", label: "Daily tasks", icon: ListChecks },
   { href: "/diary", label: "Diary", icon: NotebookPen },
   { href: "/portfolio", label: "Portfolio", icon: ChartNoAxesColumn },
+  { href: "/money", label: "Money", icon: Coins },
   { href: "/mints", label: "Upcoming mints", icon: Sparkles },
+  { href: "/watchlist", label: "Watchlist", icon: BellRing },
   { href: "/mail", label: "Mail", icon: Mail },
   { href: "/assistant", label: "Research desk", icon: Telescope },
   { href: "/wallets", label: "Wallets", icon: Wallet },
@@ -462,7 +464,9 @@ export function AppShell({ children }: { children: ReactNode }) {
       k: "/tasks",
       d: "/diary",
       o: "/portfolio",
+      n: "/money",
       m: "/mints",
+      l: "/watchlist",
       w: "/wallets",
       a: "/assistant",
       r: "/recap",
