@@ -29,6 +29,8 @@ export const WALLET_BRANDS = [
   { id: "sender", name: "Sender" },
   { id: "intear", name: "Intear" },
   { id: "monero", name: "Monero GUI" },
+  { id: "ledger", name: "Ledger" },
+  { id: "keplr", name: "Keplr" },
   { id: "cakewallet", name: "Cake Wallet" },
   { id: "trezor", name: "Trezor" },
 ] as const;
