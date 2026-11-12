@@ -24,6 +24,13 @@ import { costTotals, ledgerRoi, useCosts } from "@/components/costs";
 import { pnlFor, projectDates } from "@/lib/project-utils";
 import { Watchlist, firedAlerts, useWatchlist } from "@/components/watchlist";
 
+/** Status tones map to the same CSS vars the `dot-*` classes use, so the donut and the list below
+ * always agree on colour. */
+function statusColor(tone: string) {
+  const known = ["gray", "blue", "amber", "green", "stone", "red", "violet"];
+  return `var(--t-${known.includes(tone) ? tone : "gray"}-fg)`;
+}
+
 export function TodayView() {
   const { data, isLoading } = useProjects();
   const model = useTaskModel();
@@ -176,11 +183,14 @@ export function TodayView() {
                 </div>
               </div>
               {pipe === "pie" ? (
-                <DonutChart
-                  size={150}
-                  slices={STATUSES.filter((s) => s.id !== "dropped").map((s) => ({ id: s.id, label: s.label, value: projects.filter((p) => p.status === s.id).length, color: `var(--${s.tone === "amber" ? "warn" : s.tone === "stone" ? "faint" : "ink-2"})` }))}
-                  emptyLabel="No projects yet"
-                />
+                <div className="flex justify-center">
+                  <DonutChart
+                    size={150}
+                    showLegend={false}
+                    slices={STATUSES.filter((s) => s.id !== "dropped").map((s) => ({ id: s.id, label: s.label, value: projects.filter((p) => p.status === s.id).length, color: statusColor(s.tone) }))}
+                    emptyLabel="No projects yet"
+                  />
+                </div>
               ) : (
               <div className="flex h-2 overflow-hidden rounded-full bg-hover">
                 {STATUSES.filter((s) => s.id !== "dropped").map((s) => {

@@ -11,7 +11,7 @@ const PALETTE = ["var(--pos)", "var(--accent)", "var(--warn)", "var(--neg)", "va
  * Donut breakdown of a portfolio dimension. SVG + d3-shape only — the app already ships d3-shape for
  * the PnL bars, so a chart library would be dead weight for one visualisation.
  */
-export function DonutChart({ slices, unit, emptyLabel = "No data yet", size = 180 }: { slices: Slice[]; unit?: (n: number) => string; emptyLabel?: string; size?: number }) {
+export function DonutChart({ slices, unit, emptyLabel = "No data yet", size = 180, showLegend = true }: { slices: Slice[]; unit?: (n: number) => string; emptyLabel?: string; size?: number; showLegend?: boolean }) {
   const [hover, setHover] = useState<string | null>(null);
   const total = slices.reduce((s, x) => s + Math.max(0, x.value), 0);
   const live = slices.filter((s) => s.value > 0);
@@ -37,7 +37,7 @@ export function DonutChart({ slices, unit, emptyLabel = "No data yet", size = 18
 
   const active = arcs.find((a) => a.id === hover) ?? null;
   return (
-    <div className="flex flex-col items-center gap-3 sm:flex-row sm:items-center sm:gap-5">
+    <div className={cn("flex flex-col items-center gap-3", showLegend && "sm:flex-row sm:items-center sm:gap-5")}>
       <svg viewBox="-100 -100 200 200" style={{ width: size, height: size }} className="shrink-0" role="img" aria-label="Breakdown">
         {arcs.map((a) => (
           <path
@@ -55,6 +55,7 @@ export function DonutChart({ slices, unit, emptyLabel = "No data yet", size = 18
           {active ? `${(active.pct * 100).toFixed(1)}%` : unit ? unit(total) : total}
         </text>
       </svg>
+      {showLegend && (
       <ul className="min-w-0 flex-1 space-y-1.5">
         {arcs.map((a) => (
           <li
@@ -69,6 +70,7 @@ export function DonutChart({ slices, unit, emptyLabel = "No data yet", size = 18
           </li>
         ))}
       </ul>
+      )}
     </div>
   );
 }
