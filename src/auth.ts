@@ -40,6 +40,13 @@ const providers = [
           name: "X",
           clientId: process.env.X_CLIENT_ID,
           clientSecret: process.env.X_CLIENT_SECRET,
+          // X's token endpoint only accepts HTTP Basic (`Authorization: Basic ...`). Auth.js defaults
+          // to putting the secret in the request body, which X rejects with
+          // 401 unauthorized_client "Missing valid authorization header" on every callback.
+          client: { token_endpoint_auth_method: "client_secret_basic" },
+          // Without an explicit issuer Auth.js falls back to "https://authjs.dev" and sends that as
+          // the token request audience.
+          issuer: "https://x.com/i/oauth2/authorize",
           authorization: { url: "https://x.com/i/oauth2/authorize", params: { scope: "users.read tweet.read follows.read offline.access" } },
           token: "https://api.x.com/2/oauth2/token",
           userinfo: "https://api.x.com/2/users/me?user.fields=profile_image_url,username,name,public_metrics",
