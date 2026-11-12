@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { bad, readJson, requireProfile } from "@/lib/server/guard";
-import { isConfigured, saveConnection, verifyTelegram } from "@/lib/server/connections";
+import { isConfigured, removeConnection, saveConnection, verifyTelegram } from "@/lib/server/connections";
 
 /** Receives the Telegram Login Widget payload and verifies its HMAC with the bot token. */
 export async function POST(req: Request) {
@@ -18,5 +18,17 @@ export async function POST(req: Request) {
     name: [data.first_name, data.last_name].filter(Boolean).join(" ") || null,
     image: data.photo_url ?? null,
   });
+  return NextResponse.json({ ok: true });
+}
+
+/**
+ * Unlink Telegram. A static route segment beats `[provider]`, so this handler has to exist here
+ * as well — otherwise `DELETE /api/connections/telegram` falls through to a file that only
+ * exports POST and the client gets a 405.
+ */
+export async function DELETE() {
+  const pid = await requireProfile();
+  if (pid instanceof NextResponse) return pid;
+  await removeConnection(pid, "telegram");
   return NextResponse.json({ ok: true });
 }

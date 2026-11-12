@@ -184,15 +184,15 @@ function WalletRow({ w }: { w: { id: string; address: string; label: string; pro
   const fam = walletFamily(w);
   return (
     <div>
-      <div className="group flex items-center gap-3 px-3 py-2">
+      <div className="group flex flex-wrap items-center gap-2 px-3 py-2 sm:flex-nowrap sm:gap-3">
         <button onClick={() => evm && setOpen((o) => !o)} className={cn("rounded p-0.5 text-faint", evm ? "hover:text-ink" : "opacity-30")} aria-label="Show balances">
           <ChevronDown className={cn("h-4 w-4 transition-transform", !open && "-rotate-90")} />
         </button>
         <ProviderPicker compact value={w.provider} onChange={async (v) => { await api(`/api/wallets/${w.id}`, { method: "PATCH", body: { provider: v } }); qc.invalidateQueries({ queryKey: keys.wallets }); }} />
-        <div className="w-[150px] shrink-0">
+        <div className="w-[110px] shrink-0 sm:w-[150px]">
           <InlineText value={w.label} placeholder="Add label" onSave={async (v) => { await api(`/api/wallets/${w.id}`, { method: "PATCH", body: { label: v } }); qc.invalidateQueries({ queryKey: keys.wallets }); }} />
         </div>
-        <span className="num min-w-0 flex-1 truncate text-[12.5px] text-ink-2">{w.address}</span>
+        <span className="num order-last w-full min-w-0 truncate text-[11.5px] text-ink-2 sm:order-none sm:w-auto sm:flex-1 sm:text-[12.5px]">{w.address}</span>
         {w.isDefault && <span className="hidden shrink-0 items-center sm:inline-flex gap-1 rounded-full bg-accent/10 px-1.5 py-0.5 text-[10.5px] font-medium text-accent"><Star className="h-2.5 w-2.5 fill-current" />Default</span>}
         {held.length > 0 ? <span className="hidden md:inline-flex"><ChainStack chains={held} size={16} max={5} /></span> : !evm && fam && <span className="hidden md:inline-flex"><ChainLogo chain={FAMILY_CHAIN[fam]} size={16} /></span>}
         <div className="hidden items-center gap-1 sm:flex">{used.slice(0, 3).map((p) => <Link key={p.id} href={`/projects/${p.id}`} title={p.name}><ProjectMark p={p} size={18} /></Link>)}{used.length > 3 && <span className="text-[11.5px] text-faint">+{used.length - 3}</span>}</div>
@@ -208,7 +208,7 @@ function WalletRow({ w }: { w: { id: string; address: string; label: string; pro
         </button>
         {(fam === "canton" || fam === "near") && <a href={fam === "canton" ? `https://ccscan.xyz/party/${encodeURIComponent(w.address)}` : `https://nearblocks.io/address/${w.address}`} target="_blank" rel="noreferrer" className="rounded p-1 text-faint hover:text-ink" aria-label="Open in explorer"><ExternalLink className="h-3.5 w-3.5" /></a>}
         {evm && <a href={`https://debank.com/profile/${w.address}`} target="_blank" rel="noreferrer" className="rounded p-1 text-faint hover:text-ink" aria-label="Open in DeBank"><ExternalLink className="h-3.5 w-3.5" /></a>}
-        <button onClick={async () => { if (!confirm("Unlink this wallet?")) return; await api(`/api/wallets/${w.id}`, { method: "DELETE" }); qc.invalidateQueries({ queryKey: keys.wallets }); }} className="rounded p-1 text-faint opacity-0 hover:text-neg group-hover:opacity-100" aria-label="Unlink"><Trash2 className="h-3.5 w-3.5" /></button>
+        <button onClick={async () => { if (!confirm("Unlink this wallet?")) return; await api(`/api/wallets/${w.id}`, { method: "DELETE" }); qc.invalidateQueries({ queryKey: keys.wallets }); }} className="rounded p-1 text-muted hover:text-neg sm:text-faint sm:opacity-0 sm:group-hover:opacity-100" aria-label="Unlink this wallet" title="Unlink"><Trash2 className="h-3.5 w-3.5" /></button>
       </div>
       {open && evm && <div className="border-t border-line bg-bg/50 px-3 py-3"><Balances address={w.address as `0x${string}`} /></div>}
     </div>

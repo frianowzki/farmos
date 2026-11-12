@@ -28,6 +28,9 @@ export const WALLET_BRANDS = [
   { id: "mynearwallet", name: "MyNearWallet" },
   { id: "sender", name: "Sender" },
   { id: "intear", name: "Intear" },
+  { id: "monero", name: "Monero GUI" },
+  { id: "cakewallet", name: "Cake Wallet" },
+  { id: "trezor", name: "Trezor" },
 ] as const;
 export type WalletBrandId = (typeof WALLET_BRANDS)[number]["id"];
 

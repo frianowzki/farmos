@@ -264,10 +264,10 @@ export function InlineText({ value, onSave, placeholder = "Empty", className, in
 }
 
 /** Dialog built on PanelUI's Dialog (base-ui): focus trap, Escape, outside press, bottom sheet on phones. */
-export function Dialog({ open, onClose, title, children, width = 520, bare }: { open: boolean; onClose: () => void; title?: ReactNode; children: ReactNode; width?: number; bare?: boolean }) {
+export function Dialog({ open, onClose, title, children, width = 520, bare, className }: { open: boolean; onClose: () => void; title?: ReactNode; children: ReactNode; width?: number; bare?: boolean; className?: string }) {
   return (
     <PanelDialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <PanelDialog.Content variant="plain" size={width > 560 ? "lg" : "md"} showClose={Boolean(title)} style={{ maxWidth: width }} className="border-line bg-panel">
+      <PanelDialog.Content variant="plain" size={width > 560 ? "lg" : "md"} showClose={Boolean(title)} style={{ maxWidth: width }} className={cn("border-line bg-panel", className)}>
         {title && <PanelDialog.Header title={title} />}
         {bare ? children : <PanelDialog.Body>{children}</PanelDialog.Body>}
       </PanelDialog.Content>

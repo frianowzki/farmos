@@ -246,7 +246,7 @@ function Composer({
           options={[{ id: "", label: "No project", media: <span className="h-4 w-4 shrink-0 rounded-[4px] border border-dashed border-line" /> }, ...projects.map((p) => ({ id: p.id, label: p.name, media: <ProjectMark p={p} size={16} className="rounded-[4px]" /> }))]}
           align="end"
           width={240}
-          className="hidden max-w-[170px] shrink-0 sm:inline-flex [&>button]:h-7 [&>button]:rounded-full [&>button]:text-[12px]"
+          className="inline-flex max-w-[110px] shrink-0 sm:max-w-[170px] [&>button]:h-7 [&>button]:rounded-full [&>button]:text-[12px]"
         />
         {busy ? (
           <button type="button" onClick={onStop} aria-label="Stop" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-ink text-bg transition-transform active:scale-95"><Square className="h-3 w-3 fill-current" /></button>

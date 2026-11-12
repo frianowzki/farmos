@@ -8,7 +8,7 @@ export type CategoryId = (typeof CATEGORIES)[number]["id"];
 
 export const STATUSES = [
   { id: "research", label: "Research", tone: "gray" },
-  { id: "active", label: "Active", tone: "blue" },
+  { id: "active", label: "Active", tone: "green" },
   { id: "waiting", label: "Waiting", tone: "amber" },
   { id: "claimable", label: "Claimable", tone: "blue" },
   { id: "done", label: "Done", tone: "stone" },

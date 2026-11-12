@@ -158,6 +158,45 @@ function AiSection() {
   return <AiForm data={data} />;
 }
 
+function ModelPicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const q = useQuery<{ models: { id: string }[]; current: string | null; error?: string }>({
+    queryKey: ["ai-models"],
+    queryFn: () => api("/api/settings/ai/models"),
+    staleTime: 5 * 60_000,
+  });
+  const [manual, setManual] = useState(false);
+  const list = q.data?.models ?? [];
+
+  // A free-text field stays available: private gateways sometimes hide /models behind auth, and
+  // then the picker would have nothing to offer.
+  if (manual || (q.isFetched && list.length === 0)) {
+    return (
+      <div className="space-y-1.5">
+        <Input value={value} onChange={(e) => onChange(e.target.value)} placeholder="deepseek-chat" className="num" />
+        <div className="flex items-center gap-2 text-[11.5px] text-faint">
+          <span>{q.data?.error ? q.data.error : "No models returned by this endpoint."}</span>
+          {list.length > 0 && <button type="button" onClick={() => setManual(false)} className="underline decoration-faint underline-offset-2 hover:text-ink">Use list</button>}
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className="space-y-1.5">
+      <NativeSelect
+        value={value}
+        onChange={onChange}
+        options={list.length ? list.map((m) => ({ id: m.id, label: m.id })) : [{ id: value, label: q.isLoading ? "Loading models…" : value || "No model selected" }]}
+        className="w-full"
+      />
+      <div className="flex items-center gap-2 text-[11.5px] text-faint">
+        <span>{list.length} model{list.length === 1 ? "" : "s"} on this endpoint</span>
+        <button type="button" onClick={() => q.refetch()} className="underline decoration-faint underline-offset-2 hover:text-ink">Refresh</button>
+        <button type="button" onClick={() => setManual(true)} className="underline decoration-faint underline-offset-2 hover:text-ink">Enter manually</button>
+      </div>
+    </div>
+  );
+}
+
 function AiForm({ data }: { data: AiPublic }) {
   const qc = useQueryClient();
   const [baseUrl, setBaseUrl] = useState(data.baseUrl);
@@ -190,7 +229,9 @@ function AiForm({ data }: { data: AiPublic }) {
     >
       <div className="max-w-xl space-y-3">
         <Field label="Base URL"><Input value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder="https://api.deepseek.com/v1" className="num" /></Field>
-        <Field label="Model"><Input value={model} onChange={(e) => setModel(e.target.value)} placeholder="deepseek-chat" className="num" /></Field>
+        <Field label="Model">
+          <ModelPicker value={model} onChange={setModel} />
+        </Field>
         <Checkbox
           checked={tools}
           onCheckedChange={setTools}

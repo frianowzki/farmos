@@ -374,7 +374,7 @@ function Palette({ open, onClose }: { open: boolean; onClose: () => void }) {
   const itemCls = "flex h-9 cursor-pointer items-center gap-2.5 rounded-md px-2.5 text-[13.5px] text-ink-2 data-[selected=true]:bg-hover data-[selected=true]:text-ink";
   const group = "[&_[cmdk-group-heading]]:px-2.5 [&_[cmdk-group-heading]]:pb-1 [&_[cmdk-group-heading]]:pt-2.5 [&_[cmdk-group-heading]]:text-[11.5px] [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-faint";
   return (
-    <Dialog open={open} onClose={onClose} width={600} bare>
+    <Dialog open={open} onClose={onClose} width={600} bare className="anchor-top">
       <Command label="Command palette">
         <div className="flex items-center gap-2 border-b border-line px-4">
           <Search className="h-4 w-4 text-muted" />

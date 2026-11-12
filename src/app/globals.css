@@ -357,3 +357,16 @@ html.dark[data-accent] {
 }
 @keyframes frio-shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
 @media (prefers-reduced-motion: reduce) { .shimmer-text { animation: none; color: var(--muted); } }
+
+/* Command palette: anchor to the top on phones so the search field is never clipped.
+   The dialog viewport is a grid with items-end on small screens (bottom-sheet style), which
+   pushed the tall palette down and cut off its input; the popup carries data-anchor="top"
+   to opt out of that. */
+@media (max-width: 639px) {
+  [data-slot="dialog-content"][data-anchor="top"] {
+    align-self: start !important;
+    margin-top: 0.5rem !important;
+    margin-bottom: auto !important;
+    max-height: calc(100dvh - 1rem);
+  }
+}

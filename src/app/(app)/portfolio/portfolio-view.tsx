@@ -1,6 +1,7 @@
 "use client";
 import { ProjectMark } from "@/components/project-mark";
 import { NftHoldingsCard, WalletBalancesCard } from "@/components/wallet-forms";
+import { DonutChart } from "@/components/donut-chart";
 import { useQueryClient } from "@tanstack/react-query";
 import { Download, FileSpreadsheet, Printer, RefreshCw } from "lucide-react";
 import Link from "next/link";
@@ -24,6 +25,7 @@ export function PortfolioView() {
   const { data, isLoading } = useProjects();
   const qc = useQueryClient();
   const [busy, setBusy] = useState(false);
+  const [chart, setChart] = useState<"bar" | "pie">("bar");
   const projects = useMemo(() => data?.projects ?? [], [data]);
   const positions = useMemo(() => data?.positions ?? [], [data]);
   const rows = useMemo(() => projects.map((p) => ({ p, r: pnlFor(p, positions) })).filter((x) => x.r.invested > 0 || x.r.realized !== 0), [projects, positions]);
@@ -84,7 +86,10 @@ export function PortfolioView() {
               </div>
             </div>
             <div className="rounded-xl border border-line bg-panel p-4">
-              <SectionTitle>Capital at work</SectionTitle>
+              <SectionTitle right={<div className="flex gap-0.5 rounded-md bg-hover p-0.5"><button onClick={() => setChart("bar")} className={cn("rounded px-2 py-1 text-[11.5px]", chart === "bar" ? "bg-panel text-ink shadow-sm" : "text-muted hover:text-ink")}>Bars</button><button onClick={() => setChart("pie")} className={cn("rounded px-2 py-1 text-[11.5px]", chart === "pie" ? "bg-panel text-ink shadow-sm" : "text-muted hover:text-ink")}>Pie</button></div>}>Capital at work</SectionTitle>
+              {chart === "pie" ? (
+                <DonutChart slices={byCat.map((c) => ({ id: c.id, label: c.label, value: c.invested }))} unit={(n) => usd(n, { compact: true })} emptyLabel="Nothing invested yet" />
+              ) : (
               <div className="space-y-3">
                 {byCat.map((c) => (
                   <div key={c.id} className="grid grid-cols-[72px_1fr_96px] items-center gap-3 text-[13px]">
@@ -96,6 +101,7 @@ export function PortfolioView() {
                   </div>
                 ))}
               </div>
+              )}
             </div>
           </div>
 

@@ -176,7 +176,8 @@ export function AddTask({ projectId, compact, autoFocus }: { projectId?: string 
       </div>
       {(title || !compact) && (
         <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-line pt-2">
-          <NativeSelect value={cadence} onChange={setCadence} options={CADENCES} className="w-[140px]" />
+          <div className="flex min-w-0 items-center gap-2">
+            <NativeSelect value={cadence} onChange={setCadence} options={CADENCES} className="w-[110px] shrink-0 sm:w-[140px]" />
           {cadence === "custom" && (
             <label className="flex items-center gap-1.5 text-[12.5px] text-muted">
               every <Input type="number" min={1} max={365} value={interval} onChange={(e) => setIntervalDays(Number(e.target.value) || 1)} className="w-16" /> days
@@ -191,6 +192,7 @@ export function AddTask({ projectId, compact, autoFocus }: { projectId?: string 
               ))}
             </div>
           )}
+          </div>
           {!projectId && (
             <NativeSelect value={proj} onChange={setProj} options={[{ id: "", label: "No project", media: <span className="h-4 w-4 shrink-0 rounded-[4px] border border-dashed border-line" /> }, ...(data?.projects ?? []).filter((p) => p.status !== "done" && p.status !== "dropped").map((p) => ({ id: p.id, label: p.name, media: <ProjectMark p={p} size={16} className="rounded-[4px]" /> }))]} className="w-[200px]" width={240} />
           )}

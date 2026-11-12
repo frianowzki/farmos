@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { bad, readJson, requireProfile } from "@/lib/server/guard";
-import { saveConnection } from "@/lib/server/connections";
+import { removeConnection, saveConnection } from "@/lib/server/connections";
 
 /** Link a Farcaster profile by username from the public Farcaster (Warpcast) API. Display only, not a verified login. */
 export async function POST(req: Request) {
@@ -23,5 +23,13 @@ export async function POST(req: Request) {
     image: user.pfp?.url ?? null,
     profile: { fid: user.fid, followers: user.followerCount ?? null, following: user.followingCount ?? null, bio: user.profile?.bio?.text ?? null, verified: false },
   });
+  return NextResponse.json({ ok: true });
+}
+
+/** Unlink Farcaster. Static segment shadows `[provider]`, so DELETE must live here too. */
+export async function DELETE() {
+  const pid = await requireProfile();
+  if (pid instanceof NextResponse) return pid;
+  await removeConnection(pid, "farcaster");
   return NextResponse.json({ ok: true });
 }

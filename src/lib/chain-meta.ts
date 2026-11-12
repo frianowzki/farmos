@@ -15,6 +15,8 @@ export const CHAINS: ChainMeta[] = [
   { key: "elysium", name: "Elysium", aliases: ["elysium l2", "kinetiq elysium"], evm: true },
   { key: "arc", name: "Arc", aliases: ["arc network", "circle arc", "arc mainnet"], evm: true },
   { key: "solana", name: "Solana", aliases: ["sol"], evm: false },
+  { key: "xrp", name: "XRP Ledger", aliases: ["xrp", "ripple", "xrpl", "xrp ledger"], evm: false },
+  { key: "polkadot", name: "Polkadot", aliases: ["dot", "polkadot relay chain"], evm: false },
   { key: "zcash", name: "Zcash", aliases: ["zec"], evm: false },
   { key: "monero", name: "Monero", aliases: ["xmr"], evm: false },
   { key: "aptos", name: "Aptos", aliases: ["apt"], evm: false },

@@ -113,8 +113,8 @@ export function WalletBalancesCard() {
       <SectionTitle
         right={
           <div className="flex items-center gap-1">
-            {linked.length > 0 && <Button size="sm" variant="ghost" onClick={refresh} disabled={refreshing || isLoading}><RefreshCw className={cn("h-3.5 w-3.5", refreshing && "animate-spin")} /> Refresh</Button>}
-            <Button size="sm" variant={adding ? "subtle" : "ghost"} onClick={() => setAdding((a) => !a)}><Plus className="h-3.5 w-3.5" /> Add wallet</Button>
+            {linked.length > 0 && <Button size="sm" variant="ghost" onClick={refresh} disabled={refreshing || isLoading} aria-label="Refresh balances" title="Refresh balances"><RefreshCw className={cn("h-3.5 w-3.5", refreshing && "animate-spin")} /></Button>}
+            <Button size="sm" variant={adding ? "subtle" : "ghost"} onClick={() => setAdding((a) => !a)} aria-label="Add wallet" title="Add wallet"><Plus className="h-3.5 w-3.5" /></Button>
           </div>
         }
       >

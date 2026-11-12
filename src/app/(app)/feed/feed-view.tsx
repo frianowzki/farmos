@@ -463,7 +463,7 @@ function NewsWire() {
   const [view, setView] = useState<"all" | "unread" | "saved">("all");
   const [search, setSearch] = useState("");
   const [brief, setBrief] = useState(false);
-  const [limit, setLimit] = useState(30);
+  const [limit, setLimit] = useState(60);
   const [busy, setBusy] = useState(false);
   const [read, markRead, unmarkRead, markMany] = useReadSet();
   const { saved, toggle } = useSaved();
@@ -543,7 +543,7 @@ function NewsWire() {
           ))}
         </ul>
       )}
-      {list.length > limit && <div className="mt-3 flex justify-center"><Button size="sm" variant="ghost" onClick={() => setLimit((l) => l + 30)}>Show more ({list.length - limit})</Button></div>}
+      {list.length > limit && <div className="mt-3 flex justify-center"><Button size="sm" variant="ghost" onClick={() => setLimit((l) => l + 60)}>Show more ({list.length - limit})</Button></div>}
       {q.data.failed.length > 0 && <p className="mt-3 text-center text-[11.5px] text-faint">Didn&apos;t answer this round: {q.data.failed.join(", ")}</p>}
     </MaybePull>
   );

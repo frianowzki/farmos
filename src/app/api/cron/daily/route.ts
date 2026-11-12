@@ -1,4 +1,7 @@
 import { NextResponse } from "next/server";
+import { and, eq } from "drizzle-orm";
+import { db, schema } from "@/db";
+import { deleteEvent } from "@/lib/server/google";
 import { timingSafeEqual } from "@/lib/session";
 import { snapshotToBlob } from "@/lib/server/backup";
 import { sendDigest } from "@/lib/server/telegram";
@@ -46,6 +49,26 @@ async function runFor(pid: (typeof PROFILE_IDS)[number]) {
     out.prices = await checkWatchlist(pid);
   } catch (e) {
     out.prices = { ok: false, error: (e as Error).message.slice(0, 160) };
+  }
+  try {
+    // Google never expires an all-day event, so dead deadlines have to be swept out here or the
+    // calendar fills up with dates that already passed.
+    const today = new Date().toISOString().slice(0, 10);
+    const links = await db().select().from(schema.calendarLinks).where(eq(schema.calendarLinks.profileId, pid));
+    let removed = 0;
+    for (const l of links) {
+      if (l.day >= today) continue;
+      try {
+        await deleteEvent(pid, l.eventId);
+      } catch {
+        // Already gone in Google is fine — the link row still goes.
+      }
+      await db().delete(schema.calendarLinks).where(and(eq(schema.calendarLinks.profileId, pid), eq(schema.calendarLinks.eventId, l.eventId)));
+      removed++;
+    }
+    out.calendar = { ok: true, removed, checked: links.length };
+  } catch (e) {
+    out.calendar = { ok: false, error: (e as Error).message.slice(0, 160) };
   }
   try {
     out.digest = await sendDigest(pid);

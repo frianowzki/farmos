@@ -342,10 +342,22 @@ export function PullToRefresh({
     const root = rootRef.current;
     if (!root) return;
 
+    /**
+     * The pull gesture must only ever engage at the very top of the page. `root.scrollTop` is
+     * useless here because this section is usually not the scroll container — the page scrolls on
+     * <body>, so root.scrollTop stays 0 forever and the gesture armed itself mid-page, whose
+     * preventDefault() then blocked scrolling back up. Ask whichever element actually scrolls.
+     */
+    const scrollTop = () => {
+      const own = root.scrollHeight > root.clientHeight + 1 ? root.scrollTop : 0;
+      const page = window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0;
+      return Math.max(own, page);
+    };
+
     const onTouchStart = (event: TouchEvent) => {
       if (
         event.touches.length !== 1 ||
-        root.scrollTop > 0 ||
+        scrollTop() > 0 ||
         disabledRef.current ||
         refreshingRef.current
       ) {
@@ -369,7 +381,9 @@ export function PullToRefresh({
       const deltaX = touch.clientX - gesture.startX;
       const deltaY = touch.clientY - gesture.startY;
 
-      if (root.scrollTop > 0 || deltaY < 0) {
+      // Scrolling up, or the page moved away from the top, cancels the pull immediately so the
+      // browser keeps native scroll behaviour.
+      if (scrollTop() > 0 || deltaY < 0) {
         gestureRef.current = { ...EMPTY_GESTURE };
         return;
       }
@@ -408,7 +422,8 @@ export function PullToRefresh({
     if (
       event.pointerType === "touch" ||
       event.button !== 0 ||
-      event.currentTarget.scrollTop > 0 ||
+      (window.scrollY || document.documentElement.scrollTop || 0) > 0 ||
+      (event.currentTarget.scrollHeight > event.currentTarget.clientHeight + 1 && event.currentTarget.scrollTop > 0) ||
       disabled ||
       isRefreshing
     ) {

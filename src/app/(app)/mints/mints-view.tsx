@@ -163,14 +163,17 @@ function DropRow({ d, w, onOpen }: { d: DropRich; w?: MintWatch; onOpen: () => v
         </div>
         <div className="flex shrink-0 flex-col items-end gap-1.5 text-[12.5px]">
           {d.is_minting ? <Marker tone="green" live>Minting</Marker> : stage ? <Countdown to={stage.start_time} compact /> : <span className="text-faint">TBA</span>}
-          <div className="hidden items-center gap-2 sm:flex">
+          <div className="flex items-center gap-2">
             {v && (publicOnly(autoOf(w)) ? <Marker tone="gray">Public only</Marker> : <Marker tone={VERDICT[v].tone}>{VERDICT[v].label}</Marker>)}
             {manual && <Pill tone="gray">{manual}</Pill>}
           </div>
         </div>
       </button>
-      {links.length > 0 && (
+      {(
         <div className="absolute bottom-3 right-4 hidden items-center gap-1 group-hover:flex">
+          <a href={`https://opensea.io/collection/${d.collection_slug}`} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className="rounded p-1 text-faint hover:bg-panel hover:text-ink" aria-label="Open on OpenSea" title="Open on OpenSea">
+            <svg viewBox="0 0 90 90" className="h-3.5 w-3.5" fill="currentColor" aria-hidden><path d="M45 0C20.15 0 0 20.15 0 45s20.15 45 45 45 45-20.15 45-45S69.85 0 45 0ZM22.2 46.5l.13-.2 11.86-18.55c.17-.27.58-.2.65.11 1.98 8.7.36 14.8-3.4 19.4-1.02 1.25-2.3 2.36-3.77 3.24-.26.15-.6-.03-.65-.33-.42-2.55-.36-5.2.53-7.65l-.35-.02Zm49.4 5.85c-2.5 1.72-6.5 2.6-9.9 2.6-6.6 0-11.7-3.9-13.5-9.4-.4-1.3-.6-2.7-.6-4.1 0-1 .1-1.9.35-2.8.15-.5-.2-.95-.7-.9-2.2.25-4.1 1.4-5.4 3.2-.75 1.05-1.2 2.3-1.35 3.65-.05.5-.55.85-1.05.75-1.9-.4-3.6-1.15-4.85-2.1-.35-.25-.4-.7-.15-1.05 3.05-4.35 7.55-7.2 13-7.2 4.05 0 7.55 1.95 9.65 5.15 1.35 2.05 1.85 4.55 1.6 6.95-.05.5.35.9.85.9 2.65 0 5.1-.9 6.95-2.4.35-.3.85-.1.9.35.25 1.7-.4 3.5-1.75 4.4Z"/></svg>
+          </a>
           {links.map((k) => <a key={k} href={d.links[k]!} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className="rounded p-1 text-faint hover:bg-panel hover:text-ink" aria-label={k}><LinkIcon field={k} className="h-3.5 w-3.5" /></a>)}
         </div>
       )}

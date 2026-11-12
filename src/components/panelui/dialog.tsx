@@ -314,6 +314,7 @@ function DialogContent({
         <Primitive.Popup
           data-slot="dialog-content"
           data-variant={variant}
+          data-anchor={className?.includes("anchor-top") ? "top" : undefined}
           className={slots.shell({ className: [slots.popup(), className] })}
           {...props}
         >
