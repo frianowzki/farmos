@@ -258,6 +258,65 @@ function Composer({
   );
 }
 
+/**
+ * Model switcher in the desk header. Reads the models the configured endpoint actually serves so the
+ * user can hop between them without leaving the chat; falls back to a plain label when the endpoint
+ * does not expose /models.
+ */
+function ModelChip() {
+  const qc = useQueryClient();
+  const ai = useAiConfig();
+  const models = useQuery<{ models: { id: string }[]; current: string | null; error?: string }>({
+    queryKey: ["ai-models"],
+    queryFn: () => api("/api/settings/ai/models"),
+    staleTime: 10 * 60_000,
+  });
+  const [saving, setSaving] = useState(false);
+  const list = models.data?.models ?? [];
+  const current = ai.data?.model ?? "";
+
+  if (!ai.data?.configured) return null;
+
+  const pick = async (id: string) => {
+    if (!id || id === current) return;
+    setSaving(true);
+    try {
+      await api("/api/settings/ai", { method: "PUT", body: { model: id } });
+      // The chat transport reads the model server-side on every request, so invalidating the config
+      // is enough — no reload needed.
+      await qc.invalidateQueries({ queryKey: keys.ai });
+      await qc.invalidateQueries({ queryKey: ["ai-models"] });
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
+    setSaving(false);
+  };
+
+  if (list.length === 0) {
+    return <span className="hidden max-w-[110px] shrink-0 truncate rounded-full border border-line px-2 py-0.5 text-[11.5px] text-muted sm:inline-block" title={current}>{shortModel(current)}</span>;
+  }
+
+  return (
+    <NativeSelect
+      variant="ghost"
+      ariaLabel="Model"
+      value={current}
+      onChange={pick}
+      options={list.map((m) => ({ id: m.id, label: shortModel(m.id) }))}
+      align="start"
+      width={260}
+      className={cn("inline-flex max-w-[118px] shrink-0 sm:max-w-[190px] [&>button]:h-7 [&>button]:rounded-full [&>button]:text-[11.5px]", saving && "opacity-60")}
+    />
+  );
+}
+
+/** Endpoints namespace models like `vendor/model-name`; the vendor part is noise in a tight header. */
+function shortModel(id: string) {
+  if (!id) return "No model";
+  const tail = id.split("/").pop() ?? id;
+  return tail.length > 26 ? `${tail.slice(0, 24)}…` : tail;
+}
+
 function DeskAvatar({ pulse }: { pulse?: boolean }) {
   return (
     <span className="relative flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-accent text-accent-ink">
@@ -329,6 +388,7 @@ function Chat({ id, initialMessages, initialMode, initialProject, initialQuery, 
   return (
     <>
       <div className="flex h-12 items-center gap-2 px-3 sm:px-5">
+        <ModelChip />
         <div className="min-w-0 flex-1 truncate text-[13.5px] font-medium text-ink-2">{empty ? "" : title}</div>
         {projectName && <Pill tone="stone"><ProjectMark p={pd!.projects.find((p) => p.id === projectId)!} size={14} /> {projectName}</Pill>}
         <Button size="sm" variant="ghost" onClick={onNew}><Plus className="h-3.5 w-3.5" /> New chat</Button>
@@ -395,9 +455,9 @@ function Chat({ id, initialMessages, initialMode, initialProject, initialQuery, 
             <div className="mx-auto w-full max-w-[760px] space-y-7 px-4 pb-10 pt-4 sm:px-6">
               {messages.map((msg, i) => <Message key={msg.id} msg={msg} streaming={status === "streaming" && i === messages.length - 1} />)}
               {status === "submitted" && (
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2.5">
                   <DeskAvatar pulse />
-                  <span className="shimmer-text text-[13.5px] text-muted">Thinking…</span>
+                  <span className="shimmer-text text-[13px] text-muted">Thinking…</span>
                 </div>
               )}
               {error && <div className="rounded-xl border border-line bg-panel p-3 text-[13px] text-neg">{error.message}</div>}
@@ -455,12 +515,15 @@ function Message({ msg, streaming }: { msg: UIMessage; streaming?: boolean }) {
       <div className="min-w-0 flex-1 space-y-2 pt-0.5">
         {msg.parts.map((part, i) => {
           if (part.type === "text") return <div key={i} className="md"><ReactMarkdown remarkPlugins={[remarkGfm]} components={{ a: (p) => <a {...p} target="_blank" rel="noreferrer noopener" /> }}>{part.text}</ReactMarkdown></div>;
-          if (part.type === "reasoning") return part.text ? <details key={i} className="text-[12.5px] text-muted"><summary className="cursor-pointer select-none">Reasoning</summary><div className="mt-1 whitespace-pre-wrap border-l border-line pl-3">{part.text}</div></details> : null;
+          // Reasoning streams are dropped on purpose: the desk shows only the finished answer.
+          if (part.type === "reasoning") return null;
           if (part.type.startsWith("tool-") || part.type === "dynamic-tool") {
             const tp = part as unknown as ToolPart;
             const name = tp.toolName ?? part.type.replace(/^tool-/, "");
+            // Only proposals surface in the transcript. Intermediate tool runs are noise for the
+            // reader, who asked to see the finished answer rather than the machinery.
             if (name === "proposeProject" && tp.state === "output-available") return <Proposal key={i} output={tp.output as { proposal: ProposalT }} />;
-            return <ToolChip key={i} name={name} part={tp} />;
+            return null;
           }
           return null;
         })}
@@ -475,23 +538,6 @@ function Message({ msg, streaming }: { msg: UIMessage; streaming?: boolean }) {
           </div>
         )}
       </div>
-    </div>
-  );
-}
-
-function ToolChip({ name, part }: { name: string; part: ToolPart }) {
-  const [open, setOpen] = useState(false);
-  const running = part.state === "input-streaming" || part.state === "input-available";
-  const failed = part.state === "output-error" || (part.output && typeof part.output === "object" && "error" in (part.output as object));
-  const arg = part.input ? String(part.input.query ?? part.input.url ?? part.input.address ?? part.input.name ?? part.input.kind ?? "") : "";
-  return (
-    <div className="text-[12.5px]">
-      <button onClick={() => setOpen((o) => !o)} className="inline-flex max-w-full items-center gap-1.5 rounded-md border border-line bg-panel px-2 py-1 text-muted hover:text-ink">
-        {running ? <Loader2 className="h-3 w-3 animate-spin" /> : failed ? <Wrench className="h-3 w-3 text-neg" /> : <Check className="h-3 w-3 text-pos" />}
-        <span className="font-medium text-ink-2">{TOOL_LABEL[name] ?? name}</span>
-        {arg && <span className="num truncate text-faint">{arg.slice(0, 70)}</span>}
-      </button>
-      {open && <pre className="num mt-1 max-h-[260px] overflow-auto rounded-md border border-line bg-sidebar p-2 text-[11px] text-ink-2">{JSON.stringify(part.output ?? part.input ?? part.errorText, null, 2)?.slice(0, 8000)}</pre>}
     </div>
   );
 }

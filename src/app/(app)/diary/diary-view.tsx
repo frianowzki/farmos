@@ -10,6 +10,7 @@ import { Button, Empty, Pill, Skeleton, TagInput } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import { today as todayFn } from "@/lib/dates";
 import { api, keys, useDiary, useProjects, type DiaryEntry } from "@/lib/client/api";
+import { ProjectMark } from "@/components/project-mark";
 
 export function DiaryView() {
   const sp = useSearchParams();
@@ -91,7 +92,21 @@ export function DiaryView() {
                       <div className="min-w-0 flex-1">
                         <div className="truncate text-[14px] font-medium">{e.title || <span className="text-muted">Untitled</span>}</div>
                         <div className="line-clamp-2 text-[13px] text-muted">{text || "Empty entry"}</div>
-                        {e.projectIds.length > 0 && <div className="mt-1.5 flex flex-wrap gap-1">{e.projectIds.map((id) => <Pill key={id} tone="stone">{pname(id)}</Pill>)}</div>}
+                        {e.projectIds.length > 0 && (
+                          <div className="mt-1.5 flex flex-wrap gap-1">
+                            {e.projectIds.map((id) => {
+                              const proj = pd?.projects.find((p) => p.id === id);
+                              return (
+                                <Pill key={id} tone="stone">
+                                  <span className="flex items-center gap-1.5">
+                                    {proj ? <ProjectMark p={proj} size={13} className="rounded-[3px]" /> : <span className="h-3 w-3 shrink-0 rounded-[3px] border border-dashed border-line" />}
+                                    {pname(id)}
+                                  </span>
+                                </Pill>
+                              );
+                            })}
+                          </div>
+                        )}
                       </div>
                     </button>
                   );

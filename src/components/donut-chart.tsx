@@ -1,9 +1,9 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { pie, arc as d3arc } from "d3-shape";
 import { cn } from "@/lib/cn";
 
-export type Slice = { id: string; label: string; value: number };
+export type Slice = { id: string; label: string; value: number; color?: string; icon?: ReactNode };
 
 const PALETTE = ["var(--pos)", "var(--accent)", "var(--warn)", "var(--neg)", "var(--ink-2)", "var(--faint)"];
 
@@ -11,7 +11,7 @@ const PALETTE = ["var(--pos)", "var(--accent)", "var(--warn)", "var(--neg)", "va
  * Donut breakdown of a portfolio dimension. SVG + d3-shape only — the app already ships d3-shape for
  * the PnL bars, so a chart library would be dead weight for one visualisation.
  */
-export function DonutChart({ slices, unit, emptyLabel = "No data yet" }: { slices: Slice[]; unit?: (n: number) => string; emptyLabel?: string }) {
+export function DonutChart({ slices, unit, emptyLabel = "No data yet", size = 180 }: { slices: Slice[]; unit?: (n: number) => string; emptyLabel?: string; size?: number }) {
   const [hover, setHover] = useState<string | null>(null);
   const total = slices.reduce((s, x) => s + Math.max(0, x.value), 0);
   const live = slices.filter((s) => s.value > 0);
@@ -24,8 +24,9 @@ export function DonutChart({ slices, unit, emptyLabel = "No data yet" }: { slice
       id: a.data.id,
       label: a.data.label,
       value: a.data.value,
+      icon: a.data.icon,
       d: shape(a as unknown as { startAngle: number; endAngle: number }) ?? "",
-      color: PALETTE[i % PALETTE.length],
+      color: a.data.color ?? PALETTE[i % PALETTE.length],
       pct: a.data.value / total,
     }));
   }, [live, total]);
@@ -37,7 +38,7 @@ export function DonutChart({ slices, unit, emptyLabel = "No data yet" }: { slice
   const active = arcs.find((a) => a.id === hover) ?? null;
   return (
     <div className="flex flex-col items-center gap-3 sm:flex-row sm:items-center sm:gap-5">
-      <svg viewBox="-100 -100 200 200" className="h-[180px] w-[180px] shrink-0" role="img" aria-label="Portfolio breakdown">
+      <svg viewBox="-100 -100 200 200" style={{ width: size, height: size }} className="shrink-0" role="img" aria-label="Breakdown">
         {arcs.map((a) => (
           <path
             key={a.id}
@@ -62,9 +63,9 @@ export function DonutChart({ slices, unit, emptyLabel = "No data yet" }: { slice
             onMouseEnter={() => setHover(a.id)}
             onMouseLeave={() => setHover(null)}
           >
-            <span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ background: a.color }} />
+            {a.icon ?? <span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ background: a.color }} />}
             <span className="min-w-0 flex-1 truncate text-ink-2">{a.label}</span>
-            <span className="num shrink-0 text-faint">{(a.pct * 100).toFixed(1)}%</span>
+            <span className="num shrink-0 text-faint">{unit ? unit(a.value) : `${(a.pct * 100).toFixed(1)}%`}</span>
           </li>
         ))}
       </ul>

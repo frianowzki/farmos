@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useSyncExternalStore } from "react";
 import { ChainLogo, ChainStack } from "@/components/chain-logo";
+import { DonutChart } from "@/components/donut-chart";
 import type { Wallet } from "@wallet-standard/base";
 import { MorphingModal } from "@/components/motion/morphing-modal";
 import { Tabs, TabsList, TabsTrigger } from "@/components/motion/tabs";
@@ -91,6 +92,7 @@ export function WalletBalancesCard() {
   const [modalView, setModalView] = useState<WalletModalView | null>(null);
   const router = useRouter();
   const [refreshing, setRefreshing] = useState(false);
+  const [chart, setChart] = useState<"bar" | "pie">("bar");
   const { data, isLoading, error } = useQuery({ queryKey: ["wallet-track"], queryFn: () => api<Snapshot>("/api/wallets/track"), enabled: linked.length > 0, staleTime: 5 * 60_000 });
   const nfts = useNfts(linked.length > 0);
   const refresh = async () => {
@@ -113,6 +115,12 @@ export function WalletBalancesCard() {
       <SectionTitle
         right={
           <div className="flex items-center gap-1">
+            {chains.length > 0 && (
+              <div className="mr-1 flex gap-0.5 rounded-md bg-hover p-0.5">
+                <button onClick={() => setChart("bar")} className={cn("rounded px-1.5 py-0.5 text-[11px]", chart === "bar" ? "bg-panel text-ink shadow-sm" : "text-muted hover:text-ink")} aria-label="Bar view">Bars</button>
+                <button onClick={() => setChart("pie")} className={cn("rounded px-1.5 py-0.5 text-[11px]", chart === "pie" ? "bg-panel text-ink shadow-sm" : "text-muted hover:text-ink")} aria-label="Pie view">Pie</button>
+              </div>
+            )}
             {linked.length > 0 && <Button size="sm" variant="ghost" onClick={refresh} disabled={refreshing || isLoading} aria-label="Refresh balances" title="Refresh balances"><RefreshCw className={cn("h-3.5 w-3.5", refreshing && "animate-spin")} /></Button>}
             <Button size="sm" variant={adding ? "subtle" : "ghost"} onClick={() => setAdding((a) => !a)} aria-label="Add wallet" title="Add wallet"><Plus className="h-3.5 w-3.5" /></Button>
           </div>
@@ -139,6 +147,16 @@ export function WalletBalancesCard() {
             <div className="num mt-1 text-[30px] font-medium leading-none tracking-[-0.02em]">{usd(total + (nfts.data?.totalUsd ?? 0))}</div>
             {Boolean(nfts.data?.totalUsd) && <div className="mt-1 text-[12px] text-muted">Tokens <span className="num text-ink-2">{usd(total)}</span> · NFTs at floor <span className="num text-ink-2">{usd(nfts.data!.totalUsd!)}</span></div>}
             {chains.length > 0 && (
+              chart === "pie" ? (
+                <div className="mt-4">
+                  <DonutChart
+                    size={150}
+                    slices={chains.map(([c, v], i) => ({ id: c, label: chainMeta(c)?.name ?? c, value: v, color: `var(--chart-${(i % 5) + 1})`, icon: <ChainLogo chain={c} size={14} /> }))}
+                    unit={(n) => usd(n, { compact: true })}
+                    emptyLabel="No balances yet"
+                  />
+                </div>
+              ) : (
               <>
                 <div className="mt-4 flex h-2 overflow-hidden rounded-full bg-hover">
                   {chains.map(([c, v], i) => (
@@ -155,6 +173,7 @@ export function WalletBalancesCard() {
                   ))}
                 </div>
               </>
+              )
             )}
           </div>
           <div className="divide-y divide-line overflow-hidden rounded-xl border border-line bg-panel">

@@ -3,8 +3,9 @@ import { useQuery } from "@tanstack/react-query";
 import { ArrowRightLeft, ArrowUpRight, CalendarDays, Check, Flame, ListChecks, NotebookPen, Plus, Telescope, Wallet } from "lucide-react";
 import Link from "next/link";
 import { LayoutGroup, motion } from "motion/react";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Page, useShell } from "@/components/shell";
+import { DonutChart } from "@/components/donut-chart";
 import { ProjectMark } from "@/components/project-mark";
 import { TodayHeader } from "@/components/today-header";
 import { Heatmap, TaskRow, useTaskModel, weekRate } from "@/components/tasks";
@@ -47,6 +48,7 @@ export function TodayView() {
   const totals = useMemo(() => sumPnl(projects.map((p) => pnlFor(p, data?.positions ?? []))), [projects, data]);
   const claimable = projects.filter((p) => p.status === "claimable");
   const activeCount = projects.filter((p) => p.status !== "done" && p.status !== "dropped").length;
+  const [pipe, setPipe] = useState<"bar" | "pie">("bar");
   const watch = useWatchlist();
   const alertsFired = firedAlerts(watch.data?.items ?? [], watch.data?.prices ?? {}).length;
   const fresh = !isLoading && projects.length === 0 && model.rows.length === 0;
@@ -166,13 +168,27 @@ export function TodayView() {
             </Link>
 
             <div className="rounded-xl border border-line bg-panel p-4">
-              <div className="mb-3 flex items-center justify-between text-[12px] font-medium text-muted">Pipeline <span className="num text-faint">{activeCount} active</span></div>
+              <div className="mb-3 flex items-center justify-between text-[12px] font-medium text-muted">
+                <span>Pipeline <span className="num text-faint">{activeCount} active</span></span>
+                <div className="flex gap-0.5 rounded-md bg-hover p-0.5">
+                  <button onClick={() => setPipe("bar")} className={cn("rounded px-1.5 py-0.5 text-[11px]", pipe === "bar" ? "bg-panel text-ink shadow-sm" : "text-muted hover:text-ink")} aria-label="Bar view">Bars</button>
+                  <button onClick={() => setPipe("pie")} className={cn("rounded px-1.5 py-0.5 text-[11px]", pipe === "pie" ? "bg-panel text-ink shadow-sm" : "text-muted hover:text-ink")} aria-label="Pie view">Pie</button>
+                </div>
+              </div>
+              {pipe === "pie" ? (
+                <DonutChart
+                  size={150}
+                  slices={STATUSES.filter((s) => s.id !== "dropped").map((s) => ({ id: s.id, label: s.label, value: projects.filter((p) => p.status === s.id).length, color: `var(--${s.tone === "amber" ? "warn" : s.tone === "stone" ? "faint" : "ink-2"})` }))}
+                  emptyLabel="No projects yet"
+                />
+              ) : (
               <div className="flex h-2 overflow-hidden rounded-full bg-hover">
                 {STATUSES.filter((s) => s.id !== "dropped").map((s) => {
                   const n = projects.filter((p) => p.status === s.id).length;
                   return n ? <div key={s.id} className={`dot-${s.tone}`} style={{ width: `${(n / Math.max(1, projects.length)) * 100}%` }} title={`${s.label}: ${n}`} /> : null;
                 })}
               </div>
+              )}
               <div className="mt-3 grid grid-cols-2 gap-y-1.5 text-[12.5px]">
                 {STATUSES.map((s) => (
                   <Link key={s.id} href={`/projects?view=board`} className="flex items-center gap-2 text-ink-2 hover:text-ink">

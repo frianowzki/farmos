@@ -187,7 +187,7 @@ export async function scanNfts(pid: string): Promise<NftSnapshot> {
 }
 
 /** Bump when the scan shape changes so a stale cached snapshot is not served after a deploy. */
-const CACHE_VERSION = "v3";
+const CACHE_VERSION = "v4";
 
 export async function getNfts(pid: string, force = false): Promise<NftSnapshot & { cached: boolean }> {
   const cached = await getSetting<NftSnapshot & { key?: string }>(pid, "wallet_nfts");
