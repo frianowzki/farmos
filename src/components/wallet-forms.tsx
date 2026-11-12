@@ -148,13 +148,25 @@ export function WalletBalancesCard() {
             {Boolean(nfts.data?.totalUsd) && <div className="mt-1 text-[12px] text-muted">Tokens <span className="num text-ink-2">{usd(total)}</span> · NFTs at floor <span className="num text-ink-2">{usd(nfts.data!.totalUsd!)}</span></div>}
             {chains.length > 0 && (
               chart === "pie" ? (
-                <div className="mt-4">
+                <div className="mt-4 flex flex-col items-center gap-4">
                   <DonutChart
                     size={150}
-                    slices={chains.map(([c, v], i) => ({ id: c, label: chainMeta(c)?.name ?? c, value: v, color: `var(--chart-${(i % 5) + 1})`, icon: <ChainLogo chain={c} size={14} /> }))}
+                    showLegend={false}
+                    slices={chains.map(([c, v], i) => ({ id: c, label: chainMeta(c)?.name ?? c, value: v, color: `var(--chart-${(i % 5) + 1})` }))}
                     unit={(n) => usd(n, { compact: true })}
                     emptyLabel="No balances yet"
                   />
+                  {/* The chain list gets long once a few networks carry dust, so the pie view lays it
+                      out as a grid instead of one column that runs off the card. */}
+                  <ul className="grid w-full grid-cols-2 gap-x-2.5 gap-y-1.5 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+                    {chains.map(([c, v], i) => (
+                      <li key={c} className="flex min-w-0 items-center gap-1.5 text-[11.5px]">
+                        <ChainLogo chain={c} size={13} />
+                        <span className="min-w-0 flex-1 truncate text-ink-2">{chainMeta(c)?.name ?? c}</span>
+                        <span className="num shrink-0 text-muted">{usd(v, { compact: true })}</span>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
               ) : (
               <>
